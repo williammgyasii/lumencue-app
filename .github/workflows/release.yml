@@ -1,0 +1,57 @@
+name: Release
+
+# Cuts a Velopack release whenever a version tag (e.g. v0.6.7) is pushed.
+# Manual runs are also supported via the "Run workflow" button (provide a version).
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g. 0.6.7)"
+        required: true
+
+# Needed so the built-in token can create the GitHub Release and upload assets.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Restore embedded secrets (appsettings.local.json)
+        shell: pwsh
+        env:
+          APPSETTINGS_LOCAL: ${{ secrets.APPSETTINGS_LOCAL }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:APPSETTINGS_LOCAL)) {
+            throw "APPSETTINGS_LOCAL secret is not set. Add it with: gh secret set APPSETTINGS_LOCAL < src/ChurchProjection.App/appsettings.local.json"
+          }
+          $path = "src/ChurchProjection.App/appsettings.local.json"
+          $env:APPSETTINGS_LOCAL | Out-File -FilePath $path -Encoding utf8 -NoNewline
+          Write-Host "Wrote $path ($($env:APPSETTINGS_LOCAL.Length) chars)."
+
+      - name: Build & publish release
+        shell: pwsh
+        run: |
+          installer/build-release.ps1 -Version "${{ steps.ver.outputs.version }}" -Token "${{ github.token }}"
