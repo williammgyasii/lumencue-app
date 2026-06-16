@@ -148,6 +148,9 @@ public class App : Application
             });
 
             await GateAndStartAsync();
+
+            // Fire-and-forget OTA update check once a window is on screen. No-ops in dev builds.
+            _ = new Updater(config).CheckAndPromptAsync();
         }
 
         base.OnFrameworkInitializationCompleted();

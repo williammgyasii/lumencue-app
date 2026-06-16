@@ -27,6 +27,7 @@
     <PackageReference Include="Serilog" Version="4.3.1" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageReference Include="Velopack" Version="1.2.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -39,5 +40,30 @@
     <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
     <None Update="appsettings.local.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('appsettings.local.json')" />
   </ItemGroup>
+
+  <!--
+    LumenCue ships win-x64 only, but Whisper.net.Runtime (and similar) bundle native
+    binaries for every OS/arch under runtimes\*. Strip the ones we never load so the
+    published build / installer stays lean.
+  -->
+  <Target Name="TrimForeignNativeRuntimes" AfterTargets="Publish">
+    <ItemGroup>
+      <_ForeignRuntimeDir Include="$(PublishDir)runtimes\linux-arm" />
+      <_ForeignRuntimeDir Include="$(PublishDir)runtimes\linux-arm64" />
+      <_ForeignRuntimeDir Include="$(PublishDir)runtimes\linux-x64" />
+      <_ForeignRuntimeDir Include="$(PublishDir)runtimes\linux-x86" />
+      <_ForeignRuntimeDir Include="$(PublishDir)runtimes\linux-musl-x64" />
+      <_ForeignRuntimeDir Include="$(PublishDir)runtimes\osx" />
+      <_ForeignRuntimeDir Include="$(PublishDir)runtimes\osx-arm64" />
+      <_ForeignRuntimeDir Include="$(PublishDir)runtimes\osx-x64" />
+      <_ForeignRuntimeDir Include="$(PublishDir)runtimes\macos-arm64" />
+      <_ForeignRuntimeDir Include="$(PublishDir)runtimes\macos-x64" />
+      <_ForeignRuntimeDir Include="$(PublishDir)runtimes\win-arm64" />
+      <_ForeignRuntimeDir Include="$(PublishDir)runtimes\win-x86" />
+    </ItemGroup>
+    <RemoveDir Directories="@(_ForeignRuntimeDir)" />
+    <!-- macOS Metal shader for Whisper; unused on Windows. -->
+    <Delete Files="$(PublishDir)ggml-metal.metal" Condition="Exists('$(PublishDir)ggml-metal.metal')" />
+  </Target>
 
 </Project>
