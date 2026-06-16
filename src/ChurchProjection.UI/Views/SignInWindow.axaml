@@ -1,0 +1,73 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ChurchProjection.UI.ViewModels"
+        x:Class="ChurchProjection.UI.Views.SignInWindow"
+        x:DataType="vm:SignInViewModel"
+        Title="Sign in — LumenCue"
+        Width="440" Height="560"
+        MinWidth="440" MinHeight="560"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen"
+        Background="#0E1014">
+
+  <Window.Styles>
+    <Style Selector="TextBox">
+      <Setter Property="Background" Value="#181C24" />
+      <Setter Property="Foreground" Value="#ECEEF2" />
+      <Setter Property="BorderBrush" Value="#3C4350" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="12,10" />
+      <Setter Property="FontSize" Value="14" />
+    </Style>
+    <Style Selector="TextBox:focus">
+      <Setter Property="BorderBrush" Value="#7C6CF6" />
+    </Style>
+    <Style Selector="TextBlock.lbl">
+      <Setter Property="Foreground" Value="#D8DCE3" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="Medium" />
+    </Style>
+  </Window.Styles>
+
+  <Border Padding="36,40">
+    <StackPanel Spacing="22" VerticalAlignment="Center">
+
+      <StackPanel Spacing="12" HorizontalAlignment="Center">
+        <Image Source="avares://ChurchProjection.UI/Assets/logo.png" Width="64" Height="64" />
+        <TextBlock Classes="h1" Text="LumenCue" Foreground="#ECEEF2" FontSize="26"
+                   FontWeight="Bold" HorizontalAlignment="Center" />
+        <TextBlock Text="{Binding ModeNote}" Foreground="#959DAB" FontSize="12.5"
+                   TextWrapping="Wrap" HorizontalAlignment="Center" TextAlignment="Center" MaxWidth="320" />
+      </StackPanel>
+
+      <StackPanel Spacing="6">
+        <TextBlock Classes="lbl" Text="Organization" />
+        <TextBox Text="{Binding OrganizationCode}" Watermark="e.g. Grace Chapel" />
+      </StackPanel>
+
+      <StackPanel Spacing="6">
+        <TextBlock Classes="lbl" Text="Branch" />
+        <TextBox Text="{Binding BranchCode}" Watermark="e.g. Main Campus" />
+      </StackPanel>
+
+      <StackPanel Spacing="6">
+        <TextBlock Classes="lbl" Text="Password" />
+        <TextBox Text="{Binding Password}" PasswordChar="•" Watermark="Branch password" />
+      </StackPanel>
+
+      <TextBlock Text="{Binding Error}" Foreground="#EF6B6B" FontSize="12.5"
+                 TextWrapping="Wrap" IsVisible="{Binding HasError}" />
+
+      <Button Content="Sign in" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+              Background="#7C6CF6" Foreground="White" FontWeight="SemiBold"
+              Padding="0,12" CornerRadius="8" FontSize="14"
+              IsEnabled="{Binding !Busy}"
+              Command="{Binding SignInCommand}" />
+
+      <TextBlock Text="Signing in claims one of your organization's seats on this device."
+                 Foreground="#6E7682" FontSize="11.5" TextWrapping="Wrap"
+                 HorizontalAlignment="Center" TextAlignment="Center" />
+    </StackPanel>
+  </Border>
+
+</Window>

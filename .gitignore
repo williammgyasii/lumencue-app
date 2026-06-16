@@ -1,0 +1,15 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+logs/
+log.txt
+runlog.txt
+models/
+*.db
+*.db-wal
+*.db-shm
+appsettings.*.json
+!appsettings.json
+publish/

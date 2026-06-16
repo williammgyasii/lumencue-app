@@ -1,0 +1,74 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ChurchProjection.UI.ViewModels.Planning"
+        x:Class="ChurchProjection.UI.Views.SongImportWindow"
+        x:DataType="vm:SongImportViewModel"
+        Title="Import Song"
+        Width="520" Height="480"
+        MinWidth="440" MinHeight="400"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        Background="#0E1014"
+        ShowInTaskbar="False">
+
+  <Window.Styles>
+    <Style Selector="TextBox">
+      <Setter Property="Background" Value="#181C24" />
+      <Setter Property="Foreground" Value="#ECEEF2" />
+      <Setter Property="BorderBrush" Value="#3C4350" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style Selector="TextBox:focus">
+      <Setter Property="BorderBrush" Value="#7C6CF6" />
+    </Style>
+  </Window.Styles>
+
+  <DockPanel>
+    <!-- Header -->
+    <Border DockPanel.Dock="Top" Background="#181C24" Padding="24,16" BorderBrush="#2A303C" BorderThickness="0,0,0,1">
+      <StackPanel Spacing="4">
+        <TextBlock Classes="h1" Text="Import Song" Foreground="#ECEEF2" FontSize="20" />
+        <TextBlock Text="Paste lyrics with section labels (Verse 1:, Chorus:, Bridge:)" Foreground="#959DAB" FontSize="13" />
+      </StackPanel>
+    </Border>
+
+    <!-- Footer -->
+    <Border DockPanel.Dock="Bottom" Background="#181C24" Padding="24,14" BorderBrush="#2A303C" BorderThickness="0,1,0,0">
+      <Grid ColumnDefinitions="*,Auto,Auto">
+        <TextBlock Text="{Binding StatusMessage}" Foreground="#22C55E" FontSize="13"
+                   VerticalAlignment="Center" IsVisible="{Binding ShowStatus}" />
+        <Button Grid.Column="1" Content="Cancel" HorizontalAlignment="Right"
+                Background="#2A303C" Foreground="#D8DCE3" FontWeight="SemiBold"
+                Padding="20,9" CornerRadius="6" FontSize="13" Margin="0,0,8,0"
+                Click="OnCancelClicked" />
+        <Button Grid.Column="2" Content="Import" HorizontalAlignment="Right"
+                Background="#7C6CF6" Foreground="White" FontWeight="SemiBold"
+                Padding="20,9" CornerRadius="6" FontSize="13"
+                Command="{Binding ImportCommand}" />
+      </Grid>
+    </Border>
+
+    <!-- Content -->
+    <StackPanel Margin="24,20" Spacing="14">
+      <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+        <StackPanel Grid.Column="0" Spacing="6">
+          <TextBlock Text="Song Title" Foreground="#D8DCE3" FontSize="13" FontWeight="Medium" />
+          <TextBox Text="{Binding Title}" Watermark="e.g. Amazing Grace" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" Spacing="6">
+          <TextBlock Text="Artist" Foreground="#D8DCE3" FontSize="13" FontWeight="Medium" />
+          <TextBox Text="{Binding Artist}" Watermark="Optional" />
+        </StackPanel>
+      </Grid>
+
+      <StackPanel Spacing="6">
+        <TextBlock Text="Lyrics" Foreground="#D8DCE3" FontSize="13" FontWeight="Medium" />
+        <TextBox Text="{Binding Lyrics}" Watermark="Verse 1:&#10;Amazing grace, how sweet the sound&#10;&#10;Chorus:&#10;I once was lost, but now am found"
+                 AcceptsReturn="True" TextWrapping="Wrap" Height="220" />
+      </StackPanel>
+    </StackPanel>
+  </DockPanel>
+
+</Window>

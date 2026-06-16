@@ -1,0 +1,317 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ChurchProjection.UI.ViewModels"
+        xmlns:op="using:ChurchProjection.UI.ViewModels.Operator"
+        xmlns:cs="using:ChurchProjection.Core.Services"
+        xmlns:proj="using:ChurchProjection.Core.Models.Projection"
+        x:Class="ChurchProjection.UI.Views.SettingsWindow"
+        x:DataType="vm:OperatorViewModel"
+        Title="Settings"
+        Width="780" Height="620"
+        MinWidth="660" MinHeight="460"
+        WindowStartupLocation="CenterOwner"
+        CanResize="True"
+        Background="#0E1014"
+        ShowInTaskbar="False">
+
+  <Window.Styles>
+    <!-- Sidebar nav -->
+    <Style Selector="ListBox.nav">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="6,4" />
+    </Style>
+    <Style Selector="ListBox.nav ListBoxItem">
+      <Setter Property="Padding" Value="12,9" />
+      <Setter Property="Margin" Value="2,2" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Foreground" Value="#959DAB" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="Medium" />
+    </Style>
+    <Style Selector="ListBox.nav ListBoxItem:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#1B202A" />
+    </Style>
+    <Style Selector="ListBox.nav ListBoxItem:selected /template/ ContentPresenter">
+      <Setter Property="Background" Value="#262446" />
+    </Style>
+    <Style Selector="ListBox.nav ListBoxItem:selected">
+      <Setter Property="Foreground" Value="#C7C0FF" />
+    </Style>
+    <Style Selector="ListBox.nav ListBoxItem:selected:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#2E2A52" />
+    </Style>
+
+    <!-- Hide the TabControl's own header strip; navigation is driven by the sidebar list -->
+    <Style Selector="TabControl /template/ ItemsPresenter">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="TabControl">
+      <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="TabItem">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+
+    <!-- Inputs -->
+    <Style Selector="ComboBox">
+      <Setter Property="Background" Value="#181C24" />
+      <Setter Property="Foreground" Value="#ECEEF2" />
+      <Setter Property="BorderBrush" Value="#3C4350" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="10,7" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="TextBox">
+      <Setter Property="Background" Value="#181C24" />
+      <Setter Property="Foreground" Value="#ECEEF2" />
+      <Setter Property="BorderBrush" Value="#3C4350" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="FontSize" Value="13" />
+    </Style>
+
+    <!-- Row label -->
+    <Style Selector="TextBlock.rowTitle">
+      <Setter Property="Foreground" Value="#ECEEF2" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="Medium" />
+    </Style>
+    <Style Selector="TextBlock.rowHint">
+      <Setter Property="Foreground" Value="#6E7682" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.label">
+      <Setter Property="Foreground" Value="#D8DCE3" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="Medium" />
+    </Style>
+
+    <!-- Setting row: bottom divider + comfortable height -->
+    <Style Selector="Border.row">
+      <Setter Property="BorderBrush" Value="#1E232C" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+      <Setter Property="Padding" Value="0,16" />
+    </Style>
+
+    <Style Selector="ToggleSwitch">
+      <Setter Property="HorizontalAlignment" Value="Right" />
+      <Setter Property="OnContent" Value="" />
+      <Setter Property="OffContent" Value="" />
+      <Setter Property="MinWidth" Value="0" />
+    </Style>
+  </Window.Styles>
+
+  <DockPanel>
+
+    <!-- Footer -->
+    <Border DockPanel.Dock="Bottom" Background="#0E1014" Padding="24,14" BorderBrush="#2A303C" BorderThickness="0,1,0,0">
+      <Button Content="Done" HorizontalAlignment="Right"
+              Background="#7C6CF6" Foreground="White" FontWeight="SemiBold"
+              Padding="26,9" CornerRadius="6" FontSize="13"
+              Click="OnDoneClicked" />
+    </Border>
+
+    <Grid ColumnDefinitions="216,*">
+
+      <!-- Sidebar -->
+      <Border Grid.Column="0" Background="#14181F" BorderBrush="#2A303C" BorderThickness="0,0,1,0">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Top" Spacing="2" Margin="18,20,16,14">
+            <TextBlock Classes="h1" Text="Settings" FontSize="18" Foreground="#ECEEF2" />
+            <TextBlock Text="App &amp; output preferences" Foreground="#6E7682" FontSize="12" />
+          </StackPanel>
+
+          <ListBox x:Name="Nav" Classes="nav" SelectedIndex="0">
+            <ListBoxItem>Display</ListBoxItem>
+            <ListBoxItem>Behavior</ListBoxItem>
+            <ListBoxItem>Screens</ListBoxItem>
+            <ListBoxItem>ProPresenter</ListBoxItem>
+          </ListBox>
+        </DockPanel>
+      </Border>
+
+      <!-- Content pages, driven by the sidebar selection -->
+      <TabControl Grid.Column="1" Background="Transparent"
+                  SelectedIndex="{Binding #Nav.SelectedIndex}">
+
+        <!-- DISPLAY -->
+        <TabItem>
+          <ScrollViewer Padding="28,24" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Spacing="0">
+              <TextBlock Classes="h1" Text="Display" FontSize="22" Foreground="#ECEEF2" Margin="0,0,0,8" />
+              <TextBlock Text="How scripture and songs are rendered on the projector screens." Classes="rowHint" Margin="0,0,0,8" />
+
+              <Border Classes="row">
+                <Grid ColumnDefinitions="*,240" VerticalAlignment="Center">
+                  <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="rowTitle" Text="Font size" />
+                    <TextBlock Classes="rowHint" Text="Base size for projected body text." />
+                  </StackPanel>
+                  <ComboBox Grid.Column="1" ItemsSource="{Binding FontSizeOptions}" SelectedItem="{Binding ProjectorFontSize}" />
+                </Grid>
+              </Border>
+
+              <Border Classes="row">
+                <Grid ColumnDefinitions="*,240" VerticalAlignment="Center">
+                  <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="rowTitle" Text="Background" />
+                    <TextBlock Classes="rowHint" Text="Use Transparent when keying over an ATEM / video source." />
+                  </StackPanel>
+                  <ComboBox Grid.Column="1" ItemsSource="{Binding BackgroundOptions}" SelectedItem="{Binding ProjectorBackground}" />
+                </Grid>
+              </Border>
+
+              <Border Classes="row">
+                <Grid ColumnDefinitions="*,240" VerticalAlignment="Center">
+                  <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="rowTitle" Text="Layout style" />
+                    <TextBlock Classes="rowHint" Text="Full screen, lower-third, and more." />
+                  </StackPanel>
+                  <ComboBox Grid.Column="1" ItemsSource="{Binding LayoutOptions}" SelectedItem="{Binding ProjectorLayout}" />
+                </Grid>
+              </Border>
+            </StackPanel>
+          </ScrollViewer>
+        </TabItem>
+
+        <!-- BEHAVIOR -->
+        <TabItem>
+          <ScrollViewer Padding="28,24" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Spacing="0">
+              <TextBlock Classes="h1" Text="Behavior" FontSize="22" Foreground="#ECEEF2" Margin="0,0,0,8" />
+              <TextBlock Text="Operator workflow defaults." Classes="rowHint" Margin="0,0,0,8" />
+
+              <Border Classes="row">
+                <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                  <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="rowTitle" Text="Single click sends to live" />
+                    <TextBlock Classes="rowHint" Text="Skip the preview step — items go directly to the projector." />
+                  </StackPanel>
+                  <ToggleSwitch Grid.Column="1" IsChecked="{Binding SingleClickGoesLive}" />
+                </Grid>
+              </Border>
+
+              <Border Classes="row">
+                <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                  <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="rowTitle" Text="Auto-start AI Listening" />
+                    <TextBlock Classes="rowHint" Text="Begin transcription automatically when the app launches." />
+                  </StackPanel>
+                  <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoStartListening}" />
+                </Grid>
+              </Border>
+            </StackPanel>
+          </ScrollViewer>
+        </TabItem>
+
+        <!-- SCREENS -->
+        <TabItem>
+          <ScrollViewer Padding="28,24" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Spacing="0">
+              <TextBlock Classes="h1" Text="Screens" FontSize="22" Foreground="#ECEEF2" Margin="0,0,0,8" />
+              <TextBlock Classes="rowHint" Margin="0,0,0,14"
+                         Text="Every screen shows the same program feed. Turn each one on/off, give it a name, and pick its view (theme) — e.g. a green-screen lower-third for an ATEM versus a full-screen LED wall. Leave View on 'Follow content' to use the per-content theme." />
+
+              <Grid ColumnDefinitions="Auto,*,160" ColumnSpacing="14" Margin="0,0,0,4">
+                <TextBlock Grid.Column="1" Text="NAME" Foreground="#6E7682" FontSize="10.5" FontWeight="SemiBold" />
+                <TextBlock Grid.Column="2" Text="VIEW (theme)" Foreground="#6E7682" FontSize="10.5" FontWeight="SemiBold" />
+              </Grid>
+
+              <ItemsControl ItemsSource="{Binding Outputs}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:OutputRow">
+                    <Border Classes="row" Padding="0,12">
+                      <Grid ColumnDefinitions="Auto,*,160" ColumnSpacing="14" VerticalAlignment="Center">
+                        <ToggleSwitch Grid.Column="0" IsChecked="{Binding IsActive}" HorizontalAlignment="Left" VerticalAlignment="Center" />
+                        <TextBox Grid.Column="1" Text="{Binding Name}" FontSize="13" VerticalAlignment="Center"
+                                 ToolTip.Tip="The screen's name (e.g. LED Wall, Lobby)" />
+                        <ComboBox Grid.Column="2" ItemsSource="{Binding ThemeOptions}" SelectedItem="{Binding SelectedThemeOption}"
+                                  HorizontalAlignment="Stretch" FontSize="12" VerticalAlignment="Center" />
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </ScrollViewer>
+        </TabItem>
+
+        <!-- PROPRESENTER -->
+        <TabItem>
+          <ScrollViewer Padding="28,24" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                        DataContext="{Binding ProPresenter}" x:DataType="op:ProPresenterViewModel">
+            <StackPanel Spacing="0">
+              <TextBlock Classes="h1" Text="ProPresenter" FontSize="22" Foreground="#ECEEF2" Margin="0,0,0,8" />
+              <TextBlock Classes="rowHint" Margin="0,0,0,16"
+                         Text="Connection &amp; message mapping. Turn the ProPresenter output on/off on the Screens page." />
+
+              <Grid ColumnDefinitions="2*,*" ColumnSpacing="16">
+                <StackPanel Grid.Column="0" Spacing="6">
+                  <TextBlock Classes="label" Text="Host / IP" />
+                  <TextBox Text="{Binding Host}" Watermark="localhost" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Spacing="6">
+                  <TextBlock Classes="label" Text="Port" />
+                  <TextBox Text="{Binding Port}" Watermark="1025" />
+                </StackPanel>
+              </Grid>
+
+              <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,16,0,0">
+                <Button Content="Test &amp; Load Messages"
+                        Command="{Binding TestConnectionCommand}"
+                        IsEnabled="{Binding !IsBusy}"
+                        Background="#262446" Foreground="#C7C0FF" FontWeight="SemiBold"
+                        Padding="14,8" CornerRadius="6" FontSize="13" />
+                <TextBlock Text="{Binding StatusText}" Foreground="#959DAB" FontSize="12"
+                           VerticalAlignment="Center" TextWrapping="Wrap" />
+              </StackPanel>
+
+              <StackPanel Spacing="6" Margin="0,16,0,0">
+                <TextBlock Classes="label" Text="Message" />
+                <ComboBox ItemsSource="{Binding Messages}" SelectedItem="{Binding SelectedMessage}"
+                          PlaceholderText="Connect, then pick a ProPresenter Message">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="cs:ProMessage">
+                      <TextBlock Text="{Binding Name}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+              </StackPanel>
+
+              <Grid ColumnDefinitions="*,*" ColumnSpacing="16" Margin="0,16,0,0">
+                <StackPanel Grid.Column="0" Spacing="6">
+                  <TextBlock Classes="label" Text="Verse / body token" />
+                  <ComboBox ItemsSource="{Binding AvailableTokens}" SelectedItem="{Binding SelectedTextToken}"
+                            PlaceholderText="Token for text" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Spacing="6">
+                  <TextBlock Classes="label" Text="Reference token (optional)" />
+                  <ComboBox ItemsSource="{Binding AvailableTokens}" SelectedItem="{Binding SelectedReferenceToken}"
+                            PlaceholderText="Token for reference" />
+                </StackPanel>
+              </Grid>
+
+              <StackPanel Spacing="6" Margin="0,16,0,0">
+                <TextBlock Classes="label" Text="Max characters per slide on LED (0 = off)" />
+                <TextBox Text="{Binding MaxCharsPerSlide}" Watermark="0" Width="120" HorizontalAlignment="Left" />
+                <TextBlock Classes="rowHint"
+                           Text="Splits long passages into smaller pages you arrow through, so text stays readable instead of overflowing the ProPresenter message. ~250 is a good start." />
+              </StackPanel>
+
+              <Border Background="#161A22" CornerRadius="8" Padding="14" Margin="0,18,0,0" BorderBrush="#2A303C" BorderThickness="1">
+                <TextBlock Classes="rowHint"
+                           Text="In ProPresenter: enable the network, create a Message with text token(s), style it for the LED, then Test &amp; Load here." />
+              </Border>
+            </StackPanel>
+          </ScrollViewer>
+        </TabItem>
+
+      </TabControl>
+    </Grid>
+  </DockPanel>
+
+</Window>

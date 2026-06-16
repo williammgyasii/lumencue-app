@@ -1,0 +1,86 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="ChurchProjection.App.App"
+             RequestedThemeVariant="Dark">
+
+  <Application.Resources>
+    <!-- ============ TYPE SYSTEM ============ -->
+    <!-- Poppins = headings/titles, Inter = body/UI. Both embedded so they render identically
+         everywhere regardless of what's installed on the machine. -->
+    <FontFamily x:Key="FontHeading">avares://ChurchProjection.UI/Assets/Fonts/#Poppins</FontFamily>
+    <FontFamily x:Key="FontBody">avares://ChurchProjection.UI/Assets/Fonts/#Inter</FontFamily>
+
+    <!-- ============ COLOR TOKENS ============ -->
+    <!-- Layered surfaces (darkest -> lightest) -->
+    <SolidColorBrush x:Key="BgBrush" Color="#0E1014" />
+    <SolidColorBrush x:Key="ChromeBrush" Color="#14181F" />
+    <SolidColorBrush x:Key="SubtleBrush" Color="#1B202A" />
+    <SolidColorBrush x:Key="SurfaceBrush" Color="#181C24" />
+    <SolidColorBrush x:Key="SurfaceAltBrush" Color="#232932" />
+    <SolidColorBrush x:Key="BorderBrush" Color="#2A303C" />
+    <SolidColorBrush x:Key="BorderStrongBrush" Color="#3C4350" />
+
+    <!-- Text -->
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#ECEEF2" />
+    <SolidColorBrush x:Key="TextTitleBrush" Color="#D8DCE3" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#959DAB" />
+    <SolidColorBrush x:Key="TextMutedBrush" Color="#6E7682" />
+
+    <!-- Accent + semantic -->
+    <SolidColorBrush x:Key="AccentBrush" Color="#7C6CF6" />
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="#6A59E8" />
+    <SolidColorBrush x:Key="AccentSoftBrush" Color="#262446" />
+    <SolidColorBrush x:Key="AiBrush" Color="#A78BFA" />
+    <SolidColorBrush x:Key="AiSoftBrush" Color="#2A2444" />
+    <SolidColorBrush x:Key="LiveBrush" Color="#22C55E" />
+    <SolidColorBrush x:Key="DangerBrush" Color="#F87171" />
+    <SolidColorBrush x:Key="WarnBrush" Color="#F59E0B" />
+    <SolidColorBrush x:Key="InfoBrush" Color="#38BDF8" />
+
+    <!-- Accent: drives default control chrome (combo/check/focus) to match the app palette. -->
+    <Color x:Key="SystemAccentColor">#7C6CF6</Color>
+    <Color x:Key="SystemAccentColorDark1">#6A59E8</Color>
+    <Color x:Key="SystemAccentColorDark2">#5848D6</Color>
+    <Color x:Key="SystemAccentColorDark3">#4838C0</Color>
+    <Color x:Key="SystemAccentColorLight1">#8E80F8</Color>
+    <Color x:Key="SystemAccentColorLight2">#A398FA</Color>
+    <Color x:Key="SystemAccentColorLight3">#BBB2FC</Color>
+  </Application.Resources>
+
+  <Application.Styles>
+    <FluentTheme />
+    <StyleInclude Source="avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml" />
+
+    <!-- Inter is the default for every control + text. -->
+    <Style Selector=":is(TemplatedControl)">
+      <Setter Property="FontFamily" Value="{StaticResource FontBody}" />
+    </Style>
+    <Style Selector="TextBlock">
+      <Setter Property="FontFamily" Value="{StaticResource FontBody}" />
+    </Style>
+
+    <!-- ============ HEADING STYLES (Poppins) ============ -->
+    <!-- Page / window title -->
+    <Style Selector="TextBlock.h1">
+      <Setter Property="FontFamily" Value="{StaticResource FontHeading}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+      <Setter Property="FontSize" Value="19" />
+    </Style>
+    <!-- Card / region heading -->
+    <Style Selector="TextBlock.h2">
+      <Setter Property="FontFamily" Value="{StaticResource FontHeading}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+      <Setter Property="FontSize" Value="14" />
+    </Style>
+    <!-- Small uppercase section label (e.g. PREVIEW, LIVE OUTPUT) -->
+    <Style Selector="TextBlock.section">
+      <Setter Property="FontFamily" Value="{StaticResource FontHeading}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="LetterSpacing" Value="0.8" />
+    </Style>
+  </Application.Styles>
+
+</Application>

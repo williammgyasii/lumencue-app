@@ -1,0 +1,187 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ChurchProjection.UI.ViewModels.Planning"
+        xmlns:views="using:ChurchProjection.UI.Views"
+        x:Class="ChurchProjection.UI.Views.SongEditorWindow"
+        x:DataType="vm:SongEditorViewModel"
+        Title="{Binding WindowTitle}"
+        Width="1180" Height="760"
+        MinWidth="980" MinHeight="600"
+        WindowStartupLocation="CenterOwner"
+        Background="#0E1014">
+
+  <Window.Styles>
+    <Style Selector="TextBox">
+      <Setter Property="Background" Value="#181C24" />
+      <Setter Property="Foreground" Value="#ECEEF2" />
+      <Setter Property="BorderBrush" Value="#3C4350" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style Selector="TextBox:focus">
+      <Setter Property="BorderBrush" Value="#7C6CF6" />
+    </Style>
+    <Style Selector="TextBlock.lbl">
+      <Setter Property="Foreground" Value="#D8DCE3" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="Medium" />
+    </Style>
+    <Style Selector="TextBlock.section">
+      <Setter Property="Foreground" Value="#959DAB" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="ComboBox">
+      <Setter Property="Background" Value="#181C24" />
+      <Setter Property="Foreground" Value="#ECEEF2" />
+      <Setter Property="BorderBrush" Value="#3C4350" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="FontSize" Value="13" />
+    </Style>
+  </Window.Styles>
+
+  <DockPanel>
+    <!-- Header -->
+    <Border DockPanel.Dock="Top" Background="#181C24" Padding="24,16" BorderBrush="#2A303C" BorderThickness="0,0,0,1">
+      <StackPanel Spacing="3">
+        <TextBlock Classes="h1" Text="Song Editor" Foreground="#ECEEF2" FontSize="20" />
+        <TextBlock Text="Paste lyrics, auto-detect verses &amp; chorus, then refine and preview against your theme."
+                   Foreground="#959DAB" FontSize="13" />
+      </StackPanel>
+    </Border>
+
+    <!-- Footer -->
+    <Border DockPanel.Dock="Bottom" Background="#181C24" Padding="24,14" BorderBrush="#2A303C" BorderThickness="0,1,0,0">
+      <Grid ColumnDefinitions="*,Auto,Auto">
+        <TextBlock Grid.Column="0" Text="{Binding SlideCountText}" Foreground="#959DAB"
+                   FontSize="13" VerticalAlignment="Center" />
+        <Button Grid.Column="1" Content="Cancel" HorizontalAlignment="Right"
+                Background="#2A303C" Foreground="#D8DCE3" FontWeight="SemiBold"
+                Padding="20,9" CornerRadius="6" FontSize="13" Margin="0,0,8,0"
+                Click="OnCancelClicked" />
+        <Button Grid.Column="2" Content="Save to Library" HorizontalAlignment="Right"
+                Background="#7C6CF6" Foreground="White" FontWeight="SemiBold"
+                Padding="20,9" CornerRadius="6" FontSize="13"
+                Command="{Binding SaveCommand}" />
+      </Grid>
+    </Border>
+
+    <!-- Body: lyrics | sections | preview -->
+    <Grid ColumnDefinitions="360,6,*,6,440" Margin="0">
+
+      <!-- Left: lyrics input + meta -->
+      <DockPanel Grid.Column="0" Margin="20,18">
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,0,0,12">
+          <StackPanel Grid.Column="0" Spacing="6">
+            <TextBlock Classes="lbl" Text="Song Title" />
+            <TextBox Text="{Binding Title}" Watermark="e.g. Amazing Grace" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" Spacing="6">
+            <TextBlock Classes="lbl" Text="Artist" />
+            <TextBox Text="{Binding Artist}" Watermark="Optional" />
+          </StackPanel>
+        </Grid>
+
+        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,12">
+          <TextBlock Classes="lbl" Text="Lines per slide" />
+          <Grid ColumnDefinitions="120,*" ColumnSpacing="10">
+            <ComboBox Grid.Column="0" ItemsSource="{Binding LinesPerSlideOptions}"
+                      SelectedItem="{Binding LinesPerSlide}" HorizontalAlignment="Stretch" />
+            <TextBlock Grid.Column="1" Text="0 = auto-fit to theme" Foreground="#6E7682"
+                       FontSize="12" VerticalAlignment="Center" />
+          </Grid>
+        </StackPanel>
+
+        <Button DockPanel.Dock="Bottom" Content="Break into sections" HorizontalAlignment="Stretch"
+                Background="#2A303C" Foreground="#ECEEF2" FontWeight="SemiBold"
+                Padding="0,11" CornerRadius="6" FontSize="13" Margin="0,12,0,0"
+                Command="{Binding ParseCommand}" />
+
+        <StackPanel Spacing="6">
+          <TextBlock Classes="lbl" Text="Lyrics" />
+          <TextBox Text="{Binding RawLyrics}"
+                   Watermark="Paste lyrics here. Blank lines separate stanzas; repeated stanzas become the chorus automatically."
+                   AcceptsReturn="True" TextWrapping="Wrap"
+                   VerticalAlignment="Stretch" Height="380"
+                   VerticalContentAlignment="Top" />
+        </StackPanel>
+      </DockPanel>
+
+      <GridSplitter Grid.Column="1" Background="#1A1E26" Width="6" />
+
+      <!-- Middle: editable section breakdown -->
+      <DockPanel Grid.Column="2" Margin="16,18">
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+          <TextBlock Grid.Column="0" Classes="section" Text="SECTIONS" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Content="+ Add" Background="#2A303C" Foreground="#ECEEF2"
+                  FontSize="12" Padding="12,6" CornerRadius="6" Command="{Binding AddSectionCommand}" />
+        </Grid>
+
+        <ListBox x:Name="SectionsList" ItemsSource="{Binding Sections}"
+                 SelectedItem="{Binding SelectedSection}"
+                 Background="Transparent" BorderThickness="0">
+          <ListBox.Styles>
+            <Style Selector="ListBoxItem">
+              <Setter Property="Padding" Value="0" />
+              <Setter Property="Margin" Value="0,0,0,10" />
+              <Setter Property="Background" Value="Transparent" />
+            </Style>
+          </ListBox.Styles>
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:SongSectionVm">
+              <Border Background="#161A22" CornerRadius="8" BorderBrush="#2A303C" BorderThickness="1" Padding="12">
+                <StackPanel Spacing="8">
+                  <Grid ColumnDefinitions="150,*,Auto,Auto,Auto" ColumnSpacing="6">
+                    <ComboBox Grid.Column="0"
+                              ItemsSource="{Binding SectionTypes}"
+                              SelectedItem="{Binding SectionType}" HorizontalAlignment="Stretch" />
+                    <Button Grid.Column="2" Content="↑" Width="30" Background="#2A303C" Foreground="#D8DCE3"
+                            CornerRadius="5" Padding="0,4" Click="OnMoveUpClicked" />
+                    <Button Grid.Column="3" Content="↓" Width="30" Background="#2A303C" Foreground="#D8DCE3"
+                            CornerRadius="5" Padding="0,4" Margin="4,0" Click="OnMoveDownClicked" />
+                    <Button Grid.Column="4" Content="✕" Width="30" Background="#2A303C" Foreground="#EF6B6B"
+                            CornerRadius="5" Padding="0,4" Click="OnDeleteClicked" />
+                  </Grid>
+                  <TextBox Text="{Binding Text}" AcceptsReturn="True" TextWrapping="Wrap"
+                           MinHeight="64" VerticalContentAlignment="Top" FontSize="13" />
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </DockPanel>
+
+      <GridSplitter Grid.Column="3" Background="#1A1E26" Width="6" />
+
+      <!-- Right: live themed preview -->
+      <DockPanel Grid.Column="4" Margin="16,18,20,18">
+        <TextBlock DockPanel.Dock="Top" Classes="section" Text="PREVIEW" Margin="0,0,0,10" />
+
+        <StackPanel DockPanel.Dock="Bottom" Spacing="10" Margin="0,12,0,0">
+          <Grid ColumnDefinitions="Auto,*,Auto" >
+            <Button Grid.Column="0" Content="‹ Prev" Background="#2A303C" Foreground="#ECEEF2"
+                    FontSize="12" Padding="12,7" CornerRadius="6" Command="{Binding PreviewPrevCommand}" />
+            <TextBlock Grid.Column="1" Text="{Binding PreviewPositionText}" Foreground="#959DAB"
+                       FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <Button Grid.Column="2" Content="Next ›" Background="#2A303C" Foreground="#ECEEF2"
+                    FontSize="12" Padding="12,7" CornerRadius="6" Command="{Binding PreviewNextCommand}" />
+          </Grid>
+          <TextBlock Text="Live render of the selected section using the Lyric theme."
+                     Foreground="#6E7682" FontSize="11" TextWrapping="Wrap"
+                     HorizontalAlignment="Center" TextAlignment="Center" />
+        </StackPanel>
+
+        <Border CornerRadius="8" ClipToBounds="True" BorderBrush="#374151" BorderThickness="1"
+                VerticalAlignment="Top" HorizontalAlignment="Center">
+          <Viewbox Stretch="Uniform" Width="400" Height="225">
+            <Border Width="1920" Height="1080">
+              <views:ProjectorView DataContext="{Binding Preview}" />
+            </Border>
+          </Viewbox>
+        </Border>
+      </DockPanel>
+    </Grid>
+  </DockPanel>
+
+</Window>

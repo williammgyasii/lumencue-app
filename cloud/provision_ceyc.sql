@@ -1,0 +1,11 @@
+drop table if exists seats;
+drop table if exists branches;
+create table branches ( organization_id text not null references organizations(id) on delete cascade, id text not null, name text not null, password_hash text not null, created_at timestamptz not null default now(), primary key (organization_id, id));
+create table seats ( organization_id text not null references organizations(id) on delete cascade, device_id text not null, branch_id text not null, token text not null, claimed_at timestamptz not null default now(), last_seen_at timestamptz not null default now(), primary key (organization_id, device_id), foreign key (organization_id, branch_id) references branches(organization_id, id) on delete cascade);
+create index if not exists idx_seats_token on seats(token);
+insert into organizations (id, name, seat_count) values ('grace', 'Grace Chapel', 5) on conflict (id) do update set name = excluded.name, seat_count = excluded.seat_count;
+insert into branches (organization_id, id, name, password_hash) values ('grace', 'main', 'Main Campus', '100000.M/lxgDaMMHgQhomTNSPn7g==.OyJHTr0TJDCCKjyPchvZjpNN203Vnq3Lxu8ipfWtROw=');
+insert into organizations (id, name, seat_count) values ('ceyc-airport', 'CEYC Airport City', 5) on conflict (id) do update set name = excluded.name, seat_count = excluded.seat_count;
+insert into branches (organization_id, id, name, password_hash) values ('ceyc-airport', 'main', 'Airport City (Main)', '100000.avkwKiBZ2/tZpVeXabRt8A==.hnw8Zk76I5ki/wVMFDhWOHqHrBCOpoUNMpSZd2ZTZKc=');
+insert into branches (organization_id, id, name, password_hash) values ('ceyc-airport', 'youth', 'Youth Church', '100000.SgFD0LJZaNMYr/JqppAhQQ==.D9plRQBCuG2VBwvuQk9kYvo8mgZJhl+6m9K6roZaV0w=');
+insert into branches (organization_id, id, name, password_hash) values ('ceyc-airport', 'teens', 'Teens Church', '100000.sUdh/pjBO1jkILIyBx+wIg==.K44KwFf84Xqp4e6PKhVoYfC8/Jd8+siajp0l9CLNXGg=');

@@ -1,0 +1,67 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ChurchProjection.UI.ViewModels.Operator"
+        x:Class="ChurchProjection.UI.Views.PreServiceWindow"
+        x:DataType="vm:PreServiceViewModel"
+        Title="Pre-service"
+        Width="520" Height="540"
+        WindowStartupLocation="CenterOwner"
+        Background="#0E1014">
+
+  <Grid RowDefinitions="Auto,*,Auto" Margin="20">
+
+    <StackPanel Grid.Row="0" Spacing="2" Margin="0,0,0,16">
+      <TextBlock Text="Pre-service screen" Foreground="#ECEEF2" FontSize="18" FontWeight="SemiBold" />
+      <TextBlock Text="Put a live countdown or clock on the active output." Foreground="#6E7682" FontSize="12" />
+    </StackPanel>
+
+    <StackPanel Grid.Row="1" Spacing="18">
+
+      <!-- Countdown -->
+      <Border Background="#161A21" CornerRadius="10" Padding="16">
+        <StackPanel Spacing="10">
+          <TextBlock Text="COUNTDOWN" Foreground="#7C6CF6" FontSize="11" FontWeight="Bold" />
+
+          <TextBlock Text="Heading" Foreground="#959DAB" FontSize="12" />
+          <TextBox Text="{Binding Heading}" FontSize="14" Watermark="Service begins in" />
+
+          <TextBlock Text="Minutes" Foreground="#959DAB" FontSize="12" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <NumericUpDown Value="{Binding Minutes}" Minimum="0" Maximum="600" Increment="1"
+                           FormatString="0.#" Width="120" FontSize="14" />
+            <Button Content="5" Command="{Binding SetMinutesCommand}" CommandParameter="5" Classes="ghost" Padding="12,6" />
+            <Button Content="10" Command="{Binding SetMinutesCommand}" CommandParameter="10" Classes="ghost" Padding="12,6" />
+            <Button Content="15" Command="{Binding SetMinutesCommand}" CommandParameter="15" Classes="ghost" Padding="12,6" />
+            <Button Content="20" Command="{Binding SetMinutesCommand}" CommandParameter="20" Classes="ghost" Padding="12,6" />
+          </StackPanel>
+
+          <TextBlock Text="Message when it reaches zero" Foreground="#959DAB" FontSize="12" />
+          <TextBox Text="{Binding DoneMessage}" FontSize="14" Watermark="Welcome!" />
+
+          <Button Content="Start countdown" Command="{Binding StartCountdownCommand}"
+                  Background="#7C6CF6" Foreground="White" FontWeight="SemiBold"
+                  Padding="18,9" CornerRadius="6" HorizontalAlignment="Left" Margin="0,4,0,0" />
+        </StackPanel>
+      </Border>
+
+      <!-- Clock -->
+      <Border Background="#161A21" CornerRadius="10" Padding="16">
+        <StackPanel Spacing="10">
+          <TextBlock Text="CLOCK" Foreground="#7C6CF6" FontSize="11" FontWeight="Bold" />
+          <TextBlock Text="Heading (optional)" Foreground="#959DAB" FontSize="12" />
+          <TextBox Text="{Binding ClockHeading}" FontSize="14" Watermark="e.g. Current time" />
+          <Button Content="Show clock" Command="{Binding ShowClockCommand}"
+                  Background="#222732" Foreground="#ECEEF2" Padding="18,9" CornerRadius="6"
+                  HorizontalAlignment="Left" />
+        </StackPanel>
+      </Border>
+
+    </StackPanel>
+
+    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,16,0,0">
+      <Button Content="Clear screen" Command="{Binding ClearCommand}"
+              Background="#222732" Foreground="#C2C8D2" Padding="16,8" CornerRadius="6" />
+    </StackPanel>
+  </Grid>
+
+</Window>

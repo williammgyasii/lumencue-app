@@ -1,0 +1,168 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ChurchProjection.UI.ViewModels"
+             xmlns:controls="using:ChurchProjection.UI.Controls"
+             x:Class="ChurchProjection.UI.Views.ProjectorView"
+             x:DataType="vm:ProjectorViewModel">
+
+  <!-- The compositor renders on an opaque black base; each layer below stacks on top of it, bottom → top,
+       and is independently toggled + faded per channel by the operator's Layers strip. -->
+  <Panel Background="Black">
+
+    <!-- LAYER 1 — Background: the theme colour + its image / live motion loop, gated together. -->
+    <Panel IsVisible="{Binding BackgroundLayerEnabled}" Opacity="{Binding BackgroundLayerOpacity}">
+      <Border Background="{Binding BackgroundBrush}" />
+      <Image Source="{Binding BackgroundImage}"
+             IsVisible="{Binding HasBackgroundImage}"
+             Stretch="{Binding BackgroundImageStretch}" />
+    </Panel>
+
+    <!-- LAYER 2 — Slide / text: the design canvas (1920x1080) scaled uniformly to the real output. All
+         text/positioning lives here so a theme's regions render pixel-identically at any resolution.
+         Hidden when blank or when the Slide layer is switched off. -->
+    <Viewbox Stretch="Uniform" IsVisible="{Binding ShowSlide}" Opacity="{Binding SlideLayerOpacity}">
+      <Canvas Width="{Binding CanvasWidth}" Height="{Binding CanvasHeight}" Background="Transparent">
+
+        <!-- Decorative shapes (painted behind everything else) -->
+        <ItemsControl ItemsSource="{Binding Shapes}" Width="{Binding CanvasWidth}" Height="{Binding CanvasHeight}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><Canvas /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.Styles>
+            <Style Selector="ContentPresenter" x:DataType="vm:ShapeVm">
+              <Setter Property="Canvas.Left" Value="{Binding X}" />
+              <Setter Property="Canvas.Top" Value="{Binding Y}" />
+            </Style>
+          </ItemsControl.Styles>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ShapeVm">
+              <Border Width="{Binding Width}" Height="{Binding Height}"
+                      Background="{Binding Brush}" CornerRadius="{Binding CornerRadius}"
+                      Opacity="{Binding Opacity}" ClipToBounds="True">
+                <Image Source="{Binding DisplayImage}" IsVisible="{Binding HasDisplayImage}"
+                       Stretch="{Binding ImageStretch}"
+                       RenderTransform="{Binding ImageTransform}" RenderTransformOrigin="0.5,0.5" />
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Lower-third background bar (behind the body/footer band) -->
+        <Border Canvas.Left="{Binding BarX}" Canvas.Top="{Binding BarY}"
+                Width="{Binding BarWidth}" Height="{Binding BarHeight}"
+                Background="{Binding LowerThirdBarBrush}" IsVisible="{Binding LowerThirdBarVisible}" />
+
+        <!-- TITLE region -->
+        <Grid Canvas.Left="{Binding TitleRegion.X}" Canvas.Top="{Binding TitleRegion.Y}"
+              Width="{Binding TitleRegion.Width}" Height="{Binding TitleRegion.Height}"
+              IsVisible="{Binding TitleRegion.Visible}">
+          <Border Background="{Binding TitleRegion.BackgroundBrush}" CornerRadius="{Binding TitleRegion.BackgroundCorner}" ClipToBounds="True">
+            <Image Source="{Binding TitleRegion.DisplayImage}" IsVisible="{Binding TitleRegion.HasDisplayImage}"
+                   Stretch="{Binding TitleRegion.BackgroundImageStretch}"
+                   RenderTransform="{Binding TitleRegion.BackgroundImageTransform}" RenderTransformOrigin="0.5,0.5" />
+          </Border>
+          <controls:OutlinedTextBlock Text="{Binding SlideTitle}"
+                     Margin="{Binding TitleRegion.TextPadding}"
+                     FontFamily="{Binding FontFamily}"
+                     FontSize="{Binding TitleFontSize}"
+                     FontWeight="{Binding FontWeight}"
+                     Foreground="{Binding TitleBrush}"
+                     TextAlignment="{Binding TitleRegion.TextAlign}"
+                     AutoFit="{Binding TitleRegion.AutoFit}"
+                     MinFontSize="{Binding TitleRegion.MinFontSize}"
+                     MaxFontSize="{Binding TitleRegion.MaxFontSize}"
+                     LineSpacing="{Binding TitleRegion.LineSpacing}"
+                     OutlineBrush="{Binding OutlineBrush}"
+                     OutlineThickness="{Binding OutlineThickness}"
+                     Effect="{Binding TextShadow}"
+                     VerticalAlignment="{Binding TitleRegion.VAlign}"
+                     HorizontalAlignment="Stretch" />
+        </Grid>
+
+        <!-- BODY region -->
+        <Grid Canvas.Left="{Binding BodyRegion.X}" Canvas.Top="{Binding BodyRegion.Y}"
+              Width="{Binding BodyRegion.Width}" Height="{Binding BodyRegion.Height}"
+              IsVisible="{Binding BodyRegion.Visible}">
+          <Border Background="{Binding BodyRegion.BackgroundBrush}" CornerRadius="{Binding BodyRegion.BackgroundCorner}" ClipToBounds="True">
+            <Image Source="{Binding BodyRegion.DisplayImage}" IsVisible="{Binding BodyRegion.HasDisplayImage}"
+                   Stretch="{Binding BodyRegion.BackgroundImageStretch}"
+                   RenderTransform="{Binding BodyRegion.BackgroundImageTransform}" RenderTransformOrigin="0.5,0.5" />
+          </Border>
+          <controls:OutlinedTextBlock Text="{Binding SlideBody}"
+                     Margin="{Binding BodyRegion.TextPadding}"
+                     FontFamily="{Binding FontFamily}"
+                     FontSize="{Binding BodyFontSize}"
+                     FontWeight="{Binding FontWeight}"
+                     Foreground="{Binding TextBrush}"
+                     TextAlignment="{Binding BodyRegion.TextAlign}"
+                     LineHeight="{Binding BodyLineHeight}"
+                     AutoFit="{Binding BodyRegion.AutoFit}"
+                     MinFontSize="{Binding BodyRegion.MinFontSize}"
+                     MaxFontSize="{Binding BodyRegion.MaxFontSize}"
+                     LineSpacing="{Binding BodyRegion.LineSpacing}"
+                     OutlineBrush="{Binding OutlineBrush}"
+                     OutlineThickness="{Binding OutlineThickness}"
+                     Effect="{Binding TextShadow}"
+                     VerticalAlignment="{Binding BodyRegion.VAlign}"
+                     HorizontalAlignment="Stretch" />
+        </Grid>
+
+        <!-- FOOTER region -->
+        <Grid Canvas.Left="{Binding FooterRegion.X}" Canvas.Top="{Binding FooterRegion.Y}"
+              Width="{Binding FooterRegion.Width}" Height="{Binding FooterRegion.Height}"
+              IsVisible="{Binding FooterRegion.Visible}">
+          <Border Background="{Binding FooterRegion.BackgroundBrush}" CornerRadius="{Binding FooterRegion.BackgroundCorner}" ClipToBounds="True">
+            <Image Source="{Binding FooterRegion.DisplayImage}" IsVisible="{Binding FooterRegion.HasDisplayImage}"
+                   Stretch="{Binding FooterRegion.BackgroundImageStretch}"
+                   RenderTransform="{Binding FooterRegion.BackgroundImageTransform}" RenderTransformOrigin="0.5,0.5" />
+          </Border>
+          <controls:OutlinedTextBlock Text="{Binding SlideFooter}"
+                     Margin="{Binding FooterRegion.TextPadding}"
+                     FontFamily="{Binding FontFamily}"
+                     FontSize="{Binding FooterFontSize}"
+                     FontWeight="Normal"
+                     Foreground="{Binding FooterBrush}"
+                     TextAlignment="{Binding FooterRegion.TextAlign}"
+                     AutoFit="{Binding FooterRegion.AutoFit}"
+                     MinFontSize="{Binding FooterRegion.MinFontSize}"
+                     MaxFontSize="{Binding FooterRegion.MaxFontSize}"
+                     LineSpacing="{Binding FooterRegion.LineSpacing}"
+                     Effect="{Binding TextShadow}"
+                     VerticalAlignment="{Binding FooterRegion.VAlign}"
+                     HorizontalAlignment="Stretch" />
+        </Grid>
+
+      </Canvas>
+    </Viewbox>
+
+    <!-- LAYER 3 — Media: a full graphic / video, on an opaque black backdrop so media that doesn't fill
+         the screen (wrong aspect / smaller image) never reveals the layers underneath. Uniform keeps the
+         artwork un-cropped on the 16:9 canvas. -->
+    <Panel IsVisible="{Binding ShowAnnouncement}" Opacity="{Binding MediaLayerOpacity}" Background="Black">
+      <Image Source="{Binding AnnouncementImage}"
+             Stretch="Uniform" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+    </Panel>
+
+    <!-- LAYER 4 — Overlay: a persistent logo / watermark that survives slide & media changes. Positioned
+         in 1920x1080 canvas space (so it scales with the output) and anchored to a chosen corner/center. -->
+    <Viewbox Stretch="Uniform" IsVisible="{Binding ShowOverlay}" Opacity="{Binding OverlayLayerOpacity}">
+      <Panel Width="1920" Height="1080">
+        <Image Source="{Binding OverlayImage}" Width="{Binding OverlayWidth}" Stretch="Uniform"
+               HorizontalAlignment="{Binding OverlayHAlign}" VerticalAlignment="{Binding OverlayVAlign}"
+               Margin="48" />
+      </Panel>
+    </Viewbox>
+
+    <!-- LAYER 5 — Alert: a banner message punched over everything (countdown handoff, room notices, etc.). -->
+    <Viewbox Stretch="Uniform" IsVisible="{Binding ShowAlert}" Opacity="{Binding AlertLayerOpacity}">
+      <Panel Width="1920" Height="1080">
+        <Border VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Background="#E60B0D12"
+                Padding="64,28" Margin="0,0,0,80">
+          <TextBlock Text="{Binding AlertText}" Foreground="White" FontSize="64" FontWeight="Bold"
+                     TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center" />
+        </Border>
+      </Panel>
+    </Viewbox>
+  </Panel>
+
+</UserControl>
