@@ -14,7 +14,7 @@ namespace ChurchProjection.App;
 /// </summary>
 internal sealed class VelopackUpdateService : IUpdateService
 {
-    private readonly BehaviorSubject<UpdateState> _state = new(new UpdateState(false, null));
+    private readonly BehaviorSubject<UpdateState> _state = new(new UpdateState());
     private readonly string _repoUrl;
     private readonly string? _token;
 
@@ -34,9 +34,11 @@ internal sealed class VelopackUpdateService : IUpdateService
         if (string.IsNullOrWhiteSpace(_repoUrl))
         {
             Log.Information("Updates: no Updates:RepoUrl configured, skipping.");
-            if (userInitiated) Emit(transient: "Updates are not configured for this build.");
+            EmitTransient("Updates are not configured for this build.", userInitiated);
             return;
         }
+
+        Push(new UpdateState { Phase = UpdatePhase.Checking });
 
         try
         {
@@ -46,7 +48,8 @@ internal sealed class VelopackUpdateService : IUpdateService
             if (!mgr.IsInstalled)
             {
                 Log.Information("Updates: not an installed build, skipping check.");
-                if (userInitiated) Emit(transient: "Updates only run in the installed app.");
+                Reset();
+                EmitTransient("Updates only run in the installed app.", userInitiated);
                 return;
             }
 
@@ -54,7 +57,8 @@ internal sealed class VelopackUpdateService : IUpdateService
             if (info is null)
             {
                 Log.Information("Updates: already up to date.");
-                if (userInitiated) Emit(transient: "You're on the latest version.");
+                Reset();
+                EmitTransient("You're on the latest version.", userInitiated);
                 return;
             }
 
@@ -62,12 +66,13 @@ internal sealed class VelopackUpdateService : IUpdateService
             _pending = info;
             var version = info.TargetFullRelease.Version.ToString();
             Log.Information("Updates: version {Version} available.", version);
-            _state.OnNext(new UpdateState(true, version));
+            Push(new UpdateState { Phase = UpdatePhase.Available, Version = version });
         }
         catch (Exception ex)
         {
             Log.Warning(ex, "Updates: check failed.");
-            if (userInitiated) Emit(transient: "Couldn't check for updates. Try again later.");
+            Reset();
+            EmitTransient("Couldn't check for updates. Try again later.", userInitiated);
         }
     }
 
@@ -79,21 +84,35 @@ internal sealed class VelopackUpdateService : IUpdateService
             return;
         }
 
+        var version = _pending.TargetFullRelease.Version.ToString();
+
         try
         {
-            Log.Information("Updates: downloading and applying update, will restart.");
-            await _manager.DownloadUpdatesAsync(_pending);
+            Push(new UpdateState { Phase = UpdatePhase.Downloading, Version = version, DownloadProgress = 0 });
+
+            await _manager.DownloadUpdatesAsync(_pending, progress =>
+                Push(new UpdateState { Phase = UpdatePhase.Downloading, Version = version, DownloadProgress = progress }));
+
+            Log.Information("Updates: download complete, applying and restarting.");
+            Push(new UpdateState { Phase = UpdatePhase.Installing, Version = version, DownloadProgress = 100 });
             _manager.ApplyUpdatesAndRestart(_pending);
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Updates: failed to install update.");
-            Emit(transient: "Update failed to install. Please try again.");
+            Log.Error(ex, "Updates: failed to download/install update.");
+            // Keep the update available so the user can retry.
+            Push(new UpdateState { Phase = UpdatePhase.Available, Version = version, TransientMessage = "Update failed. Please try again." });
         }
     }
 
-    // Emits a one-off message while preserving the current availability/version state.
-    // The view model is responsible for auto-dismissing the message after a short delay.
-    private void Emit(string transient)
-        => _state.OnNext(_state.Value with { TransientMessage = transient });
+    private void Push(UpdateState state) => _state.OnNext(state);
+
+    private void Reset() => _state.OnNext(new UpdateState());
+
+    private void EmitTransient(string message, bool userInitiated)
+    {
+        if (!userInitiated) return;
+        // Preserve current availability/version while flashing the message.
+        _state.OnNext(_state.Value with { TransientMessage = message });
+    }
 }

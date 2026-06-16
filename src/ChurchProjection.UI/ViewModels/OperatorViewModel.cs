@@ -86,6 +86,10 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     private bool _updateAvailable;
     private string _updateVersion = string.Empty;
     private string? _updateMessage;
+    private bool _isCheckingForUpdate;
+    private bool _isDownloadingUpdate;
+    private bool _isInstallingUpdate;
+    private int _downloadProgress;
 
     public ViewModelActivator Activator { get; } = new();
 
@@ -165,10 +169,47 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
 
     public bool HasUpdateMessage => !string.IsNullOrEmpty(_updateMessage);
 
-    /// <summary>The running app version, shown in the status bar and clickable to check for updates.</summary>
+    /// <summary>True while a check is in flight (About page spinner / disabled buttons).</summary>
+    public bool IsCheckingForUpdate
+    {
+        get => _isCheckingForUpdate;
+        private set { this.RaiseAndSetIfChanged(ref _isCheckingForUpdate, value); this.RaisePropertyChanged(nameof(IsUpdateBusy)); }
+    }
+
+    /// <summary>True while the update package is downloading; drives the progress bar.</summary>
+    public bool IsDownloadingUpdate
+    {
+        get => _isDownloadingUpdate;
+        private set { this.RaiseAndSetIfChanged(ref _isDownloadingUpdate, value); this.RaisePropertyChanged(nameof(IsUpdateBusy)); }
+    }
+
+    /// <summary>True once the download finishes and the app is about to restart.</summary>
+    public bool IsInstallingUpdate
+    {
+        get => _isInstallingUpdate;
+        private set { this.RaiseAndSetIfChanged(ref _isInstallingUpdate, value); this.RaisePropertyChanged(nameof(IsUpdateBusy)); }
+    }
+
+    /// <summary>Download progress (0–100) for the in-app download manager.</summary>
+    public int DownloadProgress
+    {
+        get => _downloadProgress;
+        private set => this.RaiseAndSetIfChanged(ref _downloadProgress, value);
+    }
+
+    /// <summary>True when any update operation is running (used to disable buttons).</summary>
+    public bool IsUpdateBusy => _isCheckingForUpdate || _isDownloadingUpdate || _isInstallingUpdate;
+
+    /// <summary>The running app version, shown in the status bar and About page; clickable to check for updates.</summary>
     public string AppVersion { get; }
 
-    /// <summary>Downloads and applies the pending update, then restarts.</summary>
+    /// <summary>OS description for the About page (e.g. "Microsoft Windows 10.0.26200").</summary>
+    public string OsDescription { get; }
+
+    /// <summary>.NET runtime description for the About page.</summary>
+    public string RuntimeDescription { get; }
+
+    /// <summary>Downloads (with progress) and applies the pending update, then restarts.</summary>
     public ReactiveCommand<Unit, Unit> InstallUpdateCommand { get; }
 
     /// <summary>Manually checks for updates (shows transient feedback when nothing's found).</summary>
@@ -180,8 +221,13 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     private void OnUpdateState(UpdateState state)
     {
         UpdateAvailable = state.Available;
-        if (state.Available && !string.IsNullOrEmpty(state.Version))
+        if (!string.IsNullOrEmpty(state.Version))
             UpdateVersion = state.Version;
+
+        IsCheckingForUpdate = state.Phase == UpdatePhase.Checking;
+        IsDownloadingUpdate = state.Phase == UpdatePhase.Downloading;
+        IsInstallingUpdate = state.Phase == UpdatePhase.Installing;
+        DownloadProgress = state.DownloadProgress;
 
         if (!string.IsNullOrEmpty(state.TransientMessage))
         {
@@ -703,6 +749,8 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         _updates = updates;
         var asmVersion = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version;
         AppVersion = asmVersion is null ? "LumenCue" : $"v{asmVersion.Major}.{asmVersion.Minor}.{asmVersion.Build}";
+        OsDescription = System.Runtime.InteropServices.RuntimeInformation.OSDescription;
+        RuntimeDescription = $".NET {Environment.Version} ({System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture})";
         InstallUpdateCommand = ReactiveCommand.CreateFromTask(async () =>
         {
             if (_updates is not null) await _updates.InstallAndRestartAsync();
