@@ -52,19 +52,11 @@ jobs:
           Set-Content $csproj -Value $text -NoNewline
           Write-Host "Stamped version $version into $csproj."
 
-      - name: Restore embedded secrets (appsettings.local.json)
-        shell: pwsh
-        env:
-          APPSETTINGS_LOCAL: ${{ secrets.APPSETTINGS_LOCAL }}
-        run: |
-          if ([string]::IsNullOrWhiteSpace($env:APPSETTINGS_LOCAL)) {
-            throw "APPSETTINGS_LOCAL secret is not set. Add it with: gh secret set APPSETTINGS_LOCAL < src/ChurchProjection.App/appsettings.local.json"
-          }
-          $path = "src/ChurchProjection.App/appsettings.local.json"
-          $env:APPSETTINGS_LOCAL | Out-File -FilePath $path -Encoding utf8 -NoNewline
-          Write-Host "Wrote $path ($($env:APPSETTINGS_LOCAL.Length) chars)."
-
+      # No secrets are injected into the build: the app ships zero credentials and reaches all
+      # services through the cloud API at runtime. Releases are pushed to the PUBLIC
+      # williammgyasii/lumencue-releases repo, which needs a cross-repo write token (RELEASES_TOKEN)
+      # since the built-in GITHUB_TOKEN only has access to this (source) repo.
       - name: Build & publish release
         shell: pwsh
         run: |
-          installer/build-release.ps1 -Version "${{ steps.ver.outputs.version }}" -Token "${{ github.token }}"
+          installer/build-release.ps1 -Version "${{ steps.ver.outputs.version }}" -Token "${{ secrets.RELEASES_TOKEN }}"

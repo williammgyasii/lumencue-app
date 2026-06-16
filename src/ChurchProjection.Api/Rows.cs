@@ -22,6 +22,12 @@ public sealed class SeatRow
     public string branch_id { get; set; } = "";
 }
 
+// Deepgram POST /v1/auth/grant response (snake_case to match the API payload).
+public sealed record DeepgramGrant(string access_token, double? expires_in);
+
+// What the client receives from POST /stt/token.
+public sealed record SttTokenResponse(string AccessToken, double ExpiresIn);
+
 public sealed class SongRow
 {
     public Guid id { get; set; }

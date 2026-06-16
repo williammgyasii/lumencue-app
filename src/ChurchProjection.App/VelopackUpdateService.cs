@@ -8,9 +8,9 @@ using Velopack.Sources;
 namespace ChurchProjection.App;
 
 /// <summary>
-/// OTA updates via Velopack against the private "lumencue-app" GitHub Releases. Because the repo
-/// is private, a read-only GitHub token (Updates:GitHubToken, shipped in appsettings.local.json)
-/// is required to read releases. No-ops gracefully in dev / non-installed builds.
+/// OTA updates via Velopack against the public "lumencue-releases" GitHub Releases. The repo is
+/// public, so no token is required to read releases (Updates:GitHubToken stays unset and the client
+/// ships no secrets). No-ops gracefully in dev / non-installed builds.
 /// </summary>
 internal sealed class VelopackUpdateService : IUpdateService
 {

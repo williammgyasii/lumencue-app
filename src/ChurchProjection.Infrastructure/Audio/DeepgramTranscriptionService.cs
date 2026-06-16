@@ -13,7 +13,7 @@ namespace ChurchProjection.Infrastructure.Audio;
 
 public class DeepgramTranscriptionService : ITranscriptionService
 {
-    private readonly string _apiKey;
+    private readonly ISttTokenProvider _tokenProvider;
     // Finals below this Deepgram confidence are treated as room noise / music bleed and dropped before
     // they reach the matcher, so a noisy sanctuary can't spawn phantom scripture/song suggestions.
     // 0 disables the gate. Tuned conservatively: clear speech scores ~0.9+, garbled noise far lower.
@@ -58,9 +58,9 @@ public class DeepgramTranscriptionService : ITranscriptionService
     public IObservable<float> AudioLevel => _audioLevel.AsObservable();
     public bool IsRunning => _isListening.Value;
 
-    public DeepgramTranscriptionService(string apiKey, double minConfidence = 0.5)
+    public DeepgramTranscriptionService(ISttTokenProvider tokenProvider, double minConfidence = 0.5)
     {
-        _apiKey = apiKey;
+        _tokenProvider = tokenProvider;
         _minConfidence = Math.Clamp(minConfidence, 0.0, 1.0);
     }
 
@@ -107,10 +107,21 @@ public class DeepgramTranscriptionService : ITranscriptionService
         _statusMessage.OnNext("Connecting to Deepgram...");
         _connectionAlive = false;
 
+        // Fetch a fresh short-lived JWT for this connection. The token only needs to be valid at
+        // connect time; the socket then stays open for the whole session. A new one is fetched on
+        // every (re)connect, so we never depend on a stale credential.
+        var token = await _tokenProvider.GetTokenAsync().ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            Log.Error("No Deepgram access token available");
+            _statusMessage.OnNext("Speech token unavailable");
+            return;
+        }
+
         Deepgram.Library.Initialize();
 
-        var options = new DeepgramWsClientOptions(_apiKey, null, true);
-        _wsClient = ClientFactory.CreateListenWebSocketClient(_apiKey, options);
+        var options = new DeepgramWsClientOptions(apiKey: null, baseAddress: null, keepAlive: true, accessToken: token);
+        _wsClient = ClientFactory.CreateListenWebSocketClient("", options);
 
         _ = _wsClient.Subscribe(new EventHandler<ResultResponse>((_, e) =>
         {

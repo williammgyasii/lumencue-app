@@ -1,0 +1,32 @@
+# Fly.io config for the LumenCue Cloud API.
+# Deploy from the ChurchProjection/ directory:  fly deploy
+# Secrets (NEON_CONNECTION_STRING, DEEPGRAM_API_KEY) are set via `fly secrets set`,
+# never committed here.
+
+app = "lumencue-api"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  # Keep one instance warm so auth + STT-token calls during a live service have no cold start.
+  min_machines_running = 1
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+
+[env]
+  PORT = "8080"
+  ASPNETCORE_ENVIRONMENT = "Production"

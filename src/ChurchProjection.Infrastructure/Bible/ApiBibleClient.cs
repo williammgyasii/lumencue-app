@@ -13,7 +13,6 @@ public partial class ApiBibleClient : IBibleApiService
     private const int OpenEndedVerse = 999;
 
     private readonly HttpClient _http;
-    private readonly string _apiKey;
 
     [GeneratedRegex(@"\[(\d+)\]")]
     private static partial Regex VerseMarkerRegex();
@@ -31,14 +30,14 @@ public partial class ApiBibleClient : IBibleApiService
         ["BSB"]  = "bba9f40183526463-01",
     };
 
-    public ApiBibleClient(string apiKey)
+    /// <summary>
+    /// The HTTP client must be preconfigured with a base address and authentication. In production
+    /// this points at the cloud API's <c>/bible/</c> proxy (seat-token auth, key stays server-side);
+    /// relative paths (<c>bibles/...</c>) are forwarded verbatim to api.bible by the backend.
+    /// </summary>
+    public ApiBibleClient(HttpClient http)
     {
-        _apiKey = apiKey;
-        _http = new HttpClient
-        {
-            BaseAddress = new Uri("https://rest.api.bible/v1/")
-        };
-        _http.DefaultRequestHeaders.Add("api-key", _apiKey);
+        _http = http;
     }
 
     public async Task<ScripturePassage?> FetchPassageAsync(ScriptureReference reference, string translation = "KJV", CancellationToken cancellationToken = default)
@@ -60,12 +59,6 @@ public partial class ApiBibleClient : IBibleApiService
 
     public async Task<List<ScripturePassage>> FetchVersesAsync(ScriptureReference reference, string translation = "KJV", CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(_apiKey))
-        {
-            Log.Warning("API.Bible key not configured");
-            return [];
-        }
-
         if (!TranslationIds.TryGetValue(translation, out var bibleId))
         {
             Log.Warning("Translation {Translation} not available on API.Bible", translation);
@@ -101,7 +94,7 @@ public partial class ApiBibleClient : IBibleApiService
     /// </summary>
     public async Task<IReadOnlyList<string>> GetChapterIdsAsync(string translation, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(_apiKey) || !TranslationIds.TryGetValue(translation, out var bibleId))
+        if (!TranslationIds.TryGetValue(translation, out var bibleId))
             return [];
 
         try
@@ -133,7 +126,7 @@ public partial class ApiBibleClient : IBibleApiService
     /// <summary>Fetches and parses a whole chapter by its API.Bible id (e.g. "JHN.3").</summary>
     public Task<List<ScripturePassage>> FetchChapterByIdAsync(string translation, string chapterId, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(_apiKey) || !TranslationIds.TryGetValue(translation, out var bibleId))
+        if (!TranslationIds.TryGetValue(translation, out var bibleId))
             return Task.FromResult(new List<ScripturePassage>());
 
         var parts = chapterId.Split('.');

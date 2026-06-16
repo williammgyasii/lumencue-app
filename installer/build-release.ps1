@@ -1,20 +1,22 @@
 <#
 .SYNOPSIS
   Publishes LumenCue (self-contained win-x64), packs a Velopack release, and
-  (optionally) uploads it to the private GitHub Releases for OTA updates.
+  (optionally) uploads it to the PUBLIC GitHub Releases for OTA updates.
 
 .DESCRIPTION
   1. dotnet publish -> publish\app  (self-contained, win-x64)
   2. vpk pack        -> publish\releases  (Setup.exe + full/delta nupkg + RELEASES)
   3. vpk upload github (unless -SkipUpload)  -> creates/updates the GitHub release
 
-  End users on prior versions then get the update in-app via Velopack's GithubSource.
+  The published build ships NO secrets: appsettings.local.json is excluded from Release
+  builds, and the app reaches all credentials through the cloud API at runtime. End users
+  get updates in-app via Velopack's GithubSource against the public releases repo.
 
 .PARAMETER Version
   SemVer stamped on the build and the Velopack package (e.g. 0.6.5). Required.
 
 .PARAMETER Token
-  GitHub token with write access to the releases repo. Defaults to the token from
+  GitHub token with write access to the public releases repo. Defaults to the token from
   the GitHub CLI (`gh auth token`), so just stay logged in as the repo owner.
 
 .PARAMETER SkipUpload
@@ -29,7 +31,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$Version,
     [string]$Token,
-    [string]$RepoUrl = "https://github.com/williammgyasii/lumencue-app",
+    [string]$RepoUrl = "https://github.com/williammgyasii/lumencue-releases",
     [string]$Runtime = "win-x64",
     [switch]$SkipUpload,
     [switch]$SkipPublish
@@ -55,13 +57,13 @@ if (-not $SkipPublish) {
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }
 }
 
-# Confirm embedded API keys + update token made it into the build.
+# Security gate: the shipped build must contain NO secrets. A Release publish excludes
+# appsettings.local.json by design; fail loudly if one ever slips in.
 $localCfg = Join-Path $AppOut 'appsettings.local.json'
 if (Test-Path $localCfg) {
-    Write-Host "appsettings.local.json present in build (API keys + update token embedded)." -ForegroundColor Green
-} else {
-    Write-Warning "appsettings.local.json NOT in build - app will run with free APIs and CANNOT self-update (no token)."
+    throw "appsettings.local.json found in the published build ($localCfg). Secrets must never ship - remove it before releasing."
 }
+Write-Host "Verified: no appsettings.local.json in build (ships zero secrets)." -ForegroundColor Green
 
 # --- 2. Ensure the Velopack CLI (vpk) is installed ------------------------------------
 $vpk = Get-Command vpk -ErrorAction SilentlyContinue

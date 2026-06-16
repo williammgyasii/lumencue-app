@@ -37,15 +37,17 @@ public class App : Application
             .Build();
 
         var neonConnStr = config["ConnectionStrings:Neon"] ?? "";
-        var apiBibleKey = config["ApiBible:ApiKey"] ?? "";
-        var deepgramKey = config["Deepgram:ApiKey"] ?? "";
+        var cloudApiBaseUrl = config["CloudApi:BaseUrl"] ?? "";
 
-        Log.Information("Neon configured: {Configured}", !string.IsNullOrWhiteSpace(neonConnStr));
-        Log.Information("API.Bible key configured: {Configured}", !string.IsNullOrWhiteSpace(apiBibleKey));
-        Log.Information("Deepgram configured: {Configured}", !string.IsNullOrWhiteSpace(deepgramKey));
+        Log.Information("Cloud API configured: {Configured}", !string.IsNullOrWhiteSpace(cloudApiBaseUrl));
+        Log.Information("Neon (dev) configured: {Configured}", !string.IsNullOrWhiteSpace(neonConnStr));
         Log.Information("Free Bible API (bible.helloao.org): always available");
 
         var services = new ServiceCollection();
+
+        // Holds the active seat token in memory for cloud-API calls (Bible proxy, STT token).
+        var seatTokens = new SeatTokenProvider();
+        services.AddSingleton<ISeatTokenProvider>(seatTokens);
 
         var dbService = new DatabaseService(AppPaths.DatabasePath);
         await dbService.InitializeAsync();
@@ -58,27 +60,36 @@ public class App : Application
         services.AddSingleton<BibleCacheService>();
         services.AddSingleton<FreeBibleApiClient>(sp =>
             new FreeBibleApiClient(sp.GetRequiredService<BibleCacheService>()));
-        var apiBibleClient = !string.IsNullOrWhiteSpace(apiBibleKey)
-            ? new ApiBibleClient(apiBibleKey) : null;
+        // Premium translations come through the cloud API's /bible/ proxy (api.bible key stays
+        // server-side); the seat token authenticates each request.
+        ApiBibleClient? apiBibleClient = null;
+        if (!string.IsNullOrWhiteSpace(cloudApiBaseUrl))
+        {
+            var bibleHttp = new HttpClient(new SeatAuthHandler(seatTokens, new HttpClientHandler()))
+            {
+                BaseAddress = new Uri(cloudApiBaseUrl.TrimEnd('/') + "/bible/"),
+                Timeout = TimeSpan.FromSeconds(25),
+            };
+            apiBibleClient = new ApiBibleClient(bibleHttp);
+        }
         if (apiBibleClient is not null)
             services.AddSingleton(apiBibleClient);
         services.AddSingleton<IBibleApiService>(sp =>
             new CombinedBibleService(sp.GetRequiredService<FreeBibleApiClient>(), apiBibleClient));
         // Tenancy / cloud sign-in + song sync. Priority:
-        //   1) Direct Neon (works from any machine, no hosted API needed) when a Neon string is set.
-        //   2) Hosted HTTP API when CloudApi:BaseUrl is set.
+        //   1) Hosted HTTP API (the shipping default — keeps all DB credentials server-side).
+        //   2) Direct Neon, dev-only escape hatch when a Neon string is present in local config.
         //   3) Local stub (offline) otherwise.
         services.AddSingleton<ISessionStore, SessionStore>();
-        var cloudApiBaseUrl = config["CloudApi:BaseUrl"] ?? "";
-        if (!string.IsNullOrWhiteSpace(neonConnStr))
-        {
-            Log.Information("Cloud backend: direct Neon (no hosted API)");
-            services.AddSingleton<ICloudGateway>(new NeonCloudGateway(neonConnStr));
-        }
-        else if (!string.IsNullOrWhiteSpace(cloudApiBaseUrl))
+        if (!string.IsNullOrWhiteSpace(cloudApiBaseUrl))
         {
             Log.Information("Cloud backend: hosted API at {BaseUrl}", cloudApiBaseUrl);
             services.AddSingleton<ICloudGateway>(new HttpCloudGateway(cloudApiBaseUrl));
+        }
+        else if (!string.IsNullOrWhiteSpace(neonConnStr))
+        {
+            Log.Information("Cloud backend: direct Neon (dev fallback, no hosted API)");
+            services.AddSingleton<ICloudGateway>(new NeonCloudGateway(neonConnStr));
         }
         else
         {
@@ -98,17 +109,29 @@ public class App : Application
         services.AddSingleton<ILayerService, LayerService>();
         services.AddSingleton<IProPresenterService, ProPresenterService>();
 
-        if (!string.IsNullOrWhiteSpace(deepgramKey))
+        // Speech-to-text. When a cloud API is configured, stream to Deepgram using a short-lived
+        // token minted by the backend (no key on the client), falling back to offline Vosk when no
+        // token can be obtained. Without a cloud API (pure offline build), use Vosk directly.
+        // Confidence gate for noisy rooms: finals below this are dropped (0 disables, default 0.5).
+        var minConfidence = double.TryParse(config["Deepgram:MinConfidence"], out var mc) ? mc : 0.5;
+        if (!string.IsNullOrWhiteSpace(cloudApiBaseUrl))
         {
-            // Confidence gate for noisy rooms: finals below this are dropped before matching.
-            // Override via "Deepgram:MinConfidence" in appsettings (0 disables, default 0.5).
-            var minConfidence = double.TryParse(config["Deepgram:MinConfidence"], out var mc) ? mc : 0.5;
-            Log.Information("STT: Using Deepgram Nova-3 (cloud), confidence gate {Min:P0}", minConfidence);
-            services.AddSingleton<ITranscriptionService>(new DeepgramTranscriptionService(deepgramKey, minConfidence));
+            Log.Information("STT: Deepgram (cloud, token-based) with Vosk offline fallback, confidence gate {Min:P0}", minConfidence);
+            var sttHttp = new HttpClient(new SeatAuthHandler(seatTokens, new HttpClientHandler()))
+            {
+                BaseAddress = new Uri(cloudApiBaseUrl.TrimEnd('/') + "/"),
+                Timeout = TimeSpan.FromSeconds(15),
+            };
+            var sttTokenProvider = new HttpSttTokenProvider(sttHttp);
+            services.AddSingleton<ISttTokenProvider>(sttTokenProvider);
+            services.AddSingleton<ITranscriptionService>(_ => new ResilientTranscriptionService(
+                new DeepgramTranscriptionService(sttTokenProvider, minConfidence),
+                new VoskTranscriptionService(),
+                sttTokenProvider));
         }
         else
         {
-            Log.Information("STT: Falling back to Vosk (local offline)");
+            Log.Information("STT: Vosk (local offline)");
             services.AddSingleton<ITranscriptionService, VoskTranscriptionService>();
         }
 
@@ -175,6 +198,7 @@ public class App : Application
 
         if (session is not null && withinGrace)
         {
+            _services.GetRequiredService<ISeatTokenProvider>().Set(session.Token);
             tenant.Set(session.OrganizationId, session.OrganizationName, session.BranchId);
             await StartOperatorAsync(session);
             _ = RevalidateInBackgroundAsync(gateway, store, session);
@@ -194,6 +218,7 @@ public class App : Application
         {
             var tenant = _services!.GetRequiredService<ITenantContext>();
             var songs = _services!.GetRequiredService<SongRepository>();
+            _services!.GetRequiredService<ISeatTokenProvider>().Set(session.Token);
             tenant.Set(session.OrganizationId, session.OrganizationName, session.BranchId);
             await songs.AdoptDefaultLibraryAsync(session.OrganizationId);
             await StartOperatorAsync(session);
@@ -236,6 +261,7 @@ public class App : Application
                 try { await gateway.SignOutAsync(session); } catch { /* best-effort seat release */ }
             }
             await store.ClearAsync();
+            _services.GetRequiredService<ISeatTokenProvider>().Set(null);
             tenant.Reset();
 
             ShowSignIn();                                            // open sign-in before closing operator (keep >= 1 window)

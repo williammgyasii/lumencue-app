@@ -1,0 +1,20 @@
+# Keep the Docker build context tiny: only the API + Core sources are needed.
+**/bin/
+**/obj/
+**/.vs/
+**/.git/
+publish/
+installer/
+.github/
+
+# Desktop-app projects the API never references
+src/ChurchProjection.App/
+src/ChurchProjection.UI/
+src/ChurchProjection.Infrastructure/
+
+# ML model binaries and local artifacts
+**/*.bin
+**/*.ggml
+**/vosk-model*/
+**/appsettings.local.json
+**/*.db

@@ -7,9 +7,9 @@
     <Product>LumenCue</Product>
     <AssemblyTitle>LumenCue</AssemblyTitle>
     <Company>LumenCue</Company>
-    <Version>0.6.6</Version>
-    <FileVersion>0.6.6</FileVersion>
-    <InformationalVersion>0.6.6</InformationalVersion>
+    <Version>0.7.0</Version>
+    <FileVersion>0.7.0</FileVersion>
+    <InformationalVersion>0.7.0</InformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -38,7 +38,13 @@
 
   <ItemGroup>
     <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
-    <None Update="appsettings.local.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('appsettings.local.json')" />
+    <!--
+      appsettings.local.json holds developer-only overrides/secrets and MUST NOT ship.
+      It is copied for local Debug runs only; Release/Publish (the installer) never bundles it,
+      so no secrets ever leave the build machine.
+    -->
+    <None Update="appsettings.local.json" CopyToOutputDirectory="PreserveNewest"
+          Condition="Exists('appsettings.local.json') And '$(Configuration)' == 'Debug'" />
   </ItemGroup>
 
   <!--
