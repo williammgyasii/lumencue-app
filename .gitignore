@@ -6,7 +6,11 @@ obj/
 logs/
 log.txt
 runlog.txt
-models/
+# ML model binaries (downloaded at runtime). Note: do NOT use a bare "models/"
+# pattern - on case-insensitive systems it also matches source "Models/" folders.
+ggml-*.bin
+*.ggml
+vosk-model*/
 *.db
 *.db-wal
 *.db-shm
