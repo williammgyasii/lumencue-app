@@ -81,6 +81,12 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     private double _previewWidth = 1920;
     private double _previewHeight = 1080;
 
+    private readonly IUpdateService? _updates;
+    private IDisposable? _updateMessageTimer;
+    private bool _updateAvailable;
+    private string _updateVersion = string.Empty;
+    private string? _updateMessage;
+
     public ViewModelActivator Activator { get; } = new();
 
     /// <summary>
@@ -132,8 +138,60 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         private set => this.RaiseAndSetIfChanged(ref _previewHeight, value);
     }
 
+    /// <summary>True while a newer version is available; drives the persistent blinking update toast.</summary>
+    public bool UpdateAvailable
+    {
+        get => _updateAvailable;
+        private set => this.RaiseAndSetIfChanged(ref _updateAvailable, value);
+    }
+
+    /// <summary>The version offered by the pending update (e.g. "0.6.6").</summary>
+    public string UpdateVersion
+    {
+        get => _updateVersion;
+        private set => this.RaiseAndSetIfChanged(ref _updateVersion, value);
+    }
+
+    /// <summary>Transient feedback for a manual check (e.g. "You're on the latest version"); auto-clears.</summary>
+    public string? UpdateMessage
+    {
+        get => _updateMessage;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _updateMessage, value);
+            this.RaisePropertyChanged(nameof(HasUpdateMessage));
+        }
+    }
+
+    public bool HasUpdateMessage => !string.IsNullOrEmpty(_updateMessage);
+
+    /// <summary>The running app version, shown in the status bar and clickable to check for updates.</summary>
+    public string AppVersion { get; }
+
+    /// <summary>Downloads and applies the pending update, then restarts.</summary>
+    public ReactiveCommand<Unit, Unit> InstallUpdateCommand { get; }
+
+    /// <summary>Manually checks for updates (shows transient feedback when nothing's found).</summary>
+    public ReactiveCommand<Unit, Unit> CheckForUpdatesCommand { get; }
+
     /// <summary>Creates a fresh Theme Studio view model bound to the shared theme service.</summary>
     public ThemeStudioViewModel CreateThemeStudio() => new(_themes, _liveBackground);
+
+    private void OnUpdateState(UpdateState state)
+    {
+        UpdateAvailable = state.Available;
+        if (state.Available && !string.IsNullOrEmpty(state.Version))
+            UpdateVersion = state.Version;
+
+        if (!string.IsNullOrEmpty(state.TransientMessage))
+        {
+            UpdateMessage = state.TransientMessage;
+            _updateMessageTimer?.Dispose();
+            _updateMessageTimer = Observable.Timer(TimeSpan.FromSeconds(5))
+                .ObserveOn(RxApp.MainThreadScheduler)
+                .Subscribe(_ => UpdateMessage = null);
+        }
+    }
 
     /// <summary>Creates a fresh song editor (new song). Wire <see cref="SongEditorViewModel.Saved"/> to refresh the library.</summary>
     public SongEditorViewModel CreateSongEditor() => new(_contentLibrary, _themes);
@@ -624,7 +682,8 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         IProPresenterService proPresenter,
         ILiveBackgroundService liveBackground,
         IAnnouncementService announcements,
-        ILayerService layers)
+        ILayerService layers,
+        IUpdateService? updates = null)
     {
         _projection = projectionService;
         _settings = settings;
@@ -640,6 +699,21 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         _layers = layers;
         Backgrounds = new BackgroundsViewModel(liveBackground);
         MediaPlayback = new Operator.MediaPlaybackViewModel(announcements, Outputs);
+
+        _updates = updates;
+        var asmVersion = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version;
+        AppVersion = asmVersion is null ? "LumenCue" : $"v{asmVersion.Major}.{asmVersion.Minor}.{asmVersion.Build}";
+        InstallUpdateCommand = ReactiveCommand.CreateFromTask(async () =>
+        {
+            if (_updates is not null) await _updates.InstallAndRestartAsync();
+        });
+        CheckForUpdatesCommand = ReactiveCommand.CreateFromTask(async () =>
+        {
+            if (_updates is not null) await _updates.CheckAsync(userInitiated: true);
+        });
+        _updates?.State
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(OnUpdateState);
 
         ContentSearch = new ContentSearchViewModel(contentLibrary);
         SongImport = new SongImportViewModel(contentLibrary);

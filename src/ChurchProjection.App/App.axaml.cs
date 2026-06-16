@@ -118,6 +118,7 @@ public class App : Application
         services.AddSingleton<ISuggestionEngine, SuggestionEngine>();
         services.AddSingleton<IScriptureSearchService, ScriptureSearchService>();
         services.AddSingleton<ISongSearchService, SongSearchService>();
+        services.AddSingleton<IUpdateService>(new VelopackUpdateService(config));
         services.AddSingleton<OperatorViewModel>();
         services.AddSingleton<ProjectorViewModel>();
         services.AddSingleton<WindowManager>();
@@ -149,8 +150,9 @@ public class App : Application
 
             await GateAndStartAsync();
 
-            // Fire-and-forget OTA update check once a window is on screen. No-ops in dev builds.
-            _ = new Updater(config).CheckAndPromptAsync();
+            // Fire-and-forget OTA update check once a window is on screen. The operator UI shows a
+            // persistent toast if an update is found. No-ops in dev / non-installed builds.
+            _ = _services.GetRequiredService<IUpdateService>().CheckAsync();
         }
 
         base.OnFrameworkInitializationCompleted();
