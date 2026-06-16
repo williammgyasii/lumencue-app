@@ -39,6 +39,19 @@ jobs:
             echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Stamp version into csproj
+        shell: pwsh
+        run: |
+          $version = "${{ steps.ver.outputs.version }}"
+          if ($version -notmatch '^\d+\.\d+\.\d+') { throw "Invalid version '$version' (expected e.g. 0.6.7)." }
+          $csproj = "src/ChurchProjection.App/ChurchProjection.App.csproj"
+          $text = Get-Content $csproj -Raw
+          $text = $text -replace '<Version>.*?</Version>', "<Version>$version</Version>"
+          $text = $text -replace '<FileVersion>.*?</FileVersion>', "<FileVersion>$version</FileVersion>"
+          $text = $text -replace '<InformationalVersion>.*?</InformationalVersion>', "<InformationalVersion>$version</InformationalVersion>"
+          Set-Content $csproj -Value $text -NoNewline
+          Write-Host "Stamped version $version into $csproj."
+
       - name: Restore embedded secrets (appsettings.local.json)
         shell: pwsh
         env:
