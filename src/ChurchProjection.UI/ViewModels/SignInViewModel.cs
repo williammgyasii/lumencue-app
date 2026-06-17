@@ -18,9 +18,7 @@ public sealed class SignInViewModel : ViewModelBase
     {
         _gateway = gateway;
         _store = store;
-        ModeNote = gateway.IsConfigured
-            ? "Sign in with your branch credentials to claim a seat."
-            : "Offline/dev mode: any organization and branch will sign in.";
+        ModeNote = "Sign in with your branch credentials to claim a seat.";
 
         var canSignIn = this.WhenAnyValue(
             x => x.OrganizationCode, x => x.BranchCode, x => x.Busy,

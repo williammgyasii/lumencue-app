@@ -93,8 +93,12 @@ public class App : Application
         }
         else
         {
-            Log.Information("Cloud backend: local stub (offline)");
-            services.AddSingleton<ICloudGateway, StubCloudGateway>();
+            // No cloud configured (dev or prod): refuse sign-in rather than accept anything. Real
+            // credentials are always validated against the cloud API (or direct Neon in dev); we never
+            // fall back to an "any password works" path.
+            Log.Error("Cloud backend: no CloudApi:BaseUrl configured; sign-in is disabled.");
+            services.AddSingleton<ICloudGateway>(new UnavailableCloudGateway(
+                "Sign-in is unavailable: this build is not connected to the LumenCue service."));
         }
         services.AddTransient<SignInViewModel>();
 
