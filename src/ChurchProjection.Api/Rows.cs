@@ -32,6 +32,8 @@ public sealed class AccessRow
     public string status { get; set; } = "";
     // Trial/period boundary. A 'trial' subscription is only active until this instant.
     public DateTime? current_period_end { get; set; }
+    // Resolved feature flags as a JSON object string, e.g. {"video_backgrounds":true,...}.
+    public string features { get; set; } = "{}";
 }
 
 // Deepgram POST /v1/auth/grant response (snake_case to match the API payload).

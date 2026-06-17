@@ -177,6 +177,16 @@ public static class Db
                 where s.organization_id = e.organization_id and s.branch_id = e.branch_id;
             end if;
         end $$;
+
+        -- 2026-06: premium feature flags per plan tier. The catalogue is product-defined, so this is
+        -- kept authoritative on every deploy. Absent/false flag = the feature is locked on the client.
+        update plans set features = case code
+            when 'trial'    then '{"video_backgrounds":true,"shared_library":true,"multi_campus":false}'::jsonb
+            when 'standard' then '{"video_backgrounds":false,"shared_library":false,"multi_campus":false}'::jsonb
+            when 'pro'      then '{"video_backgrounds":true,"shared_library":true,"multi_campus":true}'::jsonb
+            when 'master'   then '{"video_backgrounds":true,"shared_library":true,"multi_campus":true}'::jsonb
+            else features
+        end;
         """;
 
     private const string DropLegacy = """
@@ -226,13 +236,13 @@ public static class Db
     {
         // --- Plans ---
         await conn.ExecuteAsync(
-            "insert into plans (code, name, seats_default, stt_minutes_per_month, price_usd_month) values (@Code, @Name, @Seats, @Stt, @Price)",
+            "insert into plans (code, name, seats_default, stt_minutes_per_month, price_usd_month, features) values (@Code, @Name, @Seats, @Stt, @Price, @Features::jsonb)",
             new[]
             {
-                new { Code = "trial",    Name = "Trial",    Seats = 2,   Stt = 600,    Price = 0m },
-                new { Code = "standard", Name = "Standard", Seats = 1,   Stt = 2400,   Price = 50m },
-                new { Code = "pro",      Name = "Pro",      Seats = 1,   Stt = 6000,   Price = 100m },
-                new { Code = "master",   Name = "Master",   Seats = 999, Stt = 100000, Price = 0m },
+                new { Code = "trial",    Name = "Trial",    Seats = 2,   Stt = 600,    Price = 0m,   Features = "{\"video_backgrounds\":true,\"shared_library\":true,\"multi_campus\":false}" },
+                new { Code = "standard", Name = "Standard", Seats = 1,   Stt = 2400,   Price = 50m,  Features = "{\"video_backgrounds\":false,\"shared_library\":false,\"multi_campus\":false}" },
+                new { Code = "pro",      Name = "Pro",      Seats = 1,   Stt = 6000,   Price = 100m, Features = "{\"video_backgrounds\":true,\"shared_library\":true,\"multi_campus\":true}" },
+                new { Code = "master",   Name = "Master",   Seats = 999, Stt = 100000, Price = 0m,   Features = "{\"video_backgrounds\":true,\"shared_library\":true,\"multi_campus\":true}" },
             });
 
         // --- Demo / launch tenants. Password for every seeded branch is "lumen123". ---

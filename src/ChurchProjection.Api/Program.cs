@@ -306,13 +306,7 @@ app.MapPost("/stt/token", async (HttpRequest http, NpgsqlDataSource ds, IHttpCli
 
     // Monthly quota: reject once this calendar month's metered usage has reached the branch's
     // allowance. Daily rows are still written; we sum them from the start of the UTC month.
-    var usedSeconds = await conn.ExecuteScalarAsync<int>(
-        """
-        select coalesce(sum(seconds_used), 0) from stt_usage
-        where organization_id = @Org and branch_id = @Branch
-          and day >= date_trunc('month', (now() at time zone 'utc'))::date
-        """,
-        new { Org = seat.organization_id, Branch = seat.branch_id });
+    var usedSeconds = await MonthlySttSecondsAsync(conn, seat.organization_id, seat.branch_id);
     if (usedSeconds >= access.stt_minutes_per_month * 60)
         return Results.Json("Monthly AI-listening limit reached. It resets next month.", statusCode: 429);
 
@@ -358,6 +352,12 @@ app.MapGet("/bible/{**path}", async (string path, HttpRequest http, NpgsqlDataSo
     await using var conn = await ds.OpenConnectionAsync();
     var seat = await AuthorizeSeatAsync(http, conn);
     if (seat is null) return Results.Json("Missing or invalid token.", statusCode: 401);
+
+    // Premium translations are a paid benefit: cut off when the branch's subscription lapses
+    // (graceful degradation — the client still has its bundled/offline translations).
+    var access = await LoadAccessAsync(conn, seat.organization_id, seat.branch_id);
+    if (!IsAccessActive(access))
+        return Results.Json("Premium Bible translations require an active subscription.", statusCode: 403);
 
     if (string.IsNullOrWhiteSpace(apiBibleKey))
         return Results.Json("Bible service is not configured.", statusCode: 503);
@@ -445,14 +445,16 @@ static async Task<AccessRow> LoadAccessAsync(NpgsqlConnection conn, string org, 
 {
     var row = await conn.QuerySingleOrDefaultAsync<AccessRow>(
         """
-        select e.seats, e.stt_minutes_per_month, s.plan_code, s.status, s.current_period_end
+        select e.seats, e.stt_minutes_per_month, s.plan_code, s.status, s.current_period_end,
+               coalesce(p.features::text, '{}') as features
         from entitlements e
         join subscriptions s on s.organization_id = e.organization_id and s.branch_id = e.branch_id
+        join plans p on p.code = s.plan_code
         where e.organization_id = @Org and e.branch_id = @Branch
         """,
         new { Org = org, Branch = branch });
 
-    return row ?? new AccessRow { seats = 1, stt_minutes_per_month = 0, plan_code = "free", status = "suspended" };
+    return row ?? new AccessRow { seats = 1, stt_minutes_per_month = 0, plan_code = "free", status = "suspended", features = "{}" };
 }
 
 static Task<int> ActiveSeatsAsync(NpgsqlConnection conn, string org, string branch, int windowDays) =>
@@ -474,10 +476,36 @@ static Task TouchDeviceActivationAsync(NpgsqlConnection conn, string org, string
         """,
         new { Org = org, Branch = branch, Hw = hardwareId });
 
+// Sum of AI-listening seconds metered for a branch since the start of the current UTC month.
+static Task<int> MonthlySttSecondsAsync(NpgsqlConnection conn, string org, string branch) =>
+    conn.ExecuteScalarAsync<int>(
+        """
+        select coalesce(sum(seconds_used), 0) from stt_usage
+        where organization_id = @Org and branch_id = @Branch
+          and day >= date_trunc('month', (now() at time zone 'utc'))::date
+        """,
+        new { Org = org, Branch = branch });
+
+// Enabled feature keys from the resolved feature JSON ({"video_backgrounds":true,...}).
+static List<string> ParseFeatures(string json)
+{
+    if (string.IsNullOrWhiteSpace(json)) return [];
+    try
+    {
+        var map = JsonSerializer.Deserialize<Dictionary<string, bool>>(json);
+        return map is null ? [] : map.Where(kv => kv.Value).Select(kv => kv.Key).ToList();
+    }
+    catch
+    {
+        return [];
+    }
+}
+
 static async Task<AuthSession> BuildSessionAsync(
     NpgsqlConnection conn, BranchRow branch, string deviceId, string token, AccessRow access)
 {
     var used = await ActiveSeatsAsync(conn, branch.organization_id, branch.id, 14);
+    var sttSeconds = await MonthlySttSecondsAsync(conn, branch.organization_id, branch.id);
 
     return new AuthSession
     {
@@ -492,6 +520,8 @@ static async Task<AuthSession> BuildSessionAsync(
         PlanCode = access.plan_code,
         SubscriptionStatus = access.status,
         SttMinutesPerMonth = access.stt_minutes_per_month,
+        SttMinutesUsed = sttSeconds / 60,
+        Features = ParseFeatures(access.features),
         LastValidatedUtc = DateTime.UtcNow,
     };
 }

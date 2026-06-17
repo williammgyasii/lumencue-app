@@ -52,5 +52,12 @@ public sealed class AuthSession
     /// <summary>Monthly AI-listening (speech-to-text) allowance in minutes. 0 = AI not included.</summary>
     public int SttMinutesPerMonth { get; set; }
 
+    /// <summary>AI-listening minutes already used this calendar month (for the usage gate display).</summary>
+    public int SttMinutesUsed { get; set; }
+
+    /// <summary>Enabled premium feature flags for this branch's plan
+    /// (e.g. "video_backgrounds", "shared_library", "multi_campus"). Absent = locked.</summary>
+    public List<string> Features { get; set; } = [];
+
     public DateTime LastValidatedUtc { get; set; }
 }
