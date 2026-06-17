@@ -676,6 +676,19 @@
                             <TextBlock Text="LIVE" Foreground="White" FontSize="9" FontWeight="Bold" />
                           </StackPanel>
                         </Border>
+                        <!-- Origin highlight: the verse the operator opened this chapter from (e.g. an AI
+                             suggestion). Amber so it never reads as LIVE; sits top-right, clear of the LIVE badge. -->
+                        <Border IsVisible="{Binding IsOrigin}" IsHitTestVisible="False"
+                                BorderBrush="#F59E0B" BorderThickness="3" CornerRadius="8" />
+                        <Border IsVisible="{Binding IsOrigin}" IsHitTestVisible="False"
+                                Background="#F59E0B" CornerRadius="6" Padding="6,2"
+                                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="6"
+                                ToolTip.Tip="The verse you opened this chapter from">
+                          <StackPanel Orientation="Horizontal" Spacing="4">
+                            <TextBlock Text="★" Foreground="#1A1205" FontSize="9" FontWeight="Bold" VerticalAlignment="Center" />
+                            <TextBlock Text="FROM HERE" Foreground="#1A1205" FontSize="9" FontWeight="Bold" />
+                          </StackPanel>
+                        </Border>
                       </Panel>
                     </DataTemplate>
                   </ListBox.ItemTemplate>

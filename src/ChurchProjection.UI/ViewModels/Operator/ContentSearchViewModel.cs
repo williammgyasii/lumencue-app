@@ -124,7 +124,12 @@ public class ContentSearchViewModel : ViewModelBase
     /// Loads every verse of a chapter into the results list (one selectable row per verse) so the
     /// operator can browse and project verses manually, independent of the live AI suggestions.
     /// </summary>
-    public async Task LoadFullChapterAsync(string book, int chapter)
+    /// <param name="originVerse">
+    /// The verse the operator opened this chapter from (e.g. an AI suggestion of Mark 1:1). That row
+    /// is highlighted and scrolled into view so the operator can see the verse that brought them here.
+    /// Pass 0 to highlight nothing.
+    /// </param>
+    public async Task LoadFullChapterAsync(string book, int chapter, int originVerse = 0)
     {
         // Cancel any in-flight search so it cannot clobber the chapter we are about to show.
         _searchCts?.Cancel();
@@ -137,9 +142,10 @@ public class ContentSearchViewModel : ViewModelBase
             var verses = await _contentLibrary.GetOrFetchVersesAsync(wholeChapter, SelectedTranslation);
 
             Results.Clear();
+            ContentItem? origin = null;
             foreach (var s in verses)
             {
-                Results.Add(new ContentItem
+                var item = new ContentItem
                 {
                     Type = ContentItemType.Scripture,
                     Title = s.Reference,
@@ -147,9 +153,16 @@ public class ContentSearchViewModel : ViewModelBase
                     Body = s.Text,
                     Tag = s.Translation,
                     Footer = $"{s.Reference} ({s.Translation})",
-                    Source = s
-                });
+                    Source = s,
+                    IsOrigin = originVerse > 0 && s.VerseStart == originVerse
+                };
+                Results.Add(item);
+                if (item.IsOrigin) origin = item;
             }
+
+            // Select the originating verse so the list auto-scrolls to it and it reads as the focus.
+            if (origin is not null)
+                SelectedItem = origin;
 
             _suppressedQuery = $"{book} {chapter}";
             SearchQuery = _suppressedQuery;

@@ -226,6 +226,9 @@ internal sealed class VlcMediaPlayer : IDisposable
         }
 
         if (_vlcBuffer != IntPtr.Zero) Marshal.FreeHGlobal(_vlcBuffer);
-        foreach (var b in _buffers) b.Dispose();
+
+        // A window may still hold the last frame as its Image.Source; retire after the next render
+        // commit rather than freeing the native surface mid-paint.
+        foreach (var b in _buffers) SafeBitmapDisposal.Retire(b);
     }
 }

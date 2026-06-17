@@ -311,7 +311,19 @@ public class ProjectorViewModel : ViewModelBase, IActivatableViewModel, IDisposa
     {
         _liveTimer?.Stop();
         _subscriptions.Dispose();
-        _overlayImage?.Dispose();
+
+        // Detach bitmaps from the (closing) view's Image controls before disposing, then retire them
+        // after the next render commit so the compositor never paints a freed surface. The live-frame
+        // buffers belong to the shared background player, so we only drop the reference here.
+        var overlay = _overlayImage;
+        var themeBg = _themeBackgroundImage;
+        _overlayImage = null;
+        _themeBackgroundImage = null;
+        OverlayImage = null;
+        BackgroundImage = null;
+        HasBackgroundImage = false;
+        SafeBitmapDisposal.Retire(overlay);
+        SafeBitmapDisposal.Retire(themeBg);
     }
 
     public string SlideTitle { get => _slideTitle; set => this.RaiseAndSetIfChanged(ref _slideTitle, value); }
@@ -526,7 +538,7 @@ public class ProjectorViewModel : ViewModelBase, IActivatableViewModel, IDisposa
                 catch (Exception ex) { Log.Warning(ex, "Failed to load overlay logo {Path}", s.OverlayImagePath); }
             }
             OverlayImage = loaded;
-            old?.Dispose();
+            SafeBitmapDisposal.Retire(old);
         }
 
         AlertText = s.AlertText ?? string.Empty;

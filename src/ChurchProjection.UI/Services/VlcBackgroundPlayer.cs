@@ -165,6 +165,9 @@ internal sealed class VlcBackgroundPlayer : IDisposable
         }
 
         if (_vlcBuffer != IntPtr.Zero) Marshal.FreeHGlobal(_vlcBuffer);
-        foreach (var b in _buffers) b.Dispose();
+
+        // A projector window may still hold one of these frames as its Image.Source. Retire them after
+        // the next render commit instead of freeing the native surface out from under the compositor.
+        foreach (var b in _buffers) SafeBitmapDisposal.Retire(b);
     }
 }

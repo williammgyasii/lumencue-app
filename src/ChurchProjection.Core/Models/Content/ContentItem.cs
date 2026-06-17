@@ -9,6 +9,7 @@ public enum ContentItemType { Scripture, Song, Announcement }
 public class ContentItem : INotifyPropertyChanged
 {
     private bool _isLive;
+    private bool _isOrigin;
 
     public ContentItemType Type { get; set; }
     public string Title { get; set; } = "";
@@ -29,6 +30,22 @@ public class ContentItem : INotifyPropertyChanged
         {
             if (_isLive == value) return;
             _isLive = value;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>
+    /// True for the single verse the operator opened this chapter from (via "Show Full Chapter").
+    /// Highlighted in the chapter list so the operator can spot the verse that brought them here
+    /// instead of hunting for it again.
+    /// </summary>
+    public bool IsOrigin
+    {
+        get => _isOrigin;
+        set
+        {
+            if (_isOrigin == value) return;
+            _isOrigin = value;
             OnPropertyChanged();
         }
     }

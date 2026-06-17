@@ -4,6 +4,7 @@ using System.Reactive;
 using System.Reactive.Concurrency;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
+using Avalonia.Threading;
 using ChurchProjection.Core.Models.Content;
 using ChurchProjection.Core.Models.Projection;
 using ChurchProjection.Core.Models.Slides;
@@ -1142,8 +1143,8 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     public void ShowFullChapter(SuggestionItem? item)
     {
         if (item is null) return;
-        if (TryParseScriptureId(item.ContentId, out var book, out var chapter))
-            LoadChapterIntoLibrary(book, chapter);
+        if (TryParseScriptureId(item.ContentId, out var book, out var chapter, out var verse))
+            LoadChapterIntoLibrary(book, chapter, verse);
     }
 
     public void ShowFullChapter(ContentItem? item)
@@ -1152,24 +1153,32 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
 
         if (item.Source is ScripturePassage passage)
         {
-            LoadChapterIntoLibrary(passage.Book, passage.Chapter);
+            LoadChapterIntoLibrary(passage.Book, passage.Chapter, passage.VerseStart);
         }
-        else if (TryParseReferenceText(item.Title, out var book, out var chapter))
+        else if (TryParseReferenceText(item.Title, out var book, out var chapter, out var verse))
         {
-            LoadChapterIntoLibrary(book, chapter);
+            LoadChapterIntoLibrary(book, chapter, verse);
         }
     }
 
-    private void LoadChapterIntoLibrary(string book, int chapter)
+    private void LoadChapterIntoLibrary(string book, int chapter, int originVerse)
     {
         SelectedContentTab = 0;
         StatusText = $"Loading {book} {chapter}...";
-        _ = ContentSearch.LoadFullChapterAsync(book, chapter);
+        _ = ContentSearch.LoadFullChapterAsync(book, chapter, originVerse);
     }
 
-    // Detects a spoken "find the scripture about ..." request and populates the Find Scripture tab.
+    // Routes a spoken utterance to its handler: a translation switch ("...in the King James") or a
+    // topical lookup ("find me the scripture about ...").
     private void OnSpokenSegment(string text)
     {
+        var translation = SpokenTranslationParser.TryParse(text);
+        if (translation is not null)
+        {
+            ApplySpokenTranslation(translation);
+            return;
+        }
+
         var topic = TopicalRequestParser.ExtractTopic(text);
         if (string.IsNullOrWhiteSpace(topic)) return;
 
@@ -1179,11 +1188,35 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         _ = TopicalSearch.RunAutoSearchAsync(topic);
     }
 
+    // Switches the active translation in response to a spoken request, re-rendering whatever scripture
+    // is already live. Translations the plan doesn't carry (e.g. TPT) tell the operator so out loud.
+    private void ApplySpokenTranslation(SpokenTranslationRequest request)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!ContentSearch.AvailableTranslations.Contains(request.Code))
+            {
+                StatusText = $"{request.DisplayName} isn't available — staying on {ContentSearch.SelectedTranslation}";
+                return;
+            }
+
+            if (string.Equals(ContentSearch.SelectedTranslation, request.Code, StringComparison.OrdinalIgnoreCase))
+            {
+                StatusText = $"Already showing {request.DisplayName}";
+                return;
+            }
+
+            ContentSearch.SelectedTranslation = request.Code;
+            StatusText = $"Switched to {request.DisplayName}";
+        });
+    }
+
     // ContentId shape: "scripture:{Book}:{Chapter}:{VerseStart}"; Book may contain spaces ("1 John").
-    private static bool TryParseScriptureId(string contentId, out string book, out int chapter)
+    private static bool TryParseScriptureId(string contentId, out string book, out int chapter, out int verse)
     {
         book = string.Empty;
         chapter = 0;
+        verse = 0;
         if (string.IsNullOrEmpty(contentId)) return false;
 
         var parts = contentId.Split(':');
@@ -1191,20 +1224,23 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
             return false;
 
         book = parts[1];
+        int.TryParse(parts[3], out verse);
         return int.TryParse(parts[2], out chapter) && chapter > 0 && book.Length > 0;
     }
 
-    private static bool TryParseReferenceText(string reference, out string book, out int chapter)
+    private static bool TryParseReferenceText(string reference, out string book, out int chapter, out int verse)
     {
         var parsed = ScriptureReferenceParser.TryParse(reference);
         if (parsed is not null)
         {
             book = parsed.Book;
             chapter = parsed.Chapter;
+            verse = parsed.VerseStart;
             return true;
         }
         book = string.Empty;
         chapter = 0;
+        verse = 0;
         return false;
     }
 

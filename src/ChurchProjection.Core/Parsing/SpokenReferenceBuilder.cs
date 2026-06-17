@@ -10,8 +10,8 @@ namespace ChurchProjection.Core.Parsing;
 /// The matcher's normal path only recognises a reference when book/chapter/verse are contiguous
 /// inside one sliding-window of speech, which a preacher's stop-start delivery defeats. This builder
 /// is fed the per-utterance segment stream instead and keeps a single <em>pending</em> reference
-/// alive across gaps, surfacing it as soon as book + chapter are known and refining it to the exact
-/// verse once that is spoken.
+/// alive across gaps, surfacing the book's opening verse the moment a book is named, then refining it
+/// to the whole chapter and finally the exact verse as those are spoken.
 ///
 /// It is deliberately conservative: a bare number is ignored until a book is pending, naming a new
 /// book restarts the reference, and the pending state expires after a configurable idle timeout so
@@ -68,8 +68,9 @@ public sealed class SpokenReferenceBuilder
                 ClearLocked();
 
             var changed = ScanLocked(segmentText, now);
-            if (!changed || _book is null || _chapter <= 0) return null;
+            if (!changed || _book is null) return null;
 
+            var hasChapter = _chapter > 0;
             var hasVerse = _verse > 0;
             var hasRange = hasVerse && _verseEnd > _verse;
 
@@ -80,10 +81,19 @@ public sealed class SpokenReferenceBuilder
                 reference = new ScriptureReference(_book, _chapter, _verse, hasRange ? _verseEnd : (int?)null);
                 id = hasRange ? $"{_book}|{_chapter}|{_verse}|{_verseEnd}" : $"{_book}|{_chapter}|{_verse}";
             }
-            else
+            else if (hasChapter)
             {
                 reference = new ScriptureReference(_book, _chapter, VerseStart: 1, VerseEnd: ScriptureReference.WholeChapterSentinel);
                 id = $"{_book}|{_chapter}|chapter";
+            }
+            else
+            {
+                // Only the book has been named so far ("let's go to Matthew"). Surface its opening verse
+                // (Matthew 1:1) so the operator can load it immediately and navigate from there once the
+                // preacher follows up with the chapter/verse. Internal _chapter stays 0 so a chapter
+                // spoken next is still read as the chapter, not a verse.
+                reference = new ScriptureReference(_book, Chapter: 1, VerseStart: 1, VerseEnd: null);
+                id = $"{_book}|book";
             }
 
             if (id == _lastEmittedId) return null; // nothing new to show
