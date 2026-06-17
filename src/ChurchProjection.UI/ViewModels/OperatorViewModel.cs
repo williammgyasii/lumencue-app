@@ -8,6 +8,7 @@ using Avalonia.Threading;
 using ChurchProjection.Core.Models.Content;
 using ChurchProjection.Core.Models.Projection;
 using ChurchProjection.Core.Models.Slides;
+using ChurchProjection.Core.Models.Tenancy;
 using ChurchProjection.Core.Parsing;
 using ChurchProjection.Core.Services;
 using ChurchProjection.Infrastructure.Bible;
@@ -40,6 +41,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     private readonly ILiveBackgroundService _liveBackground;
     private readonly IAnnouncementService _announcements;
     private readonly ILayerService _layers;
+    private readonly IEntitlementService _entitlements;
     private readonly Progress<string> _indexProgress;
 
     // The scripture reference currently shown live, so a translation switch can re-render it.
@@ -78,6 +80,9 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     private string _projectorBackground = "Black";
     private string _projectorLayout = "Full Screen";
     private bool _autoStartListening;
+    private bool _isUpgradePromptOpen;
+    private string _upgradePromptTitle = "";
+    private string _upgradePromptMessage = "";
     private bool _screenOutputEnabled = true;
     private double _previewWidth = 1920;
     private double _previewHeight = 1080;
@@ -344,6 +349,108 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
 
         // Seat usage rides along with the account label; SyncStatus is reserved for live sync state.
         AccountLabel = seatCount > 0 ? $"{label} · Seat {seatsUsed}/{seatCount}" : label;
+    }
+
+    // --- In-app paywall (binds to the resolved entitlements) ---
+
+    private const string UpgradeUrl = "https://lumencueapp.com/pricing";
+
+    private EntitlementState Ent => _entitlements.Current;
+
+    /// <summary>Top-bar status strip (trial countdown / grace warning / inactive) — empty when hidden.</summary>
+    public bool ShowEntitlementBanner => Ent.HasBanner;
+    public string EntitlementBannerText => Ent.BannerText;
+    public bool ShowUpgrade => Ent.ShowUpgrade;
+
+    /// <summary>Feature gate: video / motion backgrounds + lower-thirds (Pro and above).</summary>
+    public bool CanUseVideoBackgrounds => Ent.CanUseVideoBackgrounds;
+    public bool VideoBackgroundsLocked => !Ent.CanUseVideoBackgrounds;
+    public bool CanUseSharedLibrary => Ent.CanUseSharedLibrary;
+
+    /// <summary>Usage gate: AI listening allowed (included, active, allowance not exhausted).</summary>
+    public bool CanUseAi => Ent.CanUseAi;
+    public bool AiBlocked => !Ent.CanUseAi;
+    public bool AiNearLimit => Ent.AiNearLimit;
+
+    public string AiUsageText
+    {
+        get
+        {
+            if (Ent.IsUnlimitedAi) return "AI listening: unlimited";
+            if (!Ent.AiIncluded) return "AI listening is not included on this plan";
+            if (Ent.AiExhausted) return "Monthly AI limit reached — resets next month, or upgrade for more";
+            return $"AI listening: {Ent.AiMinutesRemaining} of {Ent.AiMinutesAllowance} min left this month";
+        }
+    }
+
+    public bool IsUpgradePromptOpen
+    {
+        get => _isUpgradePromptOpen;
+        set => this.RaiseAndSetIfChanged(ref _isUpgradePromptOpen, value);
+    }
+
+    public string UpgradePromptTitle
+    {
+        get => _upgradePromptTitle;
+        set => this.RaiseAndSetIfChanged(ref _upgradePromptTitle, value);
+    }
+
+    public string UpgradePromptMessage
+    {
+        get => _upgradePromptMessage;
+        set => this.RaiseAndSetIfChanged(ref _upgradePromptMessage, value);
+    }
+
+    private void RequestUpgrade(string? feature)
+    {
+        (UpgradePromptTitle, UpgradePromptMessage) = feature switch
+        {
+            FeatureKeys.VideoBackgrounds => (
+                "Upgrade to use video backgrounds",
+                "Video & motion backgrounds and lower-thirds are part of the Pro plan. Upgrade to bring cinematic backgrounds into your services."),
+            FeatureKeys.SharedLibrary => (
+                "Upgrade to share your library",
+                "Sharing a song library across branches is part of the Pro plan. Upgrade to keep every campus in sync."),
+            "ai" => (
+                "Monthly AI limit reached",
+                "You've used this month's AI-listening allowance. It resets at the start of next month — or upgrade to Pro for more hands-free transcription."),
+            _ => (
+                "Upgrade LumenCue",
+                "Unlock more AI-listening minutes, video backgrounds, a shared library and multi-campus management."),
+        };
+        IsUpgradePromptOpen = true;
+    }
+
+    private void OpenCheckout()
+    {
+        IsUpgradePromptOpen = false;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = UpgradeUrl,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Could not open the upgrade page");
+            StatusText = "Couldn't open the upgrade page — visit lumencueapp.com/pricing.";
+        }
+    }
+
+    private void RefreshEntitlements()
+    {
+        this.RaisePropertyChanged(nameof(ShowEntitlementBanner));
+        this.RaisePropertyChanged(nameof(EntitlementBannerText));
+        this.RaisePropertyChanged(nameof(ShowUpgrade));
+        this.RaisePropertyChanged(nameof(CanUseVideoBackgrounds));
+        this.RaisePropertyChanged(nameof(VideoBackgroundsLocked));
+        this.RaisePropertyChanged(nameof(CanUseSharedLibrary));
+        this.RaisePropertyChanged(nameof(CanUseAi));
+        this.RaisePropertyChanged(nameof(AiBlocked));
+        this.RaisePropertyChanged(nameof(AiNearLimit));
+        this.RaisePropertyChanged(nameof(AiUsageText));
     }
 
     /// <summary>Maps the scheduler's state to the short label shown next to the account.</summary>
@@ -714,6 +821,17 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     public ReactiveCommand<Unit, Unit> ShowMediaModeCommand { get; }
     public ReactiveCommand<Unit, Unit> SignOutCommand { get; }
 
+    /// <summary>Opens the generic upgrade prompt (from the top-bar Upgrade button / status banner).</summary>
+    public ReactiveCommand<Unit, Unit> UpgradeCommand { get; }
+
+    /// <summary>Opens a feature-specific upgrade prompt (param = feature key, e.g. "video_backgrounds" or "ai").</summary>
+    public ReactiveCommand<string?, Unit> RequestUpgradeCommand { get; }
+
+    /// <summary>Sends the operator to the hosted checkout / pricing page and closes the prompt.</summary>
+    public ReactiveCommand<Unit, Unit> OpenCheckoutCommand { get; }
+
+    public ReactiveCommand<Unit, Unit> DismissUpgradePromptCommand { get; }
+
     public OperatorViewModel(
         IProjectionService projectionService,
         IContentLibraryService contentLibrary,
@@ -730,6 +848,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         ILiveBackgroundService liveBackground,
         IAnnouncementService announcements,
         ILayerService layers,
+        IEntitlementService entitlements,
         IUpdateService? updates = null)
     {
         _projection = projectionService;
@@ -744,6 +863,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         _liveBackground = liveBackground;
         _announcements = announcements;
         _layers = layers;
+        _entitlements = entitlements;
         Backgrounds = new BackgroundsViewModel(liveBackground);
         MediaPlayback = new Operator.MediaPlaybackViewModel(announcements, Outputs);
 
@@ -839,6 +959,15 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         syncScheduler.StatusChanged += info =>
             RxApp.MainThreadScheduler.Schedule(() => SyncStatus = DescribeSync(info));
         SignOutCommand = ReactiveCommand.Create(() => SignOutRequested?.Invoke());
+
+        UpgradeCommand = ReactiveCommand.Create(() => RequestUpgrade(null));
+        RequestUpgradeCommand = ReactiveCommand.Create<string?>(RequestUpgrade);
+        OpenCheckoutCommand = ReactiveCommand.Create(OpenCheckout);
+        DismissUpgradePromptCommand = ReactiveCommand.Create(() => { IsUpgradePromptOpen = false; });
+
+        // Refresh every paywall-bound property whenever entitlements change (sign-in / revalidation).
+        _entitlements.Changed += _ => RxApp.MainThreadScheduler.Schedule(RefreshEntitlements);
+        RefreshEntitlements();
 
         Transcription.Suggestions.CollectionChanged += (_, e) =>
         {

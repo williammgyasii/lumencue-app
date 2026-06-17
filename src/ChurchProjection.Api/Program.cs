@@ -519,6 +519,7 @@ static async Task<AuthSession> BuildSessionAsync(
         SeatsUsed = used,
         PlanCode = access.plan_code,
         SubscriptionStatus = access.status,
+        CurrentPeriodEndUtc = access.current_period_end,
         SttMinutesPerMonth = access.stt_minutes_per_month,
         SttMinutesUsed = sttSeconds / 60,
         Features = ParseFeatures(access.features),

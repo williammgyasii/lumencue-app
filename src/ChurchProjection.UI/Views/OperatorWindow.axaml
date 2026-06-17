@@ -175,6 +175,11 @@
             <TextBlock Text="{Binding AccountLabel}" Foreground="#C2C8D2" FontSize="11"
                        MaxWidth="240" TextTrimming="CharacterEllipsis" />
           </Border>
+          <Border Background="#3A2A12" CornerRadius="10" Padding="10,4" IsVisible="{Binding ShowEntitlementBanner}"
+                  ToolTip.Tip="Subscription status">
+            <TextBlock Text="{Binding EntitlementBannerText}" Foreground="#F59E0B" FontSize="11"
+                       MaxWidth="380" TextTrimming="CharacterEllipsis" />
+          </Border>
         </StackPanel>
 
         <!-- CENTER: workspace modes — a service is either showing scripture or singing -->
@@ -243,6 +248,9 @@
 
         <!-- RIGHT: operational controls -->
         <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <Button Classes="ghost" Content="Upgrade" Command="{Binding UpgradeCommand}" Padding="10,6" FontSize="12"
+                  Foreground="#F59E0B" FontWeight="SemiBold" IsVisible="{Binding ShowUpgrade}"
+                  ToolTip.Tip="See plans and upgrade for more AI minutes and premium features" />
           <Button Classes="ghost" Content="Pre-service" Tapped="OnPreServiceClicked" Padding="10,6" FontSize="12"
                   ToolTip.Tip="Put a live countdown or clock on the screen before the service starts" />
           <Button Classes="ghost" Content="Settings" Tapped="OnSettingsClicked" Padding="10,6" FontSize="12" />
@@ -839,16 +847,33 @@
                 <!-- AI Suggestions tab content -->
                 <DockPanel IsVisible="{Binding IsSuggestionsTab}">
                   <Border DockPanel.Dock="Top" Padding="12,8" IsVisible="{Binding Transcription.IsListening}">
-                    <TextBlock Foreground="#959DAB" FontSize="12" FontStyle="Italic"
-                               Text="Listening for scriptures and content..." />
+                    <StackPanel Spacing="3">
+                      <TextBlock Foreground="#959DAB" FontSize="12" FontStyle="Italic"
+                                 Text="Listening for scriptures and content..." />
+                      <TextBlock Foreground="#F59E0B" FontSize="11" Text="{Binding AiUsageText}"
+                                 IsVisible="{Binding AiNearLimit}" />
+                    </StackPanel>
                   </Border>
                   <Border DockPanel.Dock="Top" Padding="12,8" IsVisible="{Binding !Transcription.IsListening}">
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                      <TextBlock Foreground="#959DAB" FontSize="12"
-                                 Text="AI Listening is off." VerticalAlignment="Center" />
-                      <Button Content="Start Listening" FontSize="12" Padding="10,5" CornerRadius="6"
-                              Background="#A78BFA" Foreground="White" FontWeight="SemiBold"
-                              Command="{Binding Transcription.ToggleListeningCommand}" />
+                    <StackPanel Spacing="6">
+                      <!-- AI available: normal start -->
+                      <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding CanUseAi}">
+                        <TextBlock Foreground="#959DAB" FontSize="12"
+                                   Text="AI Listening is off." VerticalAlignment="Center" />
+                        <Button Content="Start Listening" FontSize="12" Padding="10,5" CornerRadius="6"
+                                Background="#A78BFA" Foreground="White" FontWeight="SemiBold"
+                                Command="{Binding Transcription.ToggleListeningCommand}" />
+                      </StackPanel>
+                      <!-- AI blocked: monthly limit reached / not active → upgrade -->
+                      <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding AiBlocked}">
+                        <TextBlock Foreground="#F59E0B" FontSize="12" VerticalAlignment="Center"
+                                   MaxWidth="320" TextWrapping="Wrap" Text="{Binding AiUsageText}" />
+                        <Button Content="Upgrade" FontSize="12" Padding="10,5" CornerRadius="6"
+                                Background="#A78BFA" Foreground="White" FontWeight="SemiBold"
+                                Command="{Binding RequestUpgradeCommand}" CommandParameter="ai" />
+                      </StackPanel>
+                      <TextBlock Foreground="#6E7682" FontSize="11" Text="{Binding AiUsageText}"
+                                 IsVisible="{Binding CanUseAi}" />
                     </StackPanel>
                   </Border>
                   <ListBox x:Name="SuggestionsListBox"
@@ -1547,6 +1572,40 @@
             BorderBrush="#2A303C" BorderThickness="1" Padding="16,12"
             BoxShadow="0 8 28 0 #80000000">
       <TextBlock Text="{Binding UpdateMessage}" Foreground="#ECEEF2" FontSize="12" VerticalAlignment="Center" />
+    </Border>
+
+    <!-- UPGRADE PROMPT (reusable paywall dialog) — shown for trial/feature/usage upsell. -->
+    <Border Grid.RowSpan="5" ZIndex="100" Background="#B3000000"
+            IsVisible="{Binding IsUpgradePromptOpen}">
+      <Border Width="440" HorizontalAlignment="Center" VerticalAlignment="Center"
+              Background="#171B22" CornerRadius="14" BorderBrush="#2A303C" BorderThickness="1"
+              Padding="26" BoxShadow="0 18 60 0 #99000000">
+        <StackPanel Spacing="14">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <Border Width="34" Height="34" CornerRadius="9">
+              <Border.Background>
+                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                  <GradientStop Color="#7C6CF6" Offset="0" />
+                  <GradientStop Color="#F472B6" Offset="1" />
+                </LinearGradientBrush>
+              </Border.Background>
+              <TextBlock Text="&#9733;" FontSize="17" Foreground="White"
+                         HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <TextBlock Text="{Binding UpgradePromptTitle}" Foreground="#ECEEF2" FontSize="17"
+                       FontWeight="Bold" VerticalAlignment="Center" MaxWidth="350" TextWrapping="Wrap" />
+          </StackPanel>
+          <TextBlock Text="{Binding UpgradePromptMessage}" Foreground="#B6BDC9" FontSize="13"
+                     TextWrapping="Wrap" LineHeight="20" />
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+            <Button Classes="ghost" Content="Maybe later" Padding="14,8" FontSize="13"
+                    Command="{Binding DismissUpgradePromptCommand}" />
+            <Button Content="See plans" Padding="16,8" FontSize="13" FontWeight="SemiBold"
+                    Background="#A78BFA" Foreground="White" CornerRadius="8"
+                    Command="{Binding OpenCheckoutCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
     </Border>
 
   </Grid>

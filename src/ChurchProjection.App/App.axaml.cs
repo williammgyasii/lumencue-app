@@ -83,6 +83,8 @@ public class App : Application
         // entitlements. When no API is configured we refuse sign-in rather than accept anything
         // (no "any password works" path).
         services.AddSingleton<ISessionStore, SessionStore>();
+        // Resolved entitlements (plan, AI allowance, premium features) that the in-app paywall binds to.
+        services.AddSingleton<IEntitlementService, EntitlementService>();
         if (!string.IsNullOrWhiteSpace(cloudApiBaseUrl))
         {
             Log.Information("Cloud backend: hosted API at {BaseUrl}", cloudApiBaseUrl);
@@ -204,9 +206,10 @@ public class App : Application
         if (session is not null && withinGrace)
         {
             _services.GetRequiredService<ISeatTokenProvider>().Set(session.Token);
+            _services.GetRequiredService<IEntitlementService>().Update(session);
             tenant.Set(session.OrganizationId, session.OrganizationName, session.BranchId);
             await StartOperatorAsync(session);
-            _ = RevalidateInBackgroundAsync(gateway, store, session);
+            _ = RevalidateInBackgroundAsync(gateway, store, _services.GetRequiredService<IEntitlementService>(), session);
         }
         else
         {
@@ -224,6 +227,7 @@ public class App : Application
             var tenant = _services!.GetRequiredService<ITenantContext>();
             var songs = _services!.GetRequiredService<SongRepository>();
             _services!.GetRequiredService<ISeatTokenProvider>().Set(session.Token);
+            _services!.GetRequiredService<IEntitlementService>().Update(session);
             tenant.Set(session.OrganizationId, session.OrganizationName, session.BranchId);
             await songs.AdoptDefaultLibraryAsync(session.OrganizationId);
             await StartOperatorAsync(session);
@@ -267,6 +271,7 @@ public class App : Application
             }
             await store.ClearAsync();
             _services.GetRequiredService<ISeatTokenProvider>().Set(null);
+            _services.GetRequiredService<IEntitlementService>().Clear();
             tenant.Reset();
 
             ShowSignIn();                                            // open sign-in before closing operator (keep >= 1 window)
@@ -278,14 +283,18 @@ public class App : Application
         }
     }
 
-    private static async Task RevalidateInBackgroundAsync(ICloudGateway gateway, ISessionStore store, AuthSession session)
+    private static async Task RevalidateInBackgroundAsync(
+        ICloudGateway gateway, ISessionStore store, IEntitlementService entitlements, AuthSession session)
     {
         if (!gateway.IsConfigured) return;
         try
         {
             var result = await gateway.ValidateAsync(session);
             if (result is { Success: true, Session: not null })
+            {
                 await store.SaveAsync(result.Session);
+                entitlements.Update(result.Session);
+            }
         }
         catch (Exception ex)
         {

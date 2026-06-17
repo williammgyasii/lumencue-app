@@ -270,7 +270,16 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
     public void OnBackgroundTileTapped(object? sender, TappedEventArgs e)
     {
         if (DataContext is OperatorViewModel vm && sender is Control { DataContext: BackgroundTileViewModel tile })
+        {
+            // Feature gate: motion/video backgrounds are a Pro feature. Still images stay free.
+            if (tile.IsVideo && vm.VideoBackgroundsLocked)
+            {
+                vm.RequestUpgradeCommand.Execute(
+                    ChurchProjection.Core.Models.Tenancy.FeatureKeys.VideoBackgrounds).Subscribe();
+                return;
+            }
             vm.Backgrounds.SelectCommand.Execute(tile).Subscribe();
+        }
     }
 
     public void OnRemoveBackgroundClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)

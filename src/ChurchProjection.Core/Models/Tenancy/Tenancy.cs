@@ -49,6 +49,9 @@ public sealed class AuthSession
     /// <summary>Subscription status: trial | active | past_due | suspended | canceled.</summary>
     public string SubscriptionStatus { get; set; } = "";
 
+    /// <summary>When the current period ends. For a trial this is the hard cut-off; null = no expiry.</summary>
+    public DateTime? CurrentPeriodEndUtc { get; set; }
+
     /// <summary>Monthly AI-listening (speech-to-text) allowance in minutes. 0 = AI not included.</summary>
     public int SttMinutesPerMonth { get; set; }
 
