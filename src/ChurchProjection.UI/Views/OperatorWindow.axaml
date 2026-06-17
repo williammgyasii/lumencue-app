@@ -11,7 +11,7 @@
         x:Class="ChurchProjection.UI.Views.OperatorWindow"
         x:DataType="vm:OperatorViewModel"
         Title="LumenCue"
-        Icon="/Assets/logo.png"
+        Icon="/Assets/app-icon.png"
         Width="1400" Height="900"
         MinWidth="1100" MinHeight="700"
         WindowStartupLocation="CenterScreen"

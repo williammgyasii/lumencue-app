@@ -5,7 +5,7 @@
         x:Class="ChurchProjection.UI.Views.ProjectorWindow"
         x:DataType="vm:ProjectorViewModel"
         Title="Projector Output"
-        Icon="/Assets/logo.png"
+        Icon="/Assets/app-icon.png"
         Background="{Binding BackgroundBrush}"
         WindowState="Normal"
         SystemDecorations="None"

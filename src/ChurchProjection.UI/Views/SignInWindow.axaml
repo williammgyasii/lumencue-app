@@ -4,6 +4,7 @@
         x:Class="ChurchProjection.UI.Views.SignInWindow"
         x:DataType="vm:SignInViewModel"
         Title="Sign in — LumenCue"
+        Icon="/Assets/app-icon.png"
         Width="440" Height="560"
         MinWidth="440" MinHeight="560"
         CanResize="False"

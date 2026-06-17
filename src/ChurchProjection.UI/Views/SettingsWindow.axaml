@@ -7,6 +7,7 @@
         x:Class="ChurchProjection.UI.Views.SettingsWindow"
         x:DataType="vm:OperatorViewModel"
         Title="Settings"
+        Icon="/Assets/app-icon.png"
         Width="780" Height="620"
         MinWidth="660" MinHeight="460"
         WindowStartupLocation="CenterOwner"
