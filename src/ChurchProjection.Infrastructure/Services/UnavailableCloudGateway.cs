@@ -5,9 +5,9 @@ using ChurchProjection.Core.Services;
 namespace ChurchProjection.Infrastructure.Services;
 
 /// <summary>
-/// Safe fallback for shipped builds that somehow have no cloud API configured. Unlike the dev-only
-/// <see cref="StubCloudGateway"/>, it never grants access: every sign-in/validate fails with a clear
-/// message. This guarantees a production build can never silently accept arbitrary credentials.
+/// Safe fallback for builds that have no cloud API configured. It never grants access: every
+/// sign-in/validate fails with a clear message, so a build can never silently accept arbitrary
+/// credentials. The hosted <see cref="HttpCloudGateway"/> is the only path that grants seats.
 /// </summary>
 public sealed class UnavailableCloudGateway : ICloudGateway
 {

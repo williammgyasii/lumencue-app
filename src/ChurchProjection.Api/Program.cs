@@ -62,8 +62,14 @@ var app = builder.Build();
 // listens on plain HTTP inside the VM, so no in-app UseHttpsRedirection (it would loop).
 app.UseCors();
 
-// Ensure schema + seed a demo organization/branch on startup so the API is usable immediately.
+// Ensure schema + seed tenants on startup so the API is usable immediately.
 await Db.InitializeAsync(dataSource, app.Logger);
+
+// Anti-abuse tuning. A seat idle longer than the active window auto-frees so a dead machine never
+// blocks a branch; the move limit caps distinct machines a branch can activate in a rolling window.
+const int ActiveSeatWindowDays = 14;
+const int MoveWindowDays = 30;
+const int MoveSlack = 3; // distinct machines allowed beyond the seat count per move window
 
 app.MapGet("/", () => Results.Ok(new { service = "LumenCue Cloud API", status = "ok" }));
 app.MapGet("/health", async (NpgsqlDataSource ds) =>
@@ -75,61 +81,76 @@ app.MapGet("/health", async (NpgsqlDataSource ds) =>
 
 // --- Auth -----------------------------------------------------------------
 
-app.MapPost("/auth/signin", async (SignInRequest req, NpgsqlDataSource ds) =>
+app.MapPost("/auth/signin", async (SignInRequest req, HttpRequest http, NpgsqlDataSource ds) =>
 {
     if (string.IsNullOrWhiteSpace(req.OrganizationCode) ||
         string.IsNullOrWhiteSpace(req.BranchCode) ||
         string.IsNullOrWhiteSpace(req.DeviceId))
         return Results.BadRequest("Organization, branch and device are required.");
 
+    // Hardware id binds the seat to a physical machine; it may arrive in the body or the header.
+    var hardwareId = !string.IsNullOrWhiteSpace(req.HardwareId) ? req.HardwareId.Trim() : HardwareId(http);
+    if (string.IsNullOrWhiteSpace(hardwareId))
+        return Results.BadRequest("This device could not be identified. Please update the app.");
+
     await using var conn = await ds.OpenConnectionAsync();
 
-    var branch = await conn.QuerySingleOrDefaultAsync<BranchRow>(
-        """
-        select b.id, b.organization_id, b.name, b.password_hash,
-               o.name as organization_name, o.seat_count
-        from branches b
-        join organizations o on o.id = b.organization_id
-        where b.organization_id = @Org and b.id = @Branch
-        """,
-        new { Org = req.OrganizationCode.Trim(), Branch = req.BranchCode.Trim() });
-
+    var branch = await LoadBranchAsync(conn, req.OrganizationCode.Trim(), req.BranchCode.Trim());
     if (branch is null || !Passwords.Verify(req.Password, branch.password_hash))
         return Results.Json("Invalid organization, branch or password.", statusCode: 401);
 
-    // Seat enforcement: reuse an existing seat for this device, else claim a free one.
-    var existingToken = await conn.ExecuteScalarAsync<string?>(
-        "select token from seats where organization_id = @Org and device_id = @Device",
-        new { Org = branch.organization_id, Device = req.DeviceId });
+    var access = await LoadAccessAsync(conn, branch.organization_id, branch.id);
+    if (!IsActive(access.status))
+        return Results.Json(
+            $"The subscription for {branch.name} is {access.status}. Contact your administrator.",
+            statusCode: 403);
 
-    var token = existingToken;
-    if (token is null)
+    // One seat per machine per branch: reuse this device's seat if it already holds one.
+    var seat = await conn.QuerySingleOrDefaultAsync<SeatRow>(
+        "select id, organization_id, branch_id, device_id, hardware_id from seats where organization_id = @Org and branch_id = @Branch and hardware_id = @Hw",
+        new { Org = branch.organization_id, Branch = branch.id, Hw = hardwareId });
+
+    var token = NewToken();
+    if (seat is not null)
     {
-        var used = await conn.ExecuteScalarAsync<int>(
-            "select count(*) from seats where organization_id = @Org",
-            new { Org = branch.organization_id });
-
-        if (used >= branch.seat_count)
-            return Results.Json(
-                $"All {branch.seat_count} seats for {branch.organization_name} are in use.",
-                statusCode: 403);
-
-        token = NewToken();
         await conn.ExecuteAsync(
-            """
-            insert into seats (organization_id, device_id, branch_id, token, claimed_at, last_seen_at)
-            values (@Org, @Device, @Branch, @Token, now(), now())
-            """,
-            new { Org = branch.organization_id, Device = req.DeviceId, Branch = branch.id, Token = token });
+            "update seats set token = @Token, device_id = @Device, last_seen_at = now() where id = @Id",
+            new { Token = token, Device = req.DeviceId, Id = seat.id });
     }
     else
     {
+        // Active-seat check (idle seats past the window auto-free, so a dead machine never blocks a branch).
+        var used = await ActiveSeatsAsync(conn, branch.organization_id, branch.id, ActiveSeatWindowDays);
+        if (used >= access.seats)
+            return Results.Json(
+                $"All {access.seats} seat(s) for {branch.name} are in use. Release one or contact your administrator.",
+                statusCode: 403);
+
+        // Device-move limit: cap how many distinct machines a branch can activate in a rolling window,
+        // so seats can't be rotated across many computers to dodge the seat count.
+        var recentDevices = await conn.ExecuteScalarAsync<int>(
+            """
+            select count(*) from device_activations
+            where organization_id = @Org and branch_id = @Branch
+              and last_seen_at > now() - (@Days || ' days')::interval
+            """,
+            new { Org = branch.organization_id, Branch = branch.id, Days = MoveWindowDays });
+        if (recentDevices >= access.seats + MoveSlack)
+            return Results.Json(
+                "Too many new devices have been activated for this branch recently. Please try again later or contact support.",
+                statusCode: 403);
+
         await conn.ExecuteAsync(
-            "update seats set branch_id = @Branch, last_seen_at = now() where organization_id = @Org and device_id = @Device",
-            new { Branch = branch.id, Org = branch.organization_id, Device = req.DeviceId });
+            """
+            insert into seats (organization_id, branch_id, device_id, hardware_id, token, claimed_at, last_seen_at)
+            values (@Org, @Branch, @Device, @Hw, @Token, now(), now())
+            """,
+            new { Org = branch.organization_id, Branch = branch.id, Device = req.DeviceId, Hw = hardwareId, Token = token });
     }
 
-    var session = await BuildSessionAsync(conn, branch, req.DeviceId, token!);
+    await TouchDeviceActivationAsync(conn, branch.organization_id, branch.id, hardwareId);
+
+    var session = await BuildSessionAsync(conn, branch, req.DeviceId, token, access);
     return Results.Ok(session);
 });
 
@@ -138,26 +159,31 @@ app.MapPost("/auth/validate", async (HttpRequest http, NpgsqlDataSource ds) =>
     var token = BearerToken(http);
     if (token is null) return Results.Json("Missing token.", statusCode: 401);
 
+    var hardwareId = HardwareId(http);
+
     await using var conn = await ds.OpenConnectionAsync();
     var seat = await conn.QuerySingleOrDefaultAsync<SeatRow>(
-        "select organization_id, device_id, branch_id from seats where token = @Token",
+        "select id, organization_id, branch_id, device_id, hardware_id from seats where token = @Token",
         new { Token = token });
     if (seat is null) return Results.Json("Session no longer valid.", statusCode: 401);
 
-    await conn.ExecuteAsync(
-        "update seats set last_seen_at = now() where token = @Token", new { Token = token });
+    // The seat is bound to the machine it was claimed on; a copied token from another device is rejected.
+    if (string.IsNullOrWhiteSpace(hardwareId) || !string.Equals(hardwareId, seat.hardware_id, StringComparison.Ordinal))
+        return Results.Json("This session is bound to a different device. Please sign in again.", statusCode: 401);
 
-    var branch = await conn.QuerySingleOrDefaultAsync<BranchRow>(
-        """
-        select b.id, b.organization_id, b.name, b.password_hash,
-               o.name as organization_name, o.seat_count
-        from branches b join organizations o on o.id = b.organization_id
-        where b.id = @Branch and b.organization_id = @Org
-        """,
-        new { Branch = seat.branch_id, Org = seat.organization_id });
+    var branch = await LoadBranchByIdAsync(conn, seat.organization_id, seat.branch_id);
     if (branch is null) return Results.Json("Branch no longer exists.", statusCode: 401);
 
-    var session = await BuildSessionAsync(conn, branch, seat.device_id, token);
+    var access = await LoadAccessAsync(conn, seat.organization_id, seat.branch_id);
+    if (!IsActive(access.status))
+        return Results.Json(
+            $"The subscription for {branch.name} is {access.status}. Contact your administrator.",
+            statusCode: 403);
+
+    await conn.ExecuteAsync("update seats set last_seen_at = now() where id = @Id", new { Id = seat.id });
+    await TouchDeviceActivationAsync(conn, seat.organization_id, seat.branch_id, seat.hardware_id);
+
+    var session = await BuildSessionAsync(conn, branch, seat.device_id, token, access);
     return Results.Ok(session);
 });
 
@@ -264,16 +290,33 @@ app.MapPut("/orgs/{orgId}/songs", async (string orgId, List<Song> songs, HttpReq
 // Mints a short-lived Deepgram JWT for an authenticated seat. The client streams
 // audio directly to Deepgram with this token, so the project key never ships.
 
+// Grants are short-lived (GrantTtlSeconds) and the client refreshes a little before expiry, so each
+// grant maps to roughly one window of live streaming. We meter by booking that window's worth of
+// usage per grant: a conservative cost backstop (it slightly over-counts) that needs no client trust.
+const int GrantTtlSeconds = 300;
+
 app.MapPost("/stt/token", async (HttpRequest http, NpgsqlDataSource ds, IHttpClientFactory httpFactory) =>
 {
-    var token = BearerToken(http);
-    if (token is null) return Results.Json("Missing token.", statusCode: 401);
-
     await using var conn = await ds.OpenConnectionAsync();
-    var seat = await conn.QuerySingleOrDefaultAsync<SeatRow>(
-        "select organization_id, device_id, branch_id from seats where token = @Token",
-        new { Token = token });
-    if (seat is null) return Results.Json("Session no longer valid.", statusCode: 401);
+
+    var seat = await AuthorizeSeatAsync(http, conn);
+    if (seat is null) return Results.Json("Missing or invalid token for this device.", statusCode: 401);
+
+    var access = await LoadAccessAsync(conn, seat.organization_id, seat.branch_id);
+    if (!IsActive(access.status))
+        return Results.Json("Your branch's subscription is inactive.", statusCode: 403);
+    if (access.stt_minutes_per_day <= 0)
+        return Results.Json("AI listening isn't included in your plan. Upgrade to enable it.", statusCode: 403);
+
+    // Daily quota: reject once today's metered usage has reached the branch's cap.
+    var usedSeconds = await conn.ExecuteScalarAsync<int>(
+        """
+        select coalesce(seconds_used, 0) from stt_usage
+        where organization_id = @Org and branch_id = @Branch and day = (now() at time zone 'utc')::date
+        """,
+        new { Org = seat.organization_id, Branch = seat.branch_id });
+    if (usedSeconds >= access.stt_minutes_per_day * 60)
+        return Results.Json("Daily AI-listening limit reached. It resets tomorrow.", statusCode: 429);
 
     if (string.IsNullOrWhiteSpace(deepgramKey))
         return Results.Json("Speech service is not configured.", statusCode: 503);
@@ -281,9 +324,7 @@ app.MapPost("/stt/token", async (HttpRequest http, NpgsqlDataSource ds, IHttpCli
     var client = httpFactory.CreateClient("deepgram");
     using var req = new HttpRequestMessage(HttpMethod.Post, "v1/auth/grant");
     req.Headers.TryAddWithoutValidation("Authorization", $"Token {deepgramKey}");
-    // 300s is comfortably long enough to (re)open the live socket; the client requests a fresh
-    // token on every connect/reconnect, so it never relies on a stale credential.
-    req.Content = JsonContent.Create(new { ttl_seconds = 300 });
+    req.Content = JsonContent.Create(new { ttl_seconds = GrantTtlSeconds });
 
     using var resp = await client.SendAsync(req);
     if (!resp.IsSuccessStatusCode)
@@ -296,8 +337,16 @@ app.MapPost("/stt/token", async (HttpRequest http, NpgsqlDataSource ds, IHttpCli
     if (grant is null || string.IsNullOrWhiteSpace(grant.access_token))
         return Results.Json("Empty token from speech service.", statusCode: 502);
 
+    // Book this grant's window against today's usage and keep the seat fresh.
     await conn.ExecuteAsync(
-        "update seats set last_seen_at = now() where token = @Token", new { Token = token });
+        """
+        insert into stt_usage (organization_id, branch_id, day, seconds_used)
+        values (@Org, @Branch, (now() at time zone 'utc')::date, @Secs)
+        on conflict (organization_id, branch_id, day)
+        do update set seconds_used = stt_usage.seconds_used + excluded.seconds_used
+        """,
+        new { Org = seat.organization_id, Branch = seat.branch_id, Secs = GrantTtlSeconds });
+    await conn.ExecuteAsync("update seats set last_seen_at = now() where id = @Id", new { Id = seat.id });
 
     return Results.Ok(new SttTokenResponse(grant.access_token, grant.expires_in ?? 30));
 });
@@ -342,22 +391,83 @@ static string? BearerToken(HttpRequest http)
         : null;
 }
 
-// Resolves the seat behind the request's bearer token (null if missing/unknown).
+// The hardware fingerprint the client sends on every authenticated request.
+static string HardwareId(HttpRequest http) => http.Headers["X-Hardware-Id"].ToString().Trim();
+
+// A subscription that permits use (free or paid, in good standing). Suspended/canceled/past_due block.
+static bool IsActive(string status) =>
+    status is "active" or "trial";
+
+// Resolves the seat behind the request's bearer token AND verifies it is being used from the device
+// it was bound to. Returns null (→ 401) for a missing token or a hardware-id mismatch (copied token).
 static async Task<SeatRow?> AuthorizeSeatAsync(HttpRequest http, NpgsqlConnection conn)
 {
     var token = BearerToken(http);
     if (token is null) return null;
 
-    return await conn.QuerySingleOrDefaultAsync<SeatRow>(
-        "select organization_id, device_id, branch_id from seats where token = @Token",
+    var seat = await conn.QuerySingleOrDefaultAsync<SeatRow>(
+        "select id, organization_id, branch_id, device_id, hardware_id from seats where token = @Token",
         new { Token = token });
+    if (seat is null) return null;
+
+    var hardwareId = HardwareId(http);
+    if (string.IsNullOrWhiteSpace(hardwareId) || !string.Equals(hardwareId, seat.hardware_id, StringComparison.Ordinal))
+        return null;
+
+    return seat;
 }
 
-static async Task<AuthSession> BuildSessionAsync(NpgsqlConnection conn, BranchRow branch, string deviceId, string token)
+static Task<BranchRow?> LoadBranchAsync(NpgsqlConnection conn, string org, string branch) =>
+    conn.QuerySingleOrDefaultAsync<BranchRow>(
+        """
+        select b.id, b.organization_id, b.name, b.password_hash, o.name as organization_name
+        from branches b join organizations o on o.id = b.organization_id
+        where b.organization_id = @Org and b.id = @Branch
+        """,
+        new { Org = org, Branch = branch });
+
+static Task<BranchRow?> LoadBranchByIdAsync(NpgsqlConnection conn, string org, string branch) =>
+    LoadBranchAsync(conn, org, branch);
+
+// Joins resolved entitlements with the subscription status. Falls back to a safe "free, none" shape
+// if rows are missing, so a misconfigured branch fails closed rather than granting unlimited access.
+static async Task<AccessRow> LoadAccessAsync(NpgsqlConnection conn, string org, string branch)
 {
-    var used = await conn.ExecuteScalarAsync<int>(
-        "select count(*) from seats where organization_id = @Org",
-        new { Org = branch.organization_id });
+    var row = await conn.QuerySingleOrDefaultAsync<AccessRow>(
+        """
+        select e.seats, e.stt_minutes_per_day, s.plan_code, s.status
+        from entitlements e
+        join subscriptions s on s.organization_id = e.organization_id and s.branch_id = e.branch_id
+        where e.organization_id = @Org and e.branch_id = @Branch
+        """,
+        new { Org = org, Branch = branch });
+
+    return row ?? new AccessRow { seats = 1, stt_minutes_per_day = 0, plan_code = "free", status = "suspended" };
+}
+
+static Task<int> ActiveSeatsAsync(NpgsqlConnection conn, string org, string branch, int windowDays) =>
+    conn.ExecuteScalarAsync<int>(
+        """
+        select count(*) from seats
+        where organization_id = @Org and branch_id = @Branch
+          and last_seen_at > now() - (@Days || ' days')::interval
+        """,
+        new { Org = org, Branch = branch, Days = windowDays });
+
+static Task TouchDeviceActivationAsync(NpgsqlConnection conn, string org, string branch, string hardwareId) =>
+    conn.ExecuteAsync(
+        """
+        insert into device_activations (organization_id, branch_id, hardware_id, first_seen_at, last_seen_at)
+        values (@Org, @Branch, @Hw, now(), now())
+        on conflict (organization_id, branch_id, hardware_id)
+        do update set last_seen_at = now()
+        """,
+        new { Org = org, Branch = branch, Hw = hardwareId });
+
+static async Task<AuthSession> BuildSessionAsync(
+    NpgsqlConnection conn, BranchRow branch, string deviceId, string token, AccessRow access)
+{
+    var used = await ActiveSeatsAsync(conn, branch.organization_id, branch.id, 14);
 
     return new AuthSession
     {
@@ -367,8 +477,11 @@ static async Task<AuthSession> BuildSessionAsync(NpgsqlConnection conn, BranchRo
         BranchId = branch.id,
         BranchName = branch.name,
         DeviceId = deviceId,
-        SeatCount = branch.seat_count,
+        SeatCount = access.seats,
         SeatsUsed = used,
+        PlanCode = access.plan_code,
+        SubscriptionStatus = access.status,
+        SttMinutesPerDay = access.stt_minutes_per_day,
         LastValidatedUtc = DateTime.UtcNow,
     };
 }

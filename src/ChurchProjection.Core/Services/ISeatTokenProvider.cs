@@ -8,4 +8,11 @@ public interface ISeatTokenProvider
 {
     string? CurrentToken { get; }
     void Set(string? token);
+
+    /// <summary>
+    /// The stable hardware fingerprint for this machine, attached to authenticated requests so the
+    /// server can verify the seat is still being used from the device it was bound to.
+    /// </summary>
+    string HardwareId { get; }
+    void SetHardware(string hardwareId);
 }

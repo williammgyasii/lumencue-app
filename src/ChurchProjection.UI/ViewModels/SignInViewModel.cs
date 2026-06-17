@@ -10,14 +10,16 @@ public sealed class SignInViewModel : ViewModelBase
 {
     private readonly ICloudGateway _gateway;
     private readonly ISessionStore _store;
+    private readonly ISeatTokenProvider _seatTokens;
 
     /// <summary>Raised after a successful sign-in with the saved session.</summary>
     public event Action<AuthSession>? SignedIn;
 
-    public SignInViewModel(ICloudGateway gateway, ISessionStore store)
+    public SignInViewModel(ICloudGateway gateway, ISessionStore store, ISeatTokenProvider seatTokens)
     {
         _gateway = gateway;
         _store = store;
+        _seatTokens = seatTokens;
         ModeNote = "Sign in with your branch credentials to claim a seat.";
 
         var canSignIn = this.WhenAnyValue(
@@ -58,7 +60,7 @@ public sealed class SignInViewModel : ViewModelBase
         {
             var deviceId = await _store.GetOrCreateDeviceIdAsync();
             var result = await _gateway.SignInAsync(
-                new SignInRequest(OrganizationCode, BranchCode, Password, deviceId));
+                new SignInRequest(OrganizationCode, BranchCode, Password, deviceId, _seatTokens.HardwareId));
 
             if (!result.Success || result.Session is null)
             {

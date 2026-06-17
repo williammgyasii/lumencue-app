@@ -45,8 +45,10 @@ public class App : Application
 
         var services = new ServiceCollection();
 
-        // Holds the active seat token in memory for cloud-API calls (Bible proxy, STT token).
+        // Holds the active seat token in memory for cloud-API calls (Bible proxy, STT token), plus
+        // the machine fingerprint that binds the seat to this device (attached to every request).
         var seatTokens = new SeatTokenProvider();
+        seatTokens.SetHardware(HardwareFingerprint.Get());
         services.AddSingleton<ISeatTokenProvider>(seatTokens);
 
         var dbService = new DatabaseService(AppPaths.DatabasePath);
@@ -76,16 +78,16 @@ public class App : Application
             services.AddSingleton(apiBibleClient);
         services.AddSingleton<IBibleApiService>(sp =>
             new CombinedBibleService(sp.GetRequiredService<FreeBibleApiClient>(), apiBibleClient));
-        // Tenancy / cloud sign-in + song sync. Priority:
-        //   1) Hosted HTTP API (the shipping default — keeps all DB credentials server-side).
-        //   2) Direct Neon, dev-only escape hatch when a Neon string is present in local config.
-        //   3) Local stub (offline) otherwise.
+        // Tenancy / cloud sign-in + song sync. The hosted HTTP API is the single source of truth:
+        // it keeps every DB/provider credential server-side and enforces seats, hardware binding and
+        // entitlements. When no API is configured we refuse sign-in rather than accept anything
+        // (no "any password works" path).
         services.AddSingleton<ISessionStore, SessionStore>();
         if (!string.IsNullOrWhiteSpace(cloudApiBaseUrl))
         {
             Log.Information("Cloud backend: hosted API at {BaseUrl}", cloudApiBaseUrl);
-            // Route through SeatAuthHandler so song-sync (Pull/Push) carries the seat token; sign-in
-            // happens before a token exists and the handler simply omits the header in that case.
+            // Route through SeatAuthHandler so every authenticated call carries the seat token and the
+            // hardware fingerprint; sign-in runs before a token exists and the handler omits the token.
             var cloudHttp = new HttpClient(new SeatAuthHandler(seatTokens, new HttpClientHandler()))
             {
                 BaseAddress = new Uri(cloudApiBaseUrl.TrimEnd('/') + "/"),
@@ -93,16 +95,8 @@ public class App : Application
             };
             services.AddSingleton<ICloudGateway>(new HttpCloudGateway(cloudHttp));
         }
-        else if (!string.IsNullOrWhiteSpace(neonConnStr))
-        {
-            Log.Information("Cloud backend: direct Neon (dev fallback, no hosted API)");
-            services.AddSingleton<ICloudGateway>(new NeonCloudGateway(neonConnStr));
-        }
         else
         {
-            // No cloud configured (dev or prod): refuse sign-in rather than accept anything. Real
-            // credentials are always validated against the cloud API (or direct Neon in dev); we never
-            // fall back to an "any password works" path.
             Log.Error("Cloud backend: no CloudApi:BaseUrl configured; sign-in is disabled.");
             services.AddSingleton<ICloudGateway>(new UnavailableCloudGateway(
                 "Sign-in is unavailable: this build is not connected to the LumenCue service."));

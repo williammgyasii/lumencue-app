@@ -12,14 +12,24 @@ public sealed class BranchRow
     public string name { get; set; } = "";
     public string password_hash { get; set; } = "";
     public string organization_name { get; set; } = "";
-    public int seat_count { get; set; }
 }
 
 public sealed class SeatRow
 {
+    public long id { get; set; }
     public string organization_id { get; set; } = "";
-    public string device_id { get; set; } = "";
     public string branch_id { get; set; } = "";
+    public string device_id { get; set; } = "";
+    public string hardware_id { get; set; } = "";
+}
+
+// Resolved plan + entitlement + subscription state for a branch (joined for sign-in/validate).
+public sealed class AccessRow
+{
+    public int seats { get; set; }
+    public int stt_minutes_per_day { get; set; }
+    public string plan_code { get; set; } = "";
+    public string status { get; set; } = "";
 }
 
 // Deepgram POST /v1/auth/grant response (snake_case to match the API payload).

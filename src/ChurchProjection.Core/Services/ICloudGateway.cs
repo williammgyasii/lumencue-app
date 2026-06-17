@@ -3,7 +3,17 @@ using ChurchProjection.Core.Models.Tenancy;
 
 namespace ChurchProjection.Core.Services;
 
-public sealed record SignInRequest(string OrganizationCode, string BranchCode, string Password, string DeviceId);
+/// <summary>
+/// Sign-in credentials plus device identity. <see cref="DeviceId"/> is a per-install GUID;
+/// <see cref="HardwareId"/> is a stable, hardware-derived fingerprint that binds a seat to a
+/// physical machine so a copied install/token can't claim a free seat on another computer.
+/// </summary>
+public sealed record SignInRequest(
+    string OrganizationCode,
+    string BranchCode,
+    string Password,
+    string DeviceId,
+    string HardwareId);
 
 public sealed record SignInResult(bool Success, AuthSession? Session, string? Error)
 {
