@@ -100,10 +100,8 @@ app.MapPost("/auth/signin", async (SignInRequest req, HttpRequest http, NpgsqlDa
         return Results.Json("Invalid organization, branch or password.", statusCode: 401);
 
     var access = await LoadAccessAsync(conn, branch.organization_id, branch.id);
-    if (!IsActive(access.status))
-        return Results.Json(
-            $"The subscription for {branch.name} is {access.status}. Contact your administrator.",
-            statusCode: 403);
+    if (!IsAccessActive(access))
+        return Results.Json(InactiveReason(branch.name, access), statusCode: 403);
 
     // One seat per machine per branch: reuse this device's seat if it already holds one.
     var seat = await conn.QuerySingleOrDefaultAsync<SeatRow>(
@@ -175,10 +173,8 @@ app.MapPost("/auth/validate", async (HttpRequest http, NpgsqlDataSource ds) =>
     if (branch is null) return Results.Json("Branch no longer exists.", statusCode: 401);
 
     var access = await LoadAccessAsync(conn, seat.organization_id, seat.branch_id);
-    if (!IsActive(access.status))
-        return Results.Json(
-            $"The subscription for {branch.name} is {access.status}. Contact your administrator.",
-            statusCode: 403);
+    if (!IsAccessActive(access))
+        return Results.Json(InactiveReason(branch.name, access), statusCode: 403);
 
     await conn.ExecuteAsync("update seats set last_seen_at = now() where id = @Id", new { Id = seat.id });
     await TouchDeviceActivationAsync(conn, seat.organization_id, seat.branch_id, seat.hardware_id);
@@ -303,7 +299,7 @@ app.MapPost("/stt/token", async (HttpRequest http, NpgsqlDataSource ds, IHttpCli
     if (seat is null) return Results.Json("Missing or invalid token for this device.", statusCode: 401);
 
     var access = await LoadAccessAsync(conn, seat.organization_id, seat.branch_id);
-    if (!IsActive(access.status))
+    if (!IsAccessActive(access))
         return Results.Json("Your branch's subscription is inactive.", statusCode: 403);
     if (access.stt_minutes_per_day <= 0)
         return Results.Json("AI listening isn't included in your plan. Upgrade to enable it.", statusCode: 403);
@@ -394,9 +390,21 @@ static string? BearerToken(HttpRequest http)
 // The hardware fingerprint the client sends on every authenticated request.
 static string HardwareId(HttpRequest http) => http.Headers["X-Hardware-Id"].ToString().Trim();
 
-// A subscription that permits use (free or paid, in good standing). Suspended/canceled/past_due block.
-static bool IsActive(string status) =>
-    status is "active" or "trial";
+// A subscription that permits use. 'active' is paid/in-good-standing; 'trial' is allowed only until
+// its current_period_end passes (after that the branch is locked until it converts to a paid plan).
+// Anything else (suspended/canceled/past_due) blocks.
+static bool IsAccessActive(AccessRow access) => access.status switch
+{
+    "active" => true,
+    "trial"  => access.current_period_end is null || access.current_period_end.Value > DateTime.UtcNow,
+    _        => false,
+};
+
+// Human-readable reason for a blocked branch, distinguishing an expired trial from other states.
+static string InactiveReason(string branchName, AccessRow access) =>
+    access.status == "trial"
+        ? $"The free trial for {branchName} has ended. Upgrade to keep using LumenCue."
+        : $"The subscription for {branchName} is {access.status}. Contact your administrator.";
 
 // Resolves the seat behind the request's bearer token AND verifies it is being used from the device
 // it was bound to. Returns null (→ 401) for a missing token or a hardware-id mismatch (copied token).
@@ -435,7 +443,7 @@ static async Task<AccessRow> LoadAccessAsync(NpgsqlConnection conn, string org, 
 {
     var row = await conn.QuerySingleOrDefaultAsync<AccessRow>(
         """
-        select e.seats, e.stt_minutes_per_day, s.plan_code, s.status
+        select e.seats, e.stt_minutes_per_day, s.plan_code, s.status, s.current_period_end
         from entitlements e
         join subscriptions s on s.organization_id = e.organization_id and s.branch_id = e.branch_id
         where e.organization_id = @Org and e.branch_id = @Branch

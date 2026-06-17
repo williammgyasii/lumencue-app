@@ -30,6 +30,8 @@ public sealed class AccessRow
     public int stt_minutes_per_day { get; set; }
     public string plan_code { get; set; } = "";
     public string status { get; set; } = "";
+    // Trial/period boundary. A 'trial' subscription is only active until this instant.
+    public DateTime? current_period_end { get; set; }
 }
 
 // Deepgram POST /v1/auth/grant response (snake_case to match the API payload).
