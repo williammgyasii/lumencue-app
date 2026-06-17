@@ -128,8 +128,45 @@ only bites users who move suspiciously often; STT metering caps cost even then.
 | Losing songs at rollout | Migration copies full list to every branch |
 | Future consolidated billing for a ministry | Entitlements layer is extensible |
 
-## Open: Billing
+## Billing model
 
-Pricing model, payment provider (note: Ghana-based — Paystack/Flutterwave vs Stripe),
-currency, trial/free tier, and whether STT is included-with-cap vs usage-billed are still in
-design and will be appended here before implementation.
+Decoupled from enforcement: the app only ever reads a branch's **entitlements record**; a
+payment provider (added later) only *writes* to it. No provider call at runtime.
+
+### Cost basis (researched 2026)
+
+- **Deepgram Nova-3 streaming** is the dominant cost: **$0.0077/min** PAYG ($0.0065/min on the
+  $4k/yr Growth plan). ~80–90% of COGS.
+- Fixed infra (Fly.io + Neon + API.Bible + Vercel) ≈ **$72/mo total**, shared across all
+  churches (~$1–3/seat at modest scale).
+- Real cost per active seat ≈ **$9–15/mo** (typical ~$7.70 STT at 1,000 min; heavy ~$12.30 at
+  1,600 min).
+- **Key constraint:** STT is billed in USD/min regardless of country, so there is a hard price
+  floor. Lower-priced regions must get a **tighter included-minute cap**, not just a lower price.
+
+### Pricing (decided)
+
+- **Standard: $50 / seat / month** (per-seat subscription). ~70–80% gross margin over COGS.
+- **Free tier:** offline Vosk STT only, local library — $0 COGS, acquisition funnel.
+- STT **bundled with a generous monthly minute cap** (the cap is the COGS ceiling); no metered
+  overage billing to customers — optional add-on minute packs instead.
+- Annual option (~2 months free) to cut churn and payment friction.
+- Switch Deepgram to Growth plan once usage passes ~$4k/yr (~50+ heavy seats).
+
+### Provider-agnostic structure (built now, charge later)
+
+- **Plan catalog**, **Subscription record** (per branch, with `provider` / `provider_*` seam
+  fields, null today), **Entitlements record** (resolved limits the app reads), **billing event
+  ledger** (append-only).
+- **`IBillingProvider` seam** with a `ManualBillingProvider` today (admin sets plan + seats).
+  Adding Paystack/Flutterwave later = one adapter + a webhook that flips status and writes
+  entitlements. No desktop-app changes.
+- Lifecycle `trial → active → past_due → suspended → canceled`. Suspension **degrades
+  gracefully** (premium STT stops at period end; offline projection keeps working) — never cut a
+  church off mid-service.
+
+### Still open
+
+- Payment provider choice (Ghana-based founder → Paystack/Flutterwave likely; Stripe for global)
+  and whether to run regional/PPP price points or a flat $50 — to be decided when wiring real
+  charging.
