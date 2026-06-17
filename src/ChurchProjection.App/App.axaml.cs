@@ -120,7 +120,7 @@ public class App : Application
         // token minted by the backend (no key on the client), falling back to offline Vosk when no
         // token can be obtained. Without a cloud API (pure offline build), use Vosk directly.
         // Confidence gate for noisy rooms: finals below this are dropped (0 disables, default 0.5).
-        var minConfidence = double.TryParse(config["Deepgram:MinConfidence"], out var mc) ? mc : 0.5;
+        var minConfidence = double.TryParse(config["Deepgram:MinConfidence"], out var mc) ? mc : 0.3;
         if (!string.IsNullOrWhiteSpace(cloudApiBaseUrl))
         {
             Log.Information("STT: Deepgram (cloud, token-based) with Vosk offline fallback, confidence gate {Min:P0}", minConfidence);
