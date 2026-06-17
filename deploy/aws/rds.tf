@@ -4,6 +4,15 @@ resource "aws_db_subnet_group" "main" {
   tags       = { Name = "${var.name}-db-subnets" }
 }
 
+# When temporary public access is on, give the DB subnets an internet route so a
+# publicly_accessible instance is actually reachable (still SG-locked to admin_cidr).
+# When off, no association -> subnets use the route-less main table (fully private).
+resource "aws_route_table_association" "db_public" {
+  count          = var.db_public_access ? length(aws_subnet.private) : 0
+  subnet_id      = aws_subnet.private[count.index].id
+  route_table_id = aws_route_table.public.id
+}
+
 resource "aws_db_instance" "main" {
   identifier     = "${var.name}-db"
   engine         = "postgres"
@@ -22,8 +31,11 @@ resource "aws_db_instance" "main" {
 
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.db.id]
-  publicly_accessible    = false
+  publicly_accessible    = var.db_public_access
   multi_az               = false
+
+  # Ensure the internet route exists before the instance is marked publicly accessible.
+  depends_on = [aws_route_table_association.db_public]
 
   backup_retention_period = 7
   deletion_protection     = false

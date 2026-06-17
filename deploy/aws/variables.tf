@@ -26,10 +26,16 @@ variable "image_tag" {
   default     = "latest"
 }
 
-variable "enable_bastion" {
-  description = "Admin SSM bastion for DB inspection. Keep the instance stopped when idle."
+variable "db_public_access" {
+  description = "TEMP: expose RDS publicly, restricted to admin_cidr only. Set false before onboarding real users."
   type        = bool
-  default     = true
+  default     = false
+}
+
+variable "admin_cidr" {
+  description = "Public IP in CIDR form (e.g. 1.2.3.4/32) allowed to reach RDS while db_public_access is true."
+  type        = string
+  default     = ""
 }
 
 variable "domain_name" {
