@@ -9,18 +9,16 @@ namespace ChurchProjection.Infrastructure.Services;
 /// <summary>
 /// Talks to the hosted auth/sync API over HTTPS. Selected automatically when <c>CloudApi:BaseUrl</c>
 /// is configured. The API keeps the Neon credentials server-side; the client only carries a token.
+/// The injected <see cref="HttpClient"/> must attach the seat token (via SeatAuthHandler) so the
+/// authenticated song-sync endpoints work; sign-in itself runs before a token exists and needs none.
 /// </summary>
 public sealed class HttpCloudGateway : ICloudGateway
 {
     private readonly HttpClient _http;
 
-    public HttpCloudGateway(string baseUrl)
+    public HttpCloudGateway(HttpClient http)
     {
-        _http = new HttpClient
-        {
-            BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/"),
-            Timeout = TimeSpan.FromSeconds(20),
-        };
+        _http = http;
     }
 
     public bool IsConfigured => true;

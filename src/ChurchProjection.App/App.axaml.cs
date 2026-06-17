@@ -84,7 +84,14 @@ public class App : Application
         if (!string.IsNullOrWhiteSpace(cloudApiBaseUrl))
         {
             Log.Information("Cloud backend: hosted API at {BaseUrl}", cloudApiBaseUrl);
-            services.AddSingleton<ICloudGateway>(new HttpCloudGateway(cloudApiBaseUrl));
+            // Route through SeatAuthHandler so song-sync (Pull/Push) carries the seat token; sign-in
+            // happens before a token exists and the handler simply omits the header in that case.
+            var cloudHttp = new HttpClient(new SeatAuthHandler(seatTokens, new HttpClientHandler()))
+            {
+                BaseAddress = new Uri(cloudApiBaseUrl.TrimEnd('/') + "/"),
+                Timeout = TimeSpan.FromSeconds(20),
+            };
+            services.AddSingleton<ICloudGateway>(new HttpCloudGateway(cloudHttp));
         }
         else if (!string.IsNullOrWhiteSpace(neonConnStr))
         {
