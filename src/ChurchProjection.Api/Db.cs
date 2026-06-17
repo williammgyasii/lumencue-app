@@ -20,8 +20,11 @@ namespace ChurchProjection.Api;
 /// </summary>
 public static class Db
 {
-    // Bump to force a destructive rebuild + reseed on next startup. v2 introduces per-branch
-    // seats/plans/entitlements, hardware-bound seats, device-move tracking and STT metering.
+    // Bump to force a destructive rebuild + reseed on next startup.
+    //
+    // WARNING: real tenants now exist (live churches). Do NOT bump this to ship schema changes —
+    // a bump DROPS ALL DATA. Evolve the schema additively via idempotent statements in
+    // <see cref="Migrations"/> instead. The destructive path is retained only for local/dev resets.
     private const int SchemaVersion = 2;
 
     private const string Schema = """
@@ -43,14 +46,14 @@ public static class Db
             primary key (organization_id, id)
         );
 
-        -- Plan catalogue. Prices are USD/seat/month; stt cap is a per-day backstop.
+        -- Plan catalogue. Prices are USD/seat/month; stt allowance is a per-month backstop.
         create table if not exists plans (
-            code                text primary key,
-            name                text not null,
-            seats_default       int  not null,
-            stt_minutes_per_day int  not null,
-            price_usd_month     numeric not null,
-            features            jsonb not null default '{}'::jsonb
+            code                  text primary key,
+            name                  text not null,
+            seats_default         int  not null,
+            stt_minutes_per_month int  not null,
+            price_usd_month       numeric not null,
+            features              jsonb not null default '{}'::jsonb
         );
 
         -- Commercial state per branch. The provider_* columns are the seam for a future payment
@@ -73,12 +76,12 @@ public static class Db
 
         -- Resolved entitlements the app reads each sign-in/validate (derived from plan + subscription).
         create table if not exists entitlements (
-            organization_id     text not null,
-            branch_id           text not null,
-            seats               int  not null,
-            stt_minutes_per_day int  not null,
-            features            jsonb not null default '{}'::jsonb,
-            updated_at          timestamptz not null default now(),
+            organization_id       text not null,
+            branch_id             text not null,
+            seats                 int  not null,
+            stt_minutes_per_month int  not null,
+            features              jsonb not null default '{}'::jsonb,
+            updated_at            timestamptz not null default now(),
             primary key (organization_id, branch_id),
             foreign key (organization_id, branch_id) references branches(organization_id, id) on delete cascade
         );
@@ -146,6 +149,36 @@ public static class Db
         create index if not exists idx_songs_org_updated on songs(organization_id, updated_at);
         """;
 
+    // Idempotent, additive migrations run on every startup once the base schema exists.
+    // Now that real tenants exist, schema changes go here (not via a destructive version bump).
+    private const string Migrations = """
+        -- 2026-06: STT allowance moved from per-day to per-month. Rename the columns in place and
+        -- backfill values once (the column guard makes each block run exactly once, at transition).
+        do $$
+        begin
+            if exists (select 1 from information_schema.columns
+                       where table_name = 'plans' and column_name = 'stt_minutes_per_day') then
+                alter table plans rename column stt_minutes_per_day to stt_minutes_per_month;
+                update plans set stt_minutes_per_month = case code
+                    when 'trial'    then 600
+                    when 'standard' then 2400
+                    when 'pro'      then 6000
+                    when 'master'   then 100000
+                    else stt_minutes_per_month
+                end;
+            end if;
+
+            if exists (select 1 from information_schema.columns
+                       where table_name = 'entitlements' and column_name = 'stt_minutes_per_day') then
+                alter table entitlements rename column stt_minutes_per_day to stt_minutes_per_month;
+                update entitlements e set stt_minutes_per_month = p.stt_minutes_per_month
+                from subscriptions s
+                join plans p on p.code = s.plan_code
+                where s.organization_id = e.organization_id and s.branch_id = e.branch_id;
+            end if;
+        end $$;
+        """;
+
     private const string DropLegacy = """
         drop table if exists stt_usage cascade;
         drop table if exists device_activations cascade;
@@ -182,20 +215,24 @@ public static class Db
             return;
         }
 
-        // Already current: ensure tables exist (no-op on a healthy DB) without touching data.
+        // Already current: ensure tables exist (no-op on a healthy DB) without touching data,
+        // then apply additive migrations (idempotent) so schema evolves without data loss.
         await conn.ExecuteAsync(Schema);
-        logger.LogInformation("Neon schema ready (version {Version}).", SchemaVersion);
+        await conn.ExecuteAsync(Migrations);
+        logger.LogInformation("Schema ready (version {Version}); migrations applied.", SchemaVersion);
     }
 
     private static async Task SeedAsync(NpgsqlConnection conn, ILogger logger)
     {
         // --- Plans ---
         await conn.ExecuteAsync(
-            "insert into plans (code, name, seats_default, stt_minutes_per_day, price_usd_month) values (@Code, @Name, @Seats, @Stt, @Price)",
+            "insert into plans (code, name, seats_default, stt_minutes_per_month, price_usd_month) values (@Code, @Name, @Seats, @Stt, @Price)",
             new[]
             {
-                new { Code = "free",     Name = "Free",     Seats = 1, Stt = 0,   Price = 0m },
-                new { Code = "standard", Name = "Standard",  Seats = 1, Stt = 360, Price = 50m },
+                new { Code = "trial",    Name = "Trial",    Seats = 2,   Stt = 600,    Price = 0m },
+                new { Code = "standard", Name = "Standard", Seats = 1,   Stt = 2400,   Price = 50m },
+                new { Code = "pro",      Name = "Pro",      Seats = 1,   Stt = 6000,   Price = 100m },
+                new { Code = "master",   Name = "Master",   Seats = 999, Stt = 100000, Price = 0m },
             });
 
         // --- Demo / launch tenants. Password for every seeded branch is "lumen123". ---
@@ -234,8 +271,8 @@ public static class Db
 
             await conn.ExecuteAsync(
                 """
-                insert into entitlements (organization_id, branch_id, seats, stt_minutes_per_day)
-                values (@Org, @Branch, @Seats, 360)
+                insert into entitlements (organization_id, branch_id, seats, stt_minutes_per_month)
+                values (@Org, @Branch, @Seats, 2400)
                 """,
                 new { Org = orgId, Branch = id, Seats = seats });
         }

@@ -49,8 +49,8 @@ public sealed class AuthSession
     /// <summary>Subscription status: trial | active | past_due | suspended | canceled.</summary>
     public string SubscriptionStatus { get; set; } = "";
 
-    /// <summary>Daily AI-listening (speech-to-text) allowance in minutes. 0 = offline STT only.</summary>
-    public int SttMinutesPerDay { get; set; }
+    /// <summary>Monthly AI-listening (speech-to-text) allowance in minutes. 0 = AI not included.</summary>
+    public int SttMinutesPerMonth { get; set; }
 
     public DateTime LastValidatedUtc { get; set; }
 }

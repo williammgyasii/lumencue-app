@@ -27,7 +27,7 @@ public sealed class SeatRow
 public sealed class AccessRow
 {
     public int seats { get; set; }
-    public int stt_minutes_per_day { get; set; }
+    public int stt_minutes_per_month { get; set; }
     public string plan_code { get; set; } = "";
     public string status { get; set; } = "";
     // Trial/period boundary. A 'trial' subscription is only active until this instant.

@@ -301,18 +301,20 @@ app.MapPost("/stt/token", async (HttpRequest http, NpgsqlDataSource ds, IHttpCli
     var access = await LoadAccessAsync(conn, seat.organization_id, seat.branch_id);
     if (!IsAccessActive(access))
         return Results.Json("Your branch's subscription is inactive.", statusCode: 403);
-    if (access.stt_minutes_per_day <= 0)
+    if (access.stt_minutes_per_month <= 0)
         return Results.Json("AI listening isn't included in your plan. Upgrade to enable it.", statusCode: 403);
 
-    // Daily quota: reject once today's metered usage has reached the branch's cap.
+    // Monthly quota: reject once this calendar month's metered usage has reached the branch's
+    // allowance. Daily rows are still written; we sum them from the start of the UTC month.
     var usedSeconds = await conn.ExecuteScalarAsync<int>(
         """
-        select coalesce(seconds_used, 0) from stt_usage
-        where organization_id = @Org and branch_id = @Branch and day = (now() at time zone 'utc')::date
+        select coalesce(sum(seconds_used), 0) from stt_usage
+        where organization_id = @Org and branch_id = @Branch
+          and day >= date_trunc('month', (now() at time zone 'utc'))::date
         """,
         new { Org = seat.organization_id, Branch = seat.branch_id });
-    if (usedSeconds >= access.stt_minutes_per_day * 60)
-        return Results.Json("Daily AI-listening limit reached. It resets tomorrow.", statusCode: 429);
+    if (usedSeconds >= access.stt_minutes_per_month * 60)
+        return Results.Json("Monthly AI-listening limit reached. It resets next month.", statusCode: 429);
 
     if (string.IsNullOrWhiteSpace(deepgramKey))
         return Results.Json("Speech service is not configured.", statusCode: 503);
@@ -443,14 +445,14 @@ static async Task<AccessRow> LoadAccessAsync(NpgsqlConnection conn, string org, 
 {
     var row = await conn.QuerySingleOrDefaultAsync<AccessRow>(
         """
-        select e.seats, e.stt_minutes_per_day, s.plan_code, s.status, s.current_period_end
+        select e.seats, e.stt_minutes_per_month, s.plan_code, s.status, s.current_period_end
         from entitlements e
         join subscriptions s on s.organization_id = e.organization_id and s.branch_id = e.branch_id
         where e.organization_id = @Org and e.branch_id = @Branch
         """,
         new { Org = org, Branch = branch });
 
-    return row ?? new AccessRow { seats = 1, stt_minutes_per_day = 0, plan_code = "free", status = "suspended" };
+    return row ?? new AccessRow { seats = 1, stt_minutes_per_month = 0, plan_code = "free", status = "suspended" };
 }
 
 static Task<int> ActiveSeatsAsync(NpgsqlConnection conn, string org, string branch, int windowDays) =>
@@ -489,7 +491,7 @@ static async Task<AuthSession> BuildSessionAsync(
         SeatsUsed = used,
         PlanCode = access.plan_code,
         SubscriptionStatus = access.status,
-        SttMinutesPerDay = access.stt_minutes_per_day,
+        SttMinutesPerMonth = access.stt_minutes_per_month,
         LastValidatedUtc = DateTime.UtcNow,
     };
 }
