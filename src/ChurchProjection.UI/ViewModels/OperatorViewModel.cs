@@ -1661,7 +1661,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         _projectorLayout = await _settings.GetAsync("projector_layout") ?? "Full Screen";
         this.RaisePropertyChanged(nameof(ProjectorLayout));
 
-        _autoStartListening = await _settings.GetBoolAsync("auto_start_listening", true);
+        _autoStartListening = await _settings.GetBoolAsync("auto_start_listening", false);
         this.RaisePropertyChanged(nameof(AutoStartListening));
 
         await LoadPlaylistsAsync();

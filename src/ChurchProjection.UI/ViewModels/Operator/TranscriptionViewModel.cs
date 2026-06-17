@@ -65,7 +65,7 @@ public class TranscriptionViewModel : ViewModelBase
         }
     }
 
-    private bool _showTranscript;
+    private bool _showTranscript = true;
     /// <summary>Whether the expanded live transcript panel is shown above the mic bar.</summary>
     public bool ShowTranscript
     {

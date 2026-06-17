@@ -14,6 +14,7 @@
         Icon="/Assets/app-icon.png"
         Width="1400" Height="900"
         MinWidth="1100" MinHeight="700"
+        WindowState="Maximized"
         WindowStartupLocation="CenterScreen"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaChromeHints="PreferSystemChrome"
