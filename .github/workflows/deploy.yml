@@ -1,0 +1,78 @@
+name: deploy-api
+
+# Builds the API image, pushes it to ECR, and applies Terraform (which rolls the
+# ECS Fargate service to the new image). Auth is via GitHub OIDC — no stored keys.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/ChurchProjection.Api/**"
+      - "src/ChurchProjection.Core/**"
+      - "Dockerfile"
+      - "Directory.Build.props"
+      - "deploy/aws/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPO: lumencue-api
+  ROLE_ARN: arn:aws:iam::618015514647:role/lumencue-api-github-actions
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          IMAGE="$REGISTRY/$ECR_REPO"
+          docker build -t "$IMAGE:${{ github.sha }}" -t "$IMAGE:latest" -f Dockerfile .
+          docker push "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:latest"
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.14.7"
+
+      - name: Terraform apply
+        working-directory: deploy/aws
+        env:
+          TF_VAR_aws_profile: ""
+          TF_VAR_image_tag: ${{ github.sha }}
+          TF_VAR_db_password: ${{ secrets.TF_DB_PASSWORD }}
+          TF_VAR_deepgram_api_key: ${{ secrets.DEEPGRAM_API_KEY }}
+          TF_VAR_apibible_api_key: ${{ secrets.APIBIBLE_API_KEY }}
+        run: |
+          terraform init -input=false
+          terraform apply -input=false -auto-approve
+
+      - name: Wait for service to stabilize
+        run: |
+          aws ecs wait services-stable \
+            --cluster lumencue-api-cluster \
+            --services lumencue-api \
+            --region "$AWS_REGION"
