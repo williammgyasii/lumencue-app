@@ -83,6 +83,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     private bool _isUpgradePromptOpen;
     private string _upgradePromptTitle = "";
     private string _upgradePromptMessage = "";
+    private bool _isWhatsNewOpen;
     private bool _screenOutputEnabled = true;
     private double _previewWidth = 1920;
     private double _previewHeight = 1080;
@@ -403,6 +404,16 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         get => _isUpgradePromptOpen;
         set => this.RaiseAndSetIfChanged(ref _isUpgradePromptOpen, value);
     }
+
+    /// <summary>"What's new" panel shown once after the app updates to a new version.</summary>
+    public bool IsWhatsNewOpen
+    {
+        get => _isWhatsNewOpen;
+        set => this.RaiseAndSetIfChanged(ref _isWhatsNewOpen, value);
+    }
+
+    public string WhatsNewTitle { get; private set; } = "";
+    public ObservableCollection<string> WhatsNewItems { get; } = [];
 
     public string UpgradePromptTitle
     {
@@ -849,6 +860,8 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
 
     public ReactiveCommand<Unit, Unit> DismissUpgradePromptCommand { get; }
 
+    public ReactiveCommand<Unit, Unit> DismissWhatsNewCommand { get; }
+
     public OperatorViewModel(
         IProjectionService projectionService,
         IContentLibraryService contentLibrary,
@@ -981,6 +994,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         RequestUpgradeCommand = ReactiveCommand.Create<string?>(RequestUpgrade);
         OpenCheckoutCommand = ReactiveCommand.Create(OpenCheckout);
         DismissUpgradePromptCommand = ReactiveCommand.Create(() => { IsUpgradePromptOpen = false; });
+        DismissWhatsNewCommand = ReactiveCommand.Create(() => { IsWhatsNewOpen = false; });
 
         // Refresh every paywall-bound property whenever entitlements change (sign-in / revalidation).
         _entitlements.Changed += _ => RxApp.MainThreadScheduler.Schedule(RefreshEntitlements);
@@ -1866,6 +1880,43 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
             // Give the cache a brief head start; uncached refs still hydrate on the fly.
             await Task.WhenAny(cacheTask, Task.Delay(PrewarmCacheWait));
             Transcription.ToggleListeningCommand.Execute().Subscribe();
+        }
+
+        await MaybeShowWhatsNewAsync();
+    }
+
+    private const string LastSeenVersionKey = "app.last_seen_version";
+
+    // Shows the "What's new" panel once after the app updates to a new version. Stays quiet on a
+    // fresh install (no prior version recorded) and when the running version has no release notes.
+    private async Task MaybeShowWhatsNewAsync()
+    {
+        try
+        {
+            var current = AppVersion; // e.g. "v0.7.11"; "LumenCue" when the assembly version is missing
+            if (string.IsNullOrWhiteSpace(current) || current == "LumenCue") return;
+
+            var lastSeen = await _settings.GetAsync(LastSeenVersionKey);
+            if (lastSeen == current) return; // already shown for this version
+
+            // Record the current version now so the panel never reappears for it, even on a fresh install.
+            await _settings.SetAsync(LastSeenVersionKey, current);
+
+            // First launch ever (no record): don't interrupt with notes for a version they never ran before.
+            if (string.IsNullOrWhiteSpace(lastSeen)) return;
+
+            var notes = ReleaseNotes.ForVersion(current);
+            if (notes is null) return;
+
+            WhatsNewItems.Clear();
+            foreach (var n in notes) WhatsNewItems.Add(n);
+            WhatsNewTitle = $"What's new in {current}";
+            this.RaisePropertyChanged(nameof(WhatsNewTitle));
+            IsWhatsNewOpen = true;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to evaluate What's New panel");
         }
     }
 
