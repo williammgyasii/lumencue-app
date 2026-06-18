@@ -180,6 +180,23 @@
             <TextBlock Text="{Binding EntitlementBannerText}" Foreground="#F59E0B" FontSize="11"
                        MaxWidth="380" TextTrimming="CharacterEllipsis" />
           </Border>
+          <!-- Always-on AI minutes remaining this month (turns amber as the allowance runs low). -->
+          <Panel IsVisible="{Binding ShowAiMinutes}">
+            <Border Background="#232932" CornerRadius="10" Padding="10,4" IsVisible="{Binding !AiNearLimit}"
+                    ToolTip.Tip="AI listening minutes remaining this month">
+              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                <Ellipse Width="7" Height="7" Fill="#22C55E" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding AiMinutesShort}" Foreground="#9BD3B0" FontSize="11" FontWeight="SemiBold" />
+              </StackPanel>
+            </Border>
+            <Border Background="#3A2A12" CornerRadius="10" Padding="10,4" IsVisible="{Binding AiNearLimit}"
+                    ToolTip.Tip="AI listening minutes remaining this month">
+              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                <Ellipse Width="7" Height="7" Fill="#F59E0B" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding AiMinutesShort}" Foreground="#F59E0B" FontSize="11" FontWeight="SemiBold" />
+              </StackPanel>
+            </Border>
+          </Panel>
         </StackPanel>
 
         <!-- CENTER: workspace modes — a service is either showing scripture or singing -->
@@ -1466,7 +1483,7 @@
         </Grid>
       </Border>
 
-      <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto" VerticalAlignment="Center">
+      <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto" VerticalAlignment="Center">
         <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
           <Button Classes="ghost" Command="{Binding ToggleTranscriptCommand}" Padding="6,3" FontSize="12"
                   ToolTip.Tip="Show / hide the live transcript">
@@ -1513,12 +1530,22 @@
           </ProgressBar>
         </StackPanel>
 
-        <ComboBox Grid.Column="4" ItemsSource="{Binding AudioDevices}" SelectedItem="{Binding SelectedDevice}"
+        <!-- Mic sensitivity: software input gain the operator can tune live while watching the meter. -->
+        <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="0,0,10,0"
+                    ToolTip.Tip="Mic sensitivity — raise if the meter barely moves; lower if it pins to the top / clips.">
+          <TextBlock Text="&#127897;" FontSize="13" VerticalAlignment="Center" Foreground="#8B93A1" />
+          <Slider Minimum="1" Maximum="10" Value="{Binding MicSensitivity}" Width="96"
+                  VerticalAlignment="Center" />
+          <TextBlock Text="{Binding MicSensitivityLabel}" Foreground="#A7AFBC" FontSize="11"
+                     MinWidth="34" VerticalAlignment="Center" />
+        </StackPanel>
+
+        <ComboBox Grid.Column="5" ItemsSource="{Binding AudioDevices}" SelectedItem="{Binding SelectedDevice}"
                   Background="#181C24" Foreground="#ECEEF2" BorderBrush="#3C4350"
                   CornerRadius="6" Padding="8,4" FontSize="11" MinWidth="150" MaxWidth="220" Margin="0,0,8,0"
                   VerticalAlignment="Center" ToolTip.Tip="Microphone input device" />
 
-        <Button Grid.Column="5" Command="{Binding ToggleListeningCommand}"
+        <Button Grid.Column="6" Command="{Binding ToggleListeningCommand}"
                 Padding="14,6" CornerRadius="6" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center">
           <Panel>
             <TextBlock Text="Stop" IsVisible="{Binding IsListening}" />

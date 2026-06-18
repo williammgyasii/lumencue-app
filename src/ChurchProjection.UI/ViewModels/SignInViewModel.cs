@@ -49,6 +49,13 @@ public sealed class SignInViewModel : ViewModelBase
 
     public bool HasError => !string.IsNullOrWhiteSpace(Error);
 
+    /// <summary>Surfaces a notice on the sign-in screen (e.g. why the user was returned here).</summary>
+    public void ShowNotice(string message)
+    {
+        Error = message;
+        this.RaisePropertyChanged(nameof(HasError));
+    }
+
     public ReactiveCommand<Unit, Unit> SignInCommand { get; }
 
     private async Task SignInAsync()

@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Headers;
 using ChurchProjection.Core.Services;
 
@@ -20,16 +21,25 @@ public sealed class SeatAuthHandler : DelegatingHandler
         InnerHandler = inner;
     }
 
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var token = _tokens.CurrentToken;
-        if (!string.IsNullOrWhiteSpace(token))
+        var hadToken = !string.IsNullOrWhiteSpace(token);
+        if (hadToken)
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var hardwareId = _tokens.HardwareId;
         if (!string.IsNullOrWhiteSpace(hardwareId) && !request.Headers.Contains(HardwareHeader))
             request.Headers.TryAddWithoutValidation(HardwareHeader, hardwareId);
 
-        return base.SendAsync(request, cancellationToken);
+        var response = await base.SendAsync(request, cancellationToken);
+
+        // A 401 on a request that DID carry a token means the seat token is no longer accepted
+        // (revoked, expired, or seat released elsewhere). Signal so the app can return to sign-in
+        // rather than keep running on a session the server rejects.
+        if (hadToken && response.StatusCode == HttpStatusCode.Unauthorized)
+            _tokens.NotifyUnauthorized();
+
+        return response;
     }
 }

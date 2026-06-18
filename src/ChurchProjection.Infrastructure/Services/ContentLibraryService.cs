@@ -13,6 +13,7 @@ public class ContentLibraryService : IContentLibraryService
     private readonly ScriptureRepository _scriptureRepo;
     private readonly SongRepository _songRepo;
     private readonly IBibleApiService _bibleApi;
+    private readonly IScriptureSearchService _scriptureSearch;
 
     // L1 cache: whole chapters held in memory, keyed by "translation|book|chapter". Bible text is
     // immutable, so entries never expire. Lookups during a live service hit this first and avoid
@@ -26,11 +27,13 @@ public class ContentLibraryService : IContentLibraryService
     public ContentLibraryService(
         ScriptureRepository scriptureRepo,
         SongRepository songRepo,
-        IBibleApiService bibleApi)
+        IBibleApiService bibleApi,
+        IScriptureSearchService scriptureSearch)
     {
         _scriptureRepo = scriptureRepo;
         _songRepo = songRepo;
         _bibleApi = bibleApi;
+        _scriptureSearch = scriptureSearch;
     }
 
     private static string ChapterKey(string translation, string book, int chapter) =>
@@ -157,6 +160,17 @@ public class ContentLibraryService : IContentLibraryService
             return await GetOrFetchVersesAsync(reference, translation, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
+        // Phrase/paraphrase search. The naive whole-phrase LIKE only matches verses that contain the
+        // typed words as one contiguous, exactly-worded substring, so a partially-spoken or slightly
+        // misheard phrase ("for god so loved world") surfaces nothing — or dozens of verses ordered by
+        // book — until enough exact words accumulate. Route through the hybrid (token-ranked keyword +
+        // semantic) search instead so the right verse ranks to the top from a fragment of the phrase.
+        var hits = await _scriptureSearch.SearchAsync(query, translation, maxResults: 50, cancellationToken).ConfigureAwait(false);
+        if (hits.Count > 0)
+            return hits.Select(h => h.Passage).ToList();
+
+        // Last resort (e.g. a query of only stop-words/short tokens the tokenizer drops): fall back to
+        // the contiguous substring search so the box is never worse than before.
         return await _scriptureRepo.SearchAsync(query, translation).ConfigureAwait(false);
     }
 

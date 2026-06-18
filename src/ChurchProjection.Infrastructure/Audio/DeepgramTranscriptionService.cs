@@ -19,7 +19,9 @@ public class DeepgramTranscriptionService : ITranscriptionService
     // 0 disables the gate. Tuned conservatively: clear speech scores ~0.9+, garbled noise far lower.
     private readonly double _minConfidence;
     // Software input gain (>=1) multiplied into captured samples to lift quiet mics before clipping.
-    private readonly float _inputGain;
+    // Volatile: read on the capture callback thread, written from the UI when the operator drags the
+    // mic-sensitivity slider, so the new value is picked up on the very next audio buffer.
+    private volatile float _inputGain;
     // Cost control: only stream audio to Deepgram while speech is present (plus a short pre-roll and
     // hangover), so long silences/music aren't billed. Deepgram bills per minute of audio sent; idle
     // time held open by KeepAlive is free. Gating is on the pre-gain RMS so it's independent of _inputGain.
@@ -72,6 +74,12 @@ public class DeepgramTranscriptionService : ITranscriptionService
     public IObservable<string> EngineName => Observable.Return("Deepgram · Cloud");
     public bool IsRunning => _isListening.Value;
 
+    public float InputGain
+    {
+        get => _inputGain;
+        set => _inputGain = (float)Math.Clamp(value, 1.0, 20.0);
+    }
+
     public DeepgramTranscriptionService(ISttTokenProvider tokenProvider, double minConfidence = 0.5,
         double inputGain = 1.0, bool vadGate = true, double vadThreshold = 0.01)
     {
@@ -79,7 +87,7 @@ public class DeepgramTranscriptionService : ITranscriptionService
         _minConfidence = Math.Clamp(minConfidence, 0.0, 1.0);
         // Software capture gain for quiet mics (e.g. built-in arrays with low Windows level/boost).
         // Clamped to a sane range; applied before clipping so the meter and Deepgram both benefit.
-        _inputGain = (float)Math.Clamp(inputGain, 1.0, 20.0);
+        InputGain = (float)inputGain;
         _vadGate = vadGate;
         _vadRmsThreshold = Math.Clamp(vadThreshold, 0.0, 1.0);
     }

@@ -383,6 +383,21 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         }
     }
 
+    /// <summary>True whenever AI listening is part of the plan, so the persistent top-bar minutes
+    /// chip stays visible at all times (not only while listening or near the limit).</summary>
+    public bool ShowAiMinutes => Ent.AiIncluded || Ent.IsUnlimitedAi;
+
+    /// <summary>Compact, always-on top-bar label for AI minutes remaining this month.</summary>
+    public string AiMinutesShort
+    {
+        get
+        {
+            if (Ent.IsUnlimitedAi) return "AI: unlimited";
+            if (Ent.AiExhausted) return "AI: limit reached";
+            return $"AI: {Ent.AiMinutesRemaining} min left";
+        }
+    }
+
     public bool IsUpgradePromptOpen
     {
         get => _isUpgradePromptOpen;
@@ -451,6 +466,8 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         this.RaisePropertyChanged(nameof(AiBlocked));
         this.RaisePropertyChanged(nameof(AiNearLimit));
         this.RaisePropertyChanged(nameof(AiUsageText));
+        this.RaisePropertyChanged(nameof(ShowAiMinutes));
+        this.RaisePropertyChanged(nameof(AiMinutesShort));
     }
 
     /// <summary>Maps the scheduler's state to the short label shown next to the account.</summary>
@@ -887,7 +904,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         ContentSearch = new ContentSearchViewModel(contentLibrary);
         SongImport = new SongImportViewModel(contentLibrary);
         ServiceQueue = new ServiceQueueViewModel(projectionService, themes);
-        Transcription = new TranscriptionViewModel(transcriptionService, suggestionEngine, projectionService);
+        Transcription = new TranscriptionViewModel(transcriptionService, suggestionEngine, projectionService, settings);
         TopicalSearch = new TopicalSearchViewModel(scriptureSearch);
         SongSearch = new SongSearchViewModel(songSearch);
         ProPresenter = new ProPresenterViewModel(proPresenter);

@@ -27,6 +27,7 @@ public sealed class UnavailableTranscriptionService : ITranscriptionService
     public IObservable<float> AudioLevel => Observable.Return(0f);
     public IObservable<string> EngineName => Observable.Return("");
     public bool IsRunning => false;
+    public float InputGain { get; set; } = 1f;
 
     public Task<List<string>> GetAvailableDevicesAsync() => Task.FromResult(new List<string>());
     public Task StartAsync(string? deviceName = null) => Task.CompletedTask;

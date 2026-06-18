@@ -1,0 +1,44 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ChurchProjection.UI.Views.SplashWindow"
+        Title="LumenCue"
+        Icon="/Assets/app-icon.png"
+        Width="540" Height="380"
+        CanResize="False"
+        SystemDecorations="None"
+        ShowInTaskbar="True"
+        WindowStartupLocation="CenterScreen"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent">
+
+  <Border CornerRadius="16" Background="#0E1014" BorderBrush="#262B36" BorderThickness="1" Margin="14">
+    <Border.Effect>
+      <DropShadowEffect Color="#000000" BlurRadius="32" OffsetX="0" OffsetY="12" Opacity="0.55" />
+    </Border.Effect>
+
+    <Grid RowDefinitions="*,Auto">
+      <StackPanel Grid.Row="0" Spacing="18" VerticalAlignment="Center" HorizontalAlignment="Center">
+        <Image Source="avares://ChurchProjection.UI/Assets/logo.png" Width="96" Height="96"
+               HorizontalAlignment="Center" />
+        <TextBlock Text="LumenCue" Foreground="#ECEEF2" FontSize="36" FontWeight="Bold"
+                   HorizontalAlignment="Center" />
+        <TextBlock Text="AI worship projection" Foreground="#959DAB" FontSize="14"
+                   HorizontalAlignment="Center" />
+      </StackPanel>
+
+      <StackPanel Grid.Row="1" Spacing="14" Margin="44,0,44,34">
+        <ProgressBar x:Name="Bar" Minimum="0" Maximum="100" Value="0" Height="5" CornerRadius="3"
+                     Background="#1B2029" Foreground="#7C6CF6">
+          <ProgressBar.Transitions>
+            <Transitions>
+              <DoubleTransition Property="Value" Duration="0:0:0.45" Easing="CubicEaseOut" />
+            </Transitions>
+          </ProgressBar.Transitions>
+        </ProgressBar>
+        <TextBlock x:Name="StatusText" Text="Starting…" Foreground="#6E7682" FontSize="12.5"
+                   HorizontalAlignment="Center" />
+      </StackPanel>
+    </Grid>
+  </Border>
+
+</Window>

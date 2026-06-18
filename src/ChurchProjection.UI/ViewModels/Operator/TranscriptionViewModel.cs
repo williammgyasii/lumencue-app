@@ -1,8 +1,10 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Reactive;
 using System.Reactive.Linq;
 using ChurchProjection.Core.Models.Content;
 using ChurchProjection.Core.Services;
+using ChurchProjection.Infrastructure.Data;
 using ReactiveUI;
 using Serilog;
 
@@ -14,11 +16,19 @@ public class TranscriptionViewModel : ViewModelBase
     private static readonly TimeSpan WindowDuration = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan AudioLevelThrottle = TimeSpan.FromMilliseconds(50);
     private static readonly TimeSpan SegmentThrottle = TimeSpan.FromMilliseconds(500);
+    // Collapse rapid mic-dropdown changes into a single restart.
+    private static readonly TimeSpan DeviceSwitchDebounce = TimeSpan.FromMilliseconds(350);
+    // Persist the mic-sensitivity slider only after the operator stops dragging.
+    private static readonly TimeSpan GainPersistDebounce = TimeSpan.FromMilliseconds(500);
+    private const string MicGainSettingKey = "mic.input_gain";
+    public const double MinMicSensitivity = 1.0;
+    public const double MaxMicSensitivity = 10.0;
     private const float SignalThreshold = 0.005f;
     private const double AudioLevelGain = 300;
 
     private readonly ITranscriptionService _transcription;
     private readonly ISuggestionEngine _engine;
+    private readonly SettingsRepository _settings;
 
     private readonly List<(string Text, DateTimeOffset Time)> _slidingWindow = [];
 
@@ -28,6 +38,7 @@ public class TranscriptionViewModel : ViewModelBase
     private float _audioLevel;
     private string _engineName = "";
     private string? _selectedDevice;
+    private double _micSensitivity = 1.0;
     private SuggestionItem? _selectedSuggestion;
 
     public string Transcript
@@ -125,6 +136,22 @@ public class TranscriptionViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _selectedDevice, value);
     }
 
+    /// <summary>Mic sensitivity (software input gain) the operator can tune live with a slider. Applied
+    /// to the capture engine immediately on every change; persisted (debounced) so it survives restarts.</summary>
+    public double MicSensitivity
+    {
+        get => _micSensitivity;
+        set
+        {
+            var clamped = Math.Clamp(value, MinMicSensitivity, MaxMicSensitivity);
+            this.RaiseAndSetIfChanged(ref _micSensitivity, clamped);
+            _transcription.InputGain = (float)clamped;
+            this.RaisePropertyChanged(nameof(MicSensitivityLabel));
+        }
+    }
+
+    public string MicSensitivityLabel => $"{_micSensitivity:0.0}×";
+
     public SuggestionItem? SelectedSuggestion
     {
         get => _selectedSuggestion;
@@ -213,10 +240,16 @@ public class TranscriptionViewModel : ViewModelBase
     public TranscriptionViewModel(
         ITranscriptionService transcription,
         ISuggestionEngine engine,
-        IProjectionService projection)
+        IProjectionService projection,
+        SettingsRepository settings)
     {
         _transcription = transcription;
         _engine = engine;
+        _settings = settings;
+
+        // Seed the slider from the engine's current gain (the appsettings default) so the control
+        // reflects reality before the persisted value (if any) loads in InitializeAsync.
+        _micSensitivity = Math.Clamp(_transcription.InputGain, MinMicSensitivity, MaxMicSensitivity);
 
         ToggleListeningCommand = ReactiveCommand.CreateFromTask(ToggleListening);
         ToggleTranscriptCommand = ReactiveCommand.Create(() => { ShowTranscript = !ShowTranscript; });
@@ -256,6 +289,34 @@ public class TranscriptionViewModel : ViewModelBase
         _engine.Suggestions
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(MergeSuggestions);
+
+        // NAudio binds the capture device at StartAsync, so picking a different mic mid-service has no
+        // effect until the next stop/start. When listening is live, restart capture automatically on a
+        // device change so the new mic takes over without the operator toggling it by hand.
+        this.WhenAnyValue(x => x.SelectedDevice)
+            .Skip(1)
+            .Throttle(DeviceSwitchDebounce)
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(device => _ = RestartForDeviceChangeAsync(device));
+
+        // Save the mic-sensitivity slider once the operator settles on a value (the live audio effect
+        // already applied in the setter; this only persists it).
+        this.WhenAnyValue(x => x.MicSensitivity)
+            .Skip(1)
+            .Throttle(GainPersistDebounce)
+            .Subscribe(value => _ = PersistMicSensitivityAsync(value));
+    }
+
+    private async Task PersistMicSensitivityAsync(double value)
+    {
+        try
+        {
+            await _settings.SetAsync(MicGainSettingKey, value.ToString("0.###", CultureInfo.InvariantCulture));
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to persist mic sensitivity {Value}", value);
+        }
     }
 
     public async Task InitializeAsync()
@@ -266,6 +327,14 @@ public class TranscriptionViewModel : ViewModelBase
             AudioDevices.Add(d);
         if (devices.Count > 0)
             SelectedDevice = devices[0];
+
+        // Restore the operator's saved mic sensitivity (falls back to the appsettings-seeded default).
+        var saved = await _settings.GetAsync(MicGainSettingKey);
+        if (saved is not null &&
+            double.TryParse(saved, NumberStyles.Float, CultureInfo.InvariantCulture, out var gain))
+        {
+            MicSensitivity = gain;
+        }
     }
 
     private async Task ToggleListening()
@@ -281,6 +350,24 @@ public class TranscriptionViewModel : ViewModelBase
         {
             Log.Error(ex, "Transcription toggle failed");
             StatusText = $"Error: {ex.Message}";
+        }
+    }
+
+    // Restart live capture on the newly-selected device. No-op when not currently listening — the
+    // next manual Start already picks up SelectedDevice — so this only kicks in mid-service.
+    private async Task RestartForDeviceChangeAsync(string? device)
+    {
+        if (!_transcription.IsRunning) return;
+        try
+        {
+            StatusText = "Switching microphone…";
+            await _transcription.StopAsync();
+            await _transcription.StartAsync(device);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to switch microphone to {Device}", device);
+            StatusText = $"Error switching mic: {ex.Message}";
         }
     }
 

@@ -29,6 +29,20 @@ public class App : Application
 
     public override async void OnFrameworkInitializationCompleted()
     {
+        // Show a lightweight splash immediately. DB init, DI wiring and the first library load below
+        // take a few seconds, during which no window would otherwise appear — leaving the operator
+        // unsure the app even launched. The splash gives instant feedback and is closed once the real
+        // window (sign-in or operator) is on screen.
+        SplashWindow? splash = null;
+        var splashShownAt = DateTime.UtcNow;
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime bootDesktop)
+        {
+            bootDesktop.ShutdownMode = Avalonia.Controls.ShutdownMode.OnLastWindowClose;
+            splash = new SplashWindow();
+            splash.Show();
+            splash.SetProgress(8);
+        }
+
         var config = new ConfigurationBuilder()
             .SetBasePath(AppContext.BaseDirectory)
             .AddJsonFile("appsettings.json", optional: true)
@@ -51,6 +65,8 @@ public class App : Application
         seatTokens.SetHardware(HardwareFingerprint.Get());
         services.AddSingleton<ISeatTokenProvider>(seatTokens);
 
+        splash?.SetStatus("Preparing database…");
+        splash?.SetProgress(24);
         var dbService = new DatabaseService(AppPaths.DatabasePath);
         await dbService.InitializeAsync();
 
@@ -161,6 +177,13 @@ public class App : Application
 
         _services = services.BuildServiceProvider();
 
+        // If any authenticated cloud call is rejected with 401, the seat token is dead — drop the
+        // session and return to sign-in instead of leaving the operator running on a session the
+        // server no longer accepts.
+        seatTokens.Unauthorized += OnSeatUnauthorized;
+
+        splash?.SetStatus("Loading settings…");
+        splash?.SetProgress(58);
         await _services.GetRequiredService<IThemeService>().LoadAsync();
         await _services.GetRequiredService<IProPresenterService>().LoadSettingsAsync();
         await _services.GetRequiredService<ILiveBackgroundService>().LoadAsync();
@@ -184,7 +207,23 @@ public class App : Application
                 }
             });
 
+            splash?.SetStatus("Loading your library…");
+            splash?.SetProgress(80);
             await GateAndStartAsync();
+
+            // The real window (sign-in or operator) is now on screen; retire the splash. Fill the bar,
+            // then hold the splash for a moment (and let the bar animation finish) so a fast,
+            // cached-session launch still reads as a deliberate load rather than a flicker.
+            splash?.SetStatus("Ready");
+            splash?.SetProgress(100);
+            var elapsed = DateTime.UtcNow - splashShownAt;
+            var minOnScreen = TimeSpan.FromMilliseconds(1600);
+            if (elapsed < minOnScreen)
+                await Task.Delay(minOnScreen - elapsed);
+
+            // Closing the splash after the main window opens keeps at least one window alive so
+            // OnLastWindowClose doesn't shut the app down.
+            splash?.Close();
 
             // Fire-and-forget OTA update check once a window is on screen. The operator UI shows a
             // persistent toast if an update is found. No-ops in dev / non-installed builds.
@@ -196,6 +235,8 @@ public class App : Application
 
     private IClassicDesktopStyleApplicationLifetime? _desktop;
     private bool _signOutWired;
+    private bool _inOperator;
+    private bool _forcedReauthInProgress;
 
     /// <summary>Decides whether to start straight into the operator (valid/offline-grace session) or gate on sign-in.</summary>
     private async Task GateAndStartAsync()
@@ -223,10 +264,14 @@ public class App : Application
         }
     }
 
-    private void ShowSignIn()
+    private void ShowSignIn(string? notice = null)
     {
         if (_services is null) return;
+        _inOperator = false;
+        _forcedReauthInProgress = false;
         var vm = _services.GetRequiredService<SignInViewModel>();
+        if (!string.IsNullOrWhiteSpace(notice))
+            vm.ShowNotice(notice);
         var window = new SignInWindow { DataContext = vm };
         vm.SignedIn += async session =>
         {
@@ -257,6 +302,42 @@ public class App : Application
         await operatorVm.InitializeAsync();
         _services.GetRequiredService<ISyncScheduler>().Start();
         _services.GetRequiredService<WindowManager>().ShowAll();
+        _inOperator = true;
+    }
+
+    // Fired (off the UI thread) when an authenticated request was rejected with 401. Marshal to the
+    // UI thread and force a single return to sign-in, ignoring the burst of follow-on 401s.
+    private void OnSeatUnauthorized()
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (!_inOperator || _forcedReauthInProgress) return;
+            _forcedReauthInProgress = true;
+            _ = ForceReauthAsync("You were signed out (your session expired or the seat was released). Please sign in again.");
+        });
+    }
+
+    private async Task ForceReauthAsync(string notice)
+    {
+        if (_services is null) return;
+        try
+        {
+            Log.Warning("Seat token rejected (401); dropping session and returning to sign-in");
+            _services.GetRequiredService<ISyncScheduler>().Stop();
+
+            // The token is already dead server-side, so skip the network sign-out and just clear local state.
+            await _services.GetRequiredService<ISessionStore>().ClearAsync();
+            _services.GetRequiredService<ISeatTokenProvider>().Set(null);
+            _services.GetRequiredService<IEntitlementService>().Clear();
+            _services.GetRequiredService<ITenantContext>().Reset();
+
+            ShowSignIn(notice);                                      // open sign-in before closing operator (keep >= 1 window)
+            _services.GetRequiredService<WindowManager>().CloseAll();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Forced re-authentication failed");
+        }
     }
 
     private async void OnSignOutRequested()
