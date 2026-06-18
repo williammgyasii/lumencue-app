@@ -32,10 +32,10 @@ variable "db_public_access" {
   default     = false
 }
 
-variable "admin_cidr" {
-  description = "Public IP in CIDR form (e.g. 1.2.3.4/32) allowed to reach RDS while db_public_access is true."
-  type        = string
-  default     = ""
+variable "admin_cidrs" {
+  description = "Public IPs in CIDR form (e.g. 1.2.3.4/32) allowed to reach RDS while db_public_access is true. Add entries (home, work); never swap."
+  type        = list(string)
+  default     = []
 }
 
 variable "domain_name" {

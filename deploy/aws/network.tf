@@ -128,15 +128,15 @@ resource "aws_security_group" "db" {
     security_groups = [aws_security_group.task.id]
   }
 
-  # TEMP: direct access from a single admin IP while db_public_access is on.
+  # TEMP: direct access from a list of admin IPs (home/work) while db_public_access is on.
   dynamic "ingress" {
-    for_each = (var.db_public_access && var.admin_cidr != "") ? [1] : []
+    for_each = (var.db_public_access && length(var.admin_cidrs) > 0) ? [1] : []
     content {
-      description = "Postgres from admin IP (temporary)"
+      description = "Postgres from admin IPs (temporary)"
       from_port   = 5432
       to_port     = 5432
       protocol    = "tcp"
-      cidr_blocks = [var.admin_cidr]
+      cidr_blocks = var.admin_cidrs
     }
   }
 
