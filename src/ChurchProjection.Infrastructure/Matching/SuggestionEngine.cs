@@ -17,25 +17,36 @@ public sealed class SuggestionEngine : ISuggestionEngine
 {
     private readonly IAiMatcherService _matcher;
     private readonly Channel<string> _channel;
+    // Separate slot for the high-frequency interim stream so a flood of live partials never drops the
+    // finalised-utterance window (which carries the full fuzzy + semantic match), and vice versa.
+    private readonly Channel<string> _interimChannel;
     private readonly Subject<IReadOnlyList<AiSuggestion>> _suggestions = new();
     private readonly CancellationTokenSource _shutdown = new();
     private readonly Task _worker;
+    private readonly Task _interimWorker;
 
     public SuggestionEngine(IAiMatcherService matcher)
     {
         _matcher = matcher;
 
-        // Capacity 1 + DropOldest: only the freshest pending window survives, so a slow
-        // match can never cause a backlog of stale transcript windows.
-        _channel = Channel.CreateBounded<string>(new BoundedChannelOptions(1)
+        _channel = CreateLatestWinsChannel();
+        _interimChannel = CreateLatestWinsChannel();
+
+        // Full match (scripture + content) on finalised windows.
+        _worker = Task.Run(() => RunAsync(_channel, scriptureOnly: false));
+        // Fast scripture-only match on live partials, so verses surface as they're spoken.
+        _interimWorker = Task.Run(() => RunAsync(_interimChannel, scriptureOnly: true));
+    }
+
+    // Capacity 1 + DropOldest: only the freshest pending window survives, so a slow match can never
+    // cause a backlog of stale transcript windows.
+    private static Channel<string> CreateLatestWinsChannel() =>
+        Channel.CreateBounded<string>(new BoundedChannelOptions(1)
         {
             FullMode = BoundedChannelFullMode.DropOldest,
             SingleReader = true,
             SingleWriter = false,
         });
-
-        _worker = Task.Run(RunAsync);
-    }
 
     public IObservable<IReadOnlyList<AiSuggestion>> Suggestions => _suggestions.AsObservable();
 
@@ -43,6 +54,12 @@ public sealed class SuggestionEngine : ISuggestionEngine
     {
         if (string.IsNullOrWhiteSpace(transcriptWindow)) return;
         _channel.Writer.TryWrite(transcriptWindow);
+    }
+
+    public void PushInterim(string transcriptWindow)
+    {
+        if (string.IsNullOrWhiteSpace(transcriptWindow)) return;
+        _interimChannel.Writer.TryWrite(transcriptWindow);
     }
 
     public void HandleSegment(string finalSegmentText)
@@ -91,9 +108,9 @@ public sealed class SuggestionEngine : ISuggestionEngine
         }
     }
 
-    private async Task RunAsync()
+    private async Task RunAsync(Channel<string> channel, bool scriptureOnly)
     {
-        var reader = _channel.Reader;
+        var reader = channel.Reader;
         try
         {
             while (await reader.WaitToReadAsync(_shutdown.Token).ConfigureAwait(false))
@@ -103,7 +120,7 @@ public sealed class SuggestionEngine : ISuggestionEngine
                 // Collapse any windows that queued up while we were busy down to the latest.
                 while (reader.TryRead(out var newer)) text = newer;
 
-                await MatchLatestAsync(reader, text).ConfigureAwait(false);
+                await MatchLatestAsync(reader, text, scriptureOnly).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException)
@@ -116,11 +133,11 @@ public sealed class SuggestionEngine : ISuggestionEngine
         }
     }
 
-    private async Task MatchLatestAsync(ChannelReader<string> reader, string text)
+    private async Task MatchLatestAsync(ChannelReader<string> reader, string text, bool scriptureOnly)
     {
         using var runCts = CancellationTokenSource.CreateLinkedTokenSource(_shutdown.Token);
 
-        var matchTask = _matcher.MatchAsync(text, runCts.Token);
+        var matchTask = _matcher.MatchAsync(text, scriptureOnly, runCts.Token);
         // Race the match against the arrival of a newer window; whichever wins, the loop
         // picks up the latest input next iteration.
         var newerInput = reader.WaitToReadAsync(runCts.Token).AsTask();
@@ -151,8 +168,9 @@ public sealed class SuggestionEngine : ISuggestionEngine
     public void Dispose()
     {
         _channel.Writer.TryComplete();
+        _interimChannel.Writer.TryComplete();
         _shutdown.Cancel();
-        try { _worker.Wait(TimeSpan.FromSeconds(2)); }
+        try { Task.WaitAll([_worker, _interimWorker], TimeSpan.FromSeconds(2)); }
         catch { /* ignore shutdown races */ }
         _shutdown.Dispose();
         _suggestions.Dispose();

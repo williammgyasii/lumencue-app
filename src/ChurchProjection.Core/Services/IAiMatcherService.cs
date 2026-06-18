@@ -18,7 +18,13 @@ public interface IAiMatcherService
     /// </summary>
     bool IncludeContentMatches { get; set; }
 
-    Task<List<AiSuggestion>> MatchAsync(string transcriptChunk, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Matches a transcript window. When <paramref name="scriptureOnly"/> is true, only the cheap
+    /// scripture-reference resolution runs — the expensive fuzzy and semantic-embedding passes are
+    /// skipped. Used for the high-frequency interim (live partial) stream so spoken verses surface
+    /// instantly, while the full match (including content matches) runs on finalised utterances.
+    /// </summary>
+    Task<List<AiSuggestion>> MatchAsync(string transcriptChunk, bool scriptureOnly = false, CancellationToken cancellationToken = default);
     void UpdateContentLibrary(IEnumerable<string> contentTexts, IEnumerable<string> contentIds);
 
     /// <summary>

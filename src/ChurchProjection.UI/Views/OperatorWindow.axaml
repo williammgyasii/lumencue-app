@@ -292,7 +292,15 @@
     </Border>
 
     <!-- MAIN: Playlists (left rail) | AI / Content (center, the hero) | Program + Queue (right rail)  (drag splitters to resize) -->
-    <Grid Grid.Row="1" ColumnDefinitions="230,6,*,6,360" Margin="14,12,14,8">
+    <!-- Columns carry MinWidth so the splitters can shrink a rail but never collapse it out of the grid. -->
+    <Grid Grid.Row="1" Margin="14,12,14,8">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="230" MinWidth="190" />
+        <ColumnDefinition Width="6" />
+        <ColumnDefinition Width="*" MinWidth="460" />
+        <ColumnDefinition Width="6" />
+        <ColumnDefinition Width="360" MinWidth="300" />
+      </Grid.ColumnDefinitions>
 
         <!-- LEFT SIDEBAR: ProPresenter-style navigator — collapsible Library + Playlists sections -->
         <Border Grid.Column="0" Background="#181C24" CornerRadius="10" BorderBrush="#2A303C" BorderThickness="1" ClipToBounds="True">
@@ -1245,7 +1253,14 @@
         <GridSplitter Grid.Column="3" ResizeDirection="Columns" VerticalAlignment="Stretch" />
 
         <!-- RIGHT RAIL: compact Program monitor (top) + Service Queue (below) -->
-        <Grid Grid.Column="4" RowDefinitions="210,6,*">
+        <!-- Program row is sized so the 16:9 thumbnail fills the rail width (no side letterboxing);
+             MinHeight on both rows keeps the row splitter from collapsing either out of view. -->
+        <Grid Grid.Column="4">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="296" MinHeight="200" />
+            <RowDefinition Height="6" />
+            <RowDefinition Height="*" MinHeight="140" />
+          </Grid.RowDefinitions>
 
           <!-- PROGRAM (small confidence monitor — what you click goes live here) -->
           <Border Grid.Row="0" CornerRadius="10" ClipToBounds="True" BorderBrush="#22C55E" BorderThickness="2">
@@ -1534,7 +1549,7 @@
         <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="0,0,10,0"
                     ToolTip.Tip="Mic sensitivity — raise if the meter barely moves; lower if it pins to the top / clips.">
           <TextBlock Text="&#127897;" FontSize="13" VerticalAlignment="Center" Foreground="#8B93A1" />
-          <Slider Minimum="1" Maximum="10" Value="{Binding MicSensitivity}" Width="96"
+          <Slider Minimum="1" Maximum="4" Value="{Binding MicSensitivity}" Width="96"
                   VerticalAlignment="Center" />
           <TextBlock Text="{Binding MicSensitivityLabel}" Foreground="#A7AFBC" FontSize="11"
                      MinWidth="34" VerticalAlignment="Center" />

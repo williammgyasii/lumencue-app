@@ -16,13 +16,19 @@ public class TranscriptionViewModel : ViewModelBase
     private static readonly TimeSpan WindowDuration = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan AudioLevelThrottle = TimeSpan.FromMilliseconds(50);
     private static readonly TimeSpan SegmentThrottle = TimeSpan.FromMilliseconds(500);
+    // Sample (not debounce) the live partial: emit the newest hypothesis on a fixed cadence so
+    // references surface mid-sentence during continuous speech, instead of only when the speaker pauses.
+    private static readonly TimeSpan InterimSampleInterval = TimeSpan.FromMilliseconds(250);
     // Collapse rapid mic-dropdown changes into a single restart.
     private static readonly TimeSpan DeviceSwitchDebounce = TimeSpan.FromMilliseconds(350);
     // Persist the mic-sensitivity slider only after the operator stops dragging.
     private static readonly TimeSpan GainPersistDebounce = TimeSpan.FromMilliseconds(500);
     private const string MicGainSettingKey = "mic.input_gain";
     public const double MinMicSensitivity = 1.0;
-    public const double MaxMicSensitivity = 10.0;
+    // Capped at 4x: with the soft-knee limiter in the audio path, this lifts quiet mics well while
+    // keeping the signal in its clean, mostly-linear range. Higher would just over-compress the audio
+    // into saturation, which sounds unnatural and degrades Deepgram accuracy.
+    public const double MaxMicSensitivity = 4.0;
     private const float SignalThreshold = 0.005f;
     private const double AudioLevelGain = 300;
 
@@ -31,6 +37,8 @@ public class TranscriptionViewModel : ViewModelBase
     private readonly SettingsRepository _settings;
 
     private readonly List<(string Text, DateTimeOffset Time)> _slidingWindow = [];
+    // Guards _slidingWindow: the final-segment and interim subscriptions run on different Rx threads.
+    private readonly object _windowLock = new();
 
     private string _transcript = "";
     private bool _isListening;
@@ -280,6 +288,12 @@ public class TranscriptionViewModel : ViewModelBase
             .Throttle(SegmentThrottle)
             .Subscribe(PushSegment);
 
+        // Also feed the live (interim) partial so references show as they're spoken, not a full
+        // utterance behind. Sampled on a fixed cadence so it keeps flowing during continuous speech.
+        _transcription.InterimTranscript
+            .Sample(InterimSampleInterval)
+            .Subscribe(PushInterim);
+
         // Handle each final utterance once for spoken commands ("next verse") and to keep the
         // navigation anchor current. Un-throttled so no command utterance is collapsed away.
         _transcription.Segments
@@ -375,11 +389,35 @@ public class TranscriptionViewModel : ViewModelBase
     {
         if (string.IsNullOrWhiteSpace(segment.Text)) return;
 
-        var now = DateTimeOffset.UtcNow;
-        _slidingWindow.Add((segment.Text, now));
-        _slidingWindow.RemoveAll(e => now - e.Time > WindowDuration);
+        string window;
+        lock (_windowLock)
+        {
+            var now = DateTimeOffset.UtcNow;
+            _slidingWindow.Add((segment.Text, now));
+            _slidingWindow.RemoveAll(e => now - e.Time > WindowDuration);
+            window = string.Join(" ", _slidingWindow.Select(e => e.Text));
+        }
 
-        _engine.Push(string.Join(" ", _slidingWindow.Select(e => e.Text)));
+        _engine.Push(window);
+    }
+
+    // Pushes the recent finals plus the live partial of the current utterance, so a reference spoken
+    // in the in-progress sentence is matched immediately rather than after Deepgram finalises it.
+    private void PushInterim(string interim)
+    {
+        if (string.IsNullOrWhiteSpace(interim)) return;
+
+        string window;
+        lock (_windowLock)
+        {
+            var now = DateTimeOffset.UtcNow;
+            window = string.Join(" ", _slidingWindow
+                .Where(e => now - e.Time <= WindowDuration)
+                .Select(e => e.Text)
+                .Append(interim));
+        }
+
+        _engine.PushInterim(window);
     }
 
     private void MergeSuggestions(IReadOnlyList<AiSuggestion> matches)

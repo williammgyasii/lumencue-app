@@ -22,6 +22,7 @@ public sealed class UnavailableTranscriptionService : ITranscriptionService
 
     public IObservable<TranscriptionSegment> Segments => Observable.Empty<TranscriptionSegment>();
     public IObservable<string> RollingTranscript => Observable.Return("");
+    public IObservable<string> InterimTranscript => Observable.Empty<string>();
     public IObservable<bool> IsListening => Observable.Return(false);
     public IObservable<string> StatusMessage => Observable.Return(_reason);
     public IObservable<float> AudioLevel => Observable.Return(0f);

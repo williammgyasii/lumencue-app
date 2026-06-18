@@ -6,6 +6,14 @@ public interface ITranscriptionService : IDisposable
 {
     IObservable<TranscriptionSegment> Segments { get; }
     IObservable<string> RollingTranscript { get; }
+
+    /// <summary>
+    /// Live, not-yet-finalised partial of the current utterance (the running recognition hypothesis).
+    /// Emitted continuously as the speaker talks, well before Deepgram finalises the utterance on an
+    /// end-of-speech pause. Fed into the matcher so spoken scripture references surface as they are
+    /// said rather than lagging a full utterance behind the speaker.
+    /// </summary>
+    IObservable<string> InterimTranscript { get; }
     IObservable<bool> IsListening { get; }
     IObservable<string> StatusMessage { get; }
     IObservable<float> AudioLevel { get; }

@@ -67,7 +67,7 @@ public class FuzzyAiMatcherService : IAiMatcherService
         Log.Debug("AI matcher index updated with {Count} items", next.Count);
     }
 
-    public async Task<List<AiSuggestion>> MatchAsync(string transcriptChunk, CancellationToken cancellationToken = default)
+    public async Task<List<AiSuggestion>> MatchAsync(string transcriptChunk, bool scriptureOnly = false, CancellationToken cancellationToken = default)
     {
         var suggestions = new List<AiSuggestion>();
 
@@ -81,7 +81,7 @@ public class FuzzyAiMatcherService : IAiMatcherService
             await AddScriptureSuggestionsAsync(r, suggestions, cancellationToken).ConfigureAwait(false);
         }
 
-        if (!_includeContentMatches || suggestions.Count >= MaxResults) return suggestions;
+        if (scriptureOnly || !_includeContentMatches || suggestions.Count >= MaxResults) return suggestions;
 
         AddFuzzySuggestions(transcriptChunk, suggestions, cancellationToken);
         return suggestions;
@@ -158,7 +158,16 @@ public class FuzzyAiMatcherService : IAiMatcherService
             .ConfigureAwait(false);
 
         if (verses.Count == 0)
+        {
+            // A specific verse that doesn't exist in the chapter — a mis-spoken or mis-heard number
+            // such as "Isaiah 4:8" when Isaiah 4 has only 6 verses — would otherwise surface nothing,
+            // leaving the operator thinking the reference was missed entirely. If the chapter itself
+            // exists, fall back to it (labelled as the chapter, never a wrong specific verse) so the
+            // recognised book + chapter stays actionable.
+            if (!isWholeChapter && r.VerseStart > 0)
+                await AddOutOfRangeChapterFallbackAsync(r, suggestions, cancellationToken).ConfigureAwait(false);
             return;
+        }
 
         if (isWholeChapter)
         {
@@ -193,6 +202,27 @@ public class FuzzyAiMatcherService : IAiMatcherService
                 Score: 1.0,
                 MatchType: "scripture_reference"));
         }
+    }
+
+    // Surfaces the chapter when a spoken verse was out of range. The chapter was just hydrated into the
+    // cache by the failed verse lookup, so this is an instant local hit (no extra network round-trip).
+    private async Task AddOutOfRangeChapterFallbackAsync(ScriptureReference r, List<AiSuggestion> suggestions, CancellationToken cancellationToken)
+    {
+        var chapterRef = new ScriptureReference(r.Book, r.Chapter, VerseStart: 1, VerseEnd: ScriptureReference.WholeChapterSentinel);
+        var chapterVerses = await _contentLibrary
+            .GetOrFetchVersesAsync(chapterRef, CurrentTranslation, localOnly: false, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        if (chapterVerses.Count == 0) return;
+
+        var first = chapterVerses[0];
+        suggestions.Add(new AiSuggestion(
+            ContentId: $"scripture:{first.Book}:{first.Chapter}:{first.VerseStart}",
+            Title: $"{first.Book} {first.Chapter}",
+            Body: first.Text,
+            Footer: $"{first.Book} {first.Chapter} ({first.Translation}) — verse {r.VerseStart} not found",
+            Score: 0.9,
+            MatchType: "scripture_reference"));
     }
 
     private void AddFuzzySuggestions(string transcriptChunk, List<AiSuggestion> suggestions, CancellationToken cancellationToken)

@@ -11,6 +11,12 @@ public static class ReleaseNotes
 {
     private static readonly Dictionary<string, string[]> Notes = new()
     {
+        ["0.7.13"] =
+        [
+            "More accurate AI transcription — improved how your microphone audio is processed so spoken words are recognised more reliably.",
+            "Spoken scripture references now appear as you say them, instead of lagging a sentence behind.",
+            "Smarter verse handling — if an exact verse isn't found we now show the chapter instead of nothing, and obviously misheard numbers are ignored.",
+        ],
         ["0.7.12"] =
         [
             "Smarter verse search — find a passage from just a few spoken or typed words, even when they aren't word-for-word exact.",

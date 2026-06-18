@@ -85,12 +85,14 @@ public class HybridAiMatcherService : IAiMatcherService
         });
     }
 
-    public async Task<List<AiSuggestion>> MatchAsync(string transcriptChunk, CancellationToken cancellationToken = default)
+    public async Task<List<AiSuggestion>> MatchAsync(string transcriptChunk, bool scriptureOnly = false, CancellationToken cancellationToken = default)
     {
-        var suggestions = await _fuzzy.MatchAsync(transcriptChunk, cancellationToken).ConfigureAwait(false);
+        var suggestions = await _fuzzy.MatchAsync(transcriptChunk, scriptureOnly, cancellationToken).ConfigureAwait(false);
 
+        // Interim (live partial) matches stay scripture-only: skip the costly embedding inference so
+        // spoken verses surface instantly instead of waiting on the semantic pass every 250ms.
         var index = _semanticIndex;
-        if (!_fuzzy.IncludeContentMatches || !_embeddings.IsReady || index.Count == 0)
+        if (scriptureOnly || !_fuzzy.IncludeContentMatches || !_embeddings.IsReady || index.Count == 0)
             return suggestions;
 
         cancellationToken.ThrowIfCancellationRequested();

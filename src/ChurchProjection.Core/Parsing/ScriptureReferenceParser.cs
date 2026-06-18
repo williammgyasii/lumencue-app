@@ -299,7 +299,8 @@ public static partial class ScriptureReferenceParser
                 if (raw.Contains(':'))
                 {
                     var parts = raw.Split(':');
-                    if (int.TryParse(parts[0], out int ch) && parts.Length > 1 && int.TryParse(parts[1].TrimEnd('-'), out int vs))
+                    if (int.TryParse(parts[0], out int ch) && parts.Length > 1 && int.TryParse(parts[1].TrimEnd('-'), out int vs)
+                        && IsPlausibleChapter(ch) && IsPlausibleVerse(vs))
                     {
                         chapter = ch;
                         verseStart = vs;
@@ -307,13 +308,18 @@ public static partial class ScriptureReferenceParser
                 }
                 else
                 {
+                    // A stray large number ("Isaiah 8206" from mis-formatted spoken numerals) is not a
+                    // real chapter — skip it rather than firing a doomed whole-chapter fetch.
+                    if (!IsPlausibleChapter(num1)) continue;
+
                     chapter = num1;
                     nextIdx++;
 
                     if (nextIdx < words.Length && words[nextIdx].TrimEnd(',', '.', ';') == ":")
                         nextIdx++;
 
-                    if (nextIdx < words.Length && int.TryParse(words[nextIdx].TrimEnd(',', '.', ';', '-'), out int num2))
+                    if (nextIdx < words.Length && int.TryParse(words[nextIdx].TrimEnd(',', '.', ';', '-'), out int num2)
+                        && IsPlausibleVerse(num2))
                     {
                         verseStart = num2;
                         nextIdx++;
@@ -348,6 +354,11 @@ public static partial class ScriptureReferenceParser
 
         return results;
     }
+
+    // Upper bounds match the Bible's extremes (150 chapters in Psalms, 176 verses in Psalm 119), so
+    // any larger number from mis-formatted spoken numerals is rejected rather than parsed as a ref.
+    private static bool IsPlausibleChapter(int n) => n is >= 1 and <= 150;
+    private static bool IsPlausibleVerse(int n) => n is >= 1 and <= 176;
 
     private static readonly Dictionary<string, int> WordToNumber = new(StringComparer.OrdinalIgnoreCase)
     {

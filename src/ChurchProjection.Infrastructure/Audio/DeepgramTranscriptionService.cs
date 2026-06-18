@@ -51,6 +51,7 @@ public class DeepgramTranscriptionService : ITranscriptionService
     private readonly BehaviorSubject<float> _audioLevel = new(0f);
     private readonly Subject<TranscriptionSegment> _segments = new();
     private readonly BehaviorSubject<string> _rollingTranscript = new("");
+    private readonly Subject<string> _interim = new();
 
     private string _lastPartial = "";
     private string? _currentDeviceName;
@@ -68,6 +69,7 @@ public class DeepgramTranscriptionService : ITranscriptionService
 
     public IObservable<TranscriptionSegment> Segments => _segments.AsObservable();
     public IObservable<string> RollingTranscript => _rollingTranscript.AsObservable();
+    public IObservable<string> InterimTranscript => _interim.AsObservable();
     public IObservable<bool> IsListening => _isListening.AsObservable();
     public IObservable<string> StatusMessage => _statusMessage.AsObservable();
     public IObservable<float> AudioLevel => _audioLevel.AsObservable();
@@ -184,6 +186,9 @@ public class DeepgramTranscriptionService : ITranscriptionService
                 {
                     _lastPartial = transcript;
                     UpdateLiveTranscript(transcript);
+                    // Feed the live partial into matching so references surface as they're spoken,
+                    // instead of waiting for Deepgram to finalise the utterance on a pause.
+                    _interim.OnNext(transcript);
                 }
             }
         }));
@@ -603,7 +608,8 @@ public class DeepgramTranscriptionService : ITranscriptionService
 
     // Down-mixes to mono and converts to 16-bit PCM at the source's native sample rate. No rate
     // conversion is performed; the native rate is advertised to Deepgram so no signal is lost.
-    // Applies the configured input gain (with hard clamp) so quiet mics still produce usable levels.
+    // Applies the configured input gain through a soft-knee limiter so quiet mics get lifted without
+    // ever hard-clipping into the distortion that hurts recognition accuracy.
     private byte[] ConvertToMono16Pcm(byte[] buffer, int bytesRecorded, WaveFormat sourceFormat)
     {
         int bytesPerSample = sourceFormat.BitsPerSample / 8;
@@ -626,12 +632,29 @@ public class DeepgramTranscriptionService : ITranscriptionService
                     sum += BitConverter.ToInt16(buffer, offset) / 32768f;
             }
 
-            var clamped = Math.Clamp((sum / sourceFormat.Channels) * _inputGain, -1f, 1f);
-            var sample16 = (short)(clamped * 32767);
+            var limited = SoftLimit((sum / sourceFormat.Channels) * _inputGain);
+            var sample16 = (short)(limited * 32767);
             pcm[i * 2] = (byte)(sample16 & 0xFF);
             pcm[i * 2 + 1] = (byte)((sample16 >> 8) & 0xFF);
         }
         return pcm;
+    }
+
+    // Knee below which the (gained) signal passes through untouched; above it we saturate smoothly.
+    private const float LimiterKnee = 0.8f;
+
+    // Soft-knee limiter. Normal-level speech (|x| <= knee) is perfectly linear so Deepgram receives a
+    // clean, undistorted signal; only peaks that the gain would have pushed past full-scale are eased
+    // down with a tanh curve instead of being hard-clamped to ±1.0. Hard clamping turns loud syllables
+    // into square waves whose harmonics wreck recognition accuracy — this avoids that while still
+    // letting the gain lift a quiet mic.
+    private static float SoftLimit(float x)
+    {
+        float a = MathF.Abs(x);
+        if (a <= LimiterKnee) return x;
+        float over = (a - LimiterKnee) / (1f - LimiterKnee);
+        float shaped = LimiterKnee + (1f - LimiterKnee) * MathF.Tanh(over);
+        return MathF.Sign(x) * shaped;
     }
 
     public void Dispose()
@@ -643,6 +666,7 @@ public class DeepgramTranscriptionService : ITranscriptionService
         _wsClient = null;
         try { Deepgram.Library.Terminate(); } catch { }
         _segments.Dispose();
+        _interim.Dispose();
         _startStopLock.Dispose();
     }
 }
