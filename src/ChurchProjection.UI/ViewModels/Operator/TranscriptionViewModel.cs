@@ -26,6 +26,7 @@ public class TranscriptionViewModel : ViewModelBase
     private bool _isListening;
     private string _statusText = "Idle";
     private float _audioLevel;
+    private string _engineName = "";
     private string? _selectedDevice;
     private SuggestionItem? _selectedSuggestion;
 
@@ -76,7 +77,11 @@ public class TranscriptionViewModel : ViewModelBase
     public bool IsListening
     {
         get => _isListening;
-        set => this.RaiseAndSetIfChanged(ref _isListening, value);
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _isListening, value);
+            this.RaisePropertyChanged(nameof(ShowEngineName));
+        }
     }
 
     public string StatusText
@@ -100,6 +105,19 @@ public class TranscriptionViewModel : ViewModelBase
     public double AudioLevelPercent => Math.Min(AudioLevel * AudioLevelGain, 100);
     public string AudioLevelDisplay => $"{AudioLevelPercent:F0}%";
     public bool HasSignal => AudioLevel > SignalThreshold;
+
+    /// <summary>Name of the active speech engine, shown only while listening.</summary>
+    public string EngineName
+    {
+        get => _engineName;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _engineName, value);
+            this.RaisePropertyChanged(nameof(ShowEngineName));
+        }
+    }
+
+    public bool ShowEngineName => _isListening && !string.IsNullOrWhiteSpace(_engineName);
 
     public string? SelectedDevice
     {
@@ -219,6 +237,10 @@ public class TranscriptionViewModel : ViewModelBase
             .Throttle(AudioLevelThrottle)
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(l => AudioLevel = l);
+
+        _transcription.EngineName
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(n => EngineName = n);
 
         // Feed transcript windows to the background engine; matching never runs on this thread.
         _transcription.Segments

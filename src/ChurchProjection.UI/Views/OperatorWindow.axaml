@@ -1477,6 +1477,11 @@
           </Button>
           <TextBlock Text="&#127908;" FontSize="14" VerticalAlignment="Center" />
           <TextBlock Text="AI LISTENING" Classes="section" Foreground="#A78BFA" FontSize="11" VerticalAlignment="Center" />
+          <Border CornerRadius="4" Padding="6,2" VerticalAlignment="Center" Background="#1E2530"
+                  BorderBrush="#2F3845" BorderThickness="1" IsVisible="{Binding ShowEngineName}"
+                  ToolTip.Tip="Active speech-to-text engine">
+            <TextBlock Text="{Binding EngineName}" Foreground="#8B93A1" FontSize="10" VerticalAlignment="Center" />
+          </Border>
         </StackPanel>
 
         <Border Grid.Column="1" CornerRadius="4" Padding="7,3" Margin="10,0,0,0" VerticalAlignment="Center" Background="#232932">

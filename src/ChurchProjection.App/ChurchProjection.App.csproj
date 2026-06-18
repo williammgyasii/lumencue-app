@@ -48,9 +48,9 @@
   </ItemGroup>
 
   <!--
-    LumenCue ships win-x64 only, but Whisper.net.Runtime (and similar) bundle native
-    binaries for every OS/arch under runtimes\*. Strip the ones we never load so the
-    published build / installer stays lean.
+    LumenCue ships win-x64 only, but native packages (e.g. Microsoft.ML.OnnxRuntime for the
+    semantic matcher) bundle binaries for every OS/arch under runtimes\*. Strip the ones we
+    never load so the published build / installer stays lean.
   -->
   <Target Name="TrimForeignNativeRuntimes" AfterTargets="Publish">
     <ItemGroup>

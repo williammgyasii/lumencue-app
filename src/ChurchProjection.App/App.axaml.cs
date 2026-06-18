@@ -116,14 +116,22 @@ public class App : Application
         services.AddSingleton<ILayerService, LayerService>();
         services.AddSingleton<IProPresenterService, ProPresenterService>();
 
-        // Speech-to-text. When a cloud API is configured, stream to Deepgram using a short-lived
-        // token minted by the backend (no key on the client), falling back to offline Vosk when no
-        // token can be obtained. Without a cloud API (pure offline build), use Vosk directly.
+        // Speech-to-text is cloud-only: stream to Deepgram using a short-lived token minted by the
+        // backend (no key on the client). Deepgram auto-reconnects and surfaces a clear status if the
+        // connection or token is unavailable; there is deliberately no offline engine, because every
+        // on-device option proved either too inaccurate or too slow to run in real time, and a bad
+        // transcript actively fires the wrong scripture/song cues on screen. When the cloud is down the
+        // operator drives cues manually instead.
         // Confidence gate for noisy rooms: finals below this are dropped (0 disables, default 0.5).
         var minConfidence = double.TryParse(config["Deepgram:MinConfidence"], out var mc) ? mc : 0.3;
+        // Software boost for quiet capture devices (built-in mic arrays often sit low). 1.0 = no change.
+        var inputGain = double.TryParse(config["Deepgram:InputGain"], out var ig) ? ig : 1.0;
+        // Cost control: only stream to Deepgram during speech. Disable by setting Deepgram:VadGate=false.
+        var vadGate = !bool.TryParse(config["Deepgram:VadGate"], out var vg) || vg;
+        var vadThreshold = double.TryParse(config["Deepgram:VadThreshold"], out var vt) ? vt : 0.01;
         if (!string.IsNullOrWhiteSpace(cloudApiBaseUrl))
         {
-            Log.Information("STT: Deepgram (cloud, token-based) with Vosk offline fallback, confidence gate {Min:P0}", minConfidence);
+            Log.Information("STT: Deepgram (cloud, token-based), confidence gate {Min:P0}", minConfidence);
             var sttHttp = new HttpClient(new SeatAuthHandler(seatTokens, new HttpClientHandler()))
             {
                 BaseAddress = new Uri(cloudApiBaseUrl.TrimEnd('/') + "/"),
@@ -131,15 +139,13 @@ public class App : Application
             };
             var sttTokenProvider = new HttpSttTokenProvider(sttHttp);
             services.AddSingleton<ISttTokenProvider>(sttTokenProvider);
-            services.AddSingleton<ITranscriptionService>(_ => new ResilientTranscriptionService(
-                new DeepgramTranscriptionService(sttTokenProvider, minConfidence),
-                new VoskTranscriptionService(),
-                sttTokenProvider));
+            services.AddSingleton<ITranscriptionService>(_ =>
+                new DeepgramTranscriptionService(sttTokenProvider, minConfidence, inputGain, vadGate, vadThreshold));
         }
         else
         {
-            Log.Information("STT: Vosk (local offline)");
-            services.AddSingleton<ITranscriptionService, VoskTranscriptionService>();
+            Log.Warning("STT: no cloud backend configured; speech-to-text disabled (manual mode only)");
+            services.AddSingleton<ITranscriptionService>(_ => new UnavailableTranscriptionService());
         }
 
         services.AddSingleton<SemanticEmbeddingService>();

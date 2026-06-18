@@ -17,9 +17,6 @@
     <PackageReference Include="Serilog" Version="4.3.1" />
     <PackageReference Include="System.Numerics.Tensors" Version="10.0.9" />
     <PackageReference Include="System.Reactive" Version="6.1.0" />
-    <PackageReference Include="Vosk" Version="0.3.38" />
-    <PackageReference Include="Whisper.net" Version="1.7.4" />
-    <PackageReference Include="Whisper.net.Runtime" Version="1.7.4" />
   </ItemGroup>
 
   <ItemGroup>

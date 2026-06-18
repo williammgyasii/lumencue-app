@@ -18,6 +18,19 @@ public class DeepgramTranscriptionService : ITranscriptionService
     // they reach the matcher, so a noisy sanctuary can't spawn phantom scripture/song suggestions.
     // 0 disables the gate. Tuned conservatively: clear speech scores ~0.9+, garbled noise far lower.
     private readonly double _minConfidence;
+    // Software input gain (>=1) multiplied into captured samples to lift quiet mics before clipping.
+    private readonly float _inputGain;
+    // Cost control: only stream audio to Deepgram while speech is present (plus a short pre-roll and
+    // hangover), so long silences/music aren't billed. Deepgram bills per minute of audio sent; idle
+    // time held open by KeepAlive is free. Gating is on the pre-gain RMS so it's independent of _inputGain.
+    private readonly bool _vadGate;
+    private readonly double _vadRmsThreshold;
+    private const int PreRollMs = 300;
+    private const int HangoverMs = 1500;
+    private readonly Queue<(byte[] Pcm, int DurMs)> _preRoll = new();
+    private int _preRollMs;
+    private bool _sending;
+    private DateTimeOffset _lastSpeechUtc = DateTimeOffset.MinValue;
     private IListenWebSocketClient? _wsClient;
     private WasapiCapture? _capture;
     private WaveFormat? _captureFormat;
@@ -56,12 +69,19 @@ public class DeepgramTranscriptionService : ITranscriptionService
     public IObservable<bool> IsListening => _isListening.AsObservable();
     public IObservable<string> StatusMessage => _statusMessage.AsObservable();
     public IObservable<float> AudioLevel => _audioLevel.AsObservable();
+    public IObservable<string> EngineName => Observable.Return("Deepgram · Cloud");
     public bool IsRunning => _isListening.Value;
 
-    public DeepgramTranscriptionService(ISttTokenProvider tokenProvider, double minConfidence = 0.5)
+    public DeepgramTranscriptionService(ISttTokenProvider tokenProvider, double minConfidence = 0.5,
+        double inputGain = 1.0, bool vadGate = true, double vadThreshold = 0.01)
     {
         _tokenProvider = tokenProvider;
         _minConfidence = Math.Clamp(minConfidence, 0.0, 1.0);
+        // Software capture gain for quiet mics (e.g. built-in arrays with low Windows level/boost).
+        // Clamped to a sane range; applied before clipping so the meter and Deepgram both benefit.
+        _inputGain = (float)Math.Clamp(inputGain, 1.0, 20.0);
+        _vadGate = vadGate;
+        _vadRmsThreshold = Math.Clamp(vadThreshold, 0.0, 1.0);
     }
 
     public Task<List<string>> GetAvailableDevicesAsync()
@@ -288,6 +308,10 @@ public class DeepgramTranscriptionService : ITranscriptionService
         if (_capture is null) return;
         try
         {
+            _preRoll.Clear();
+            _preRollMs = 0;
+            _sending = false;
+            _lastSpeechUtc = DateTimeOffset.MinValue;
             _capture.DataAvailable += OnDataAvailable;
             _capture.StartRecording();
         }
@@ -468,14 +492,75 @@ public class DeepgramTranscriptionService : ITranscriptionService
 
         UpdateAudioLevel(pcmBytes);
 
+        if (!_vadGate || _vadRmsThreshold <= 0)
+        {
+            SendToDeepgram(pcmBytes);
+            return;
+        }
+
+        // Pre-gain RMS keeps the speech/silence decision independent of the input-gain setting.
+        double rms = RawRms(e.Buffer, e.BytesRecorded, _captureFormat);
+        int durMs = _captureSampleRate > 0 ? (int)(1000L * (pcmBytes.Length / 2) / _captureSampleRate) : 0;
+        var now = DateTimeOffset.UtcNow;
+
+        if (rms >= _vadRmsThreshold) _lastSpeechUtc = now;
+        bool active = (now - _lastSpeechUtc).TotalMilliseconds <= HangoverMs;
+
+        if (active)
+        {
+            if (!_sending)
+            {
+                // Flush the buffered lead-in so Deepgram hears the word onset, not a clipped start.
+                while (_preRoll.Count > 0)
+                    SendToDeepgram(_preRoll.Dequeue().Pcm);
+                _preRollMs = 0;
+                _sending = true;
+            }
+            SendToDeepgram(pcmBytes);
+        }
+        else
+        {
+            // Sustained silence: stop billing. Keep a short rolling pre-roll for the next onset.
+            _sending = false;
+            _preRoll.Enqueue((pcmBytes, durMs));
+            _preRollMs += durMs;
+            while (_preRollMs > PreRollMs && _preRoll.Count > 0)
+                _preRollMs -= _preRoll.Dequeue().DurMs;
+        }
+    }
+
+    private void SendToDeepgram(byte[] pcmBytes)
+    {
         try
         {
-            _wsClient.Send(pcmBytes);
+            _wsClient?.Send(pcmBytes);
         }
         catch (Exception ex)
         {
             Log.Warning(ex, "Failed to send audio to Deepgram");
         }
+    }
+
+    // Root-mean-square amplitude (0..1) of the raw, pre-gain capture buffer (first channel).
+    private static double RawRms(byte[] buffer, int bytesRecorded, WaveFormat sourceFormat)
+    {
+        int bytesPerSample = sourceFormat.BitsPerSample / 8;
+        if (bytesPerSample == 0 || sourceFormat.Channels == 0) return 0;
+        int frameStride = bytesPerSample * sourceFormat.Channels;
+        int n = bytesRecorded / frameStride;
+        if (n == 0) return 0;
+
+        double sumSq = 0;
+        for (int i = 0; i < n; i++)
+        {
+            int offset = i * frameStride;
+            if (offset + bytesPerSample > bytesRecorded) break;
+            float s = bytesPerSample == 4
+                ? BitConverter.ToSingle(buffer, offset)
+                : bytesPerSample == 2 ? BitConverter.ToInt16(buffer, offset) / 32768f : 0f;
+            sumSq += s * (double)s;
+        }
+        return Math.Sqrt(sumSq / n);
     }
 
     private void UpdateAudioLevel(byte[] pcmBytes)
@@ -510,7 +595,8 @@ public class DeepgramTranscriptionService : ITranscriptionService
 
     // Down-mixes to mono and converts to 16-bit PCM at the source's native sample rate. No rate
     // conversion is performed; the native rate is advertised to Deepgram so no signal is lost.
-    private static byte[] ConvertToMono16Pcm(byte[] buffer, int bytesRecorded, WaveFormat sourceFormat)
+    // Applies the configured input gain (with hard clamp) so quiet mics still produce usable levels.
+    private byte[] ConvertToMono16Pcm(byte[] buffer, int bytesRecorded, WaveFormat sourceFormat)
     {
         int bytesPerSample = sourceFormat.BitsPerSample / 8;
         int sampleCount = bytesRecorded / (bytesPerSample * sourceFormat.Channels);
@@ -532,7 +618,7 @@ public class DeepgramTranscriptionService : ITranscriptionService
                     sum += BitConverter.ToInt16(buffer, offset) / 32768f;
             }
 
-            var clamped = Math.Clamp(sum / sourceFormat.Channels, -1f, 1f);
+            var clamped = Math.Clamp((sum / sourceFormat.Channels) * _inputGain, -1f, 1f);
             var sample16 = (short)(clamped * 32767);
             pcm[i * 2] = (byte)(sample16 & 0xFF);
             pcm[i * 2 + 1] = (byte)((sample16 >> 8) & 0xFF);
