@@ -41,6 +41,7 @@ public static class ThemeImporter
 
         var graphic = new ThemeShape
         {
+            Name = "Lower-third",
             X = x,
             Y = y,
             Width = width,

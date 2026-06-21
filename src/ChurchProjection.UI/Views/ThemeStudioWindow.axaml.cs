@@ -1,8 +1,11 @@
+using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
 using ChurchProjection.Core.Models.Theme;
 using ChurchProjection.UI.ViewModels;
 
@@ -53,6 +56,45 @@ public partial class ThemeStudioWindow : Window
         if (DataContext is ThemeStudioViewModel vm && sender is Control { Tag: string tag }
             && System.Enum.TryParse<RegionKind>(tag, out var kind))
             vm.SelectedRegion = kind;
+    }
+
+    // Double-click a layer name in the OBJECTS list to rename it inline (shapes only).
+    private void OnObjectDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is Control { DataContext: LayoutObjectItem item } container && item.CanRename)
+        {
+            item.BeginEdit();
+            // Focus the rename box once it's been made visible.
+            Dispatcher.UIThread.Post(() =>
+            {
+                var box = container.GetVisualDescendants().OfType<TextBox>().FirstOrDefault();
+                box?.Focus();
+                box?.SelectAll();
+            }, DispatcherPriority.Input);
+        }
+    }
+
+    private void OnRenameKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (sender is not TextBox { DataContext: LayoutObjectItem item }) return;
+        if (e.Key == Key.Enter) { item.CommitEdit(); e.Handled = true; }
+        else if (e.Key == Key.Escape) { item.CancelEdit(); e.Handled = true; }
+    }
+
+    private void OnRenameCommit(object? sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox { DataContext: LayoutObjectItem item })
+            item.CommitEdit();
+    }
+
+    // Click a shape's transparent hit-target on the canvas to select it directly (free-form).
+    private void OnShapeBoxPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (DataContext is ThemeStudioViewModel vm && sender is Control { Tag: int index })
+        {
+            vm.SelectShape(index);
+            e.Handled = true;
+        }
     }
 
     // Drag the body of the selection box to move the region.

@@ -37,6 +37,10 @@ public enum ThemeImageFit { Fill, Uniform, UniformToFill }
 /// </summary>
 public sealed class ThemeShape
 {
+    /// <summary>Operator-given name for this layer (e.g. "Lower-third"). Null = use an auto label
+    /// derived from the shape (see <see cref="ThemeLayerNaming.DefaultLabel"/>).</summary>
+    public string? Name { get; set; }
+
     public double X { get; set; }
     public double Y { get; set; }
     public double Width { get; set; } = 600;

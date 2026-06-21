@@ -11,6 +11,13 @@ public static class ReleaseNotes
 {
     private static readonly Dictionary<string, string[]> Notes = new()
     {
+        ["0.7.15"] =
+        [
+            "Fine-tune imported lower-third designs right in the app — nudge and reposition your artwork freely, even when it fills the whole frame, so there's no more trips back to Photoshop.",
+            "Design themes by feel: click any element directly on the canvas to select and drag it, with cleaner resize handles and a live size readout.",
+            "Name your theme layers (double-click to rename) so busy designs stay easy to follow.",
+            "Your media folders now live in the main sidebar, switching alongside whatever mode you're in.",
+        ],
         ["0.7.14"] =
         [
             "Import your church's own lower-third designs — drop in your artwork and overlay live scripture and titles on top, automatically sized to fit the screen.",

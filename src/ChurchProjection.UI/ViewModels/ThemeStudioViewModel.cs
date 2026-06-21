@@ -202,8 +202,38 @@ public sealed class ThemeStudioViewModel : ViewModelBase, IDisposable
         LayoutObjects.Add(new LayoutObjectItem { Name = "Body", Region = RegionKind.Body, Hidden = !(_draft.BodyRegion?.Visible ?? true) });
         LayoutObjects.Add(new LayoutObjectItem { Name = "Footer", Region = RegionKind.Footer, Hidden = !(_draft.FooterRegion?.Visible ?? true) });
         for (var i = 0; i < _draft.Shapes.Count; i++)
-            LayoutObjects.Add(new LayoutObjectItem { Name = $"Shape {i + 1}", IsShape = true, ShapeIndex = i });
+        {
+            var idx = i;
+            LayoutObjects.Add(new LayoutObjectItem
+            {
+                Name = ShapeLabel(idx),
+                IsShape = true,
+                ShapeIndex = idx,
+                CanRename = true,
+                RenameAction = (item, newName) => RenameShape(item.ShapeIndex, newName),
+            });
+        }
+        RebuildShapeHandles();
         SyncSelectedObject();
+    }
+
+    /// <summary>The label shown for a shape: the operator's name if set, otherwise an auto label
+    /// ("Image" / "Bar" / "Rectangle").</summary>
+    private string ShapeLabel(int index)
+    {
+        var s = _draft.Shapes[index];
+        return string.IsNullOrWhiteSpace(s.Name) ? ThemeLayerNaming.DefaultLabel(s) : s.Name!;
+    }
+
+    /// <summary>Renames a shape layer (blank clears back to the auto label). Persisted on the draft.</summary>
+    private void RenameShape(int index, string? newName)
+    {
+        if (index < 0 || index >= _draft.Shapes.Count) return;
+        var trimmed = newName?.Trim();
+        _draft.Shapes[index].Name = string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
+        RebuildLayoutObjects();
+        this.RaisePropertyChanged(nameof(SelObjectName));
+        if (!_loading) RefreshPreview();
     }
 
     private void SyncSelectedObject()
@@ -251,6 +281,24 @@ public sealed class ThemeStudioViewModel : ViewModelBase, IDisposable
 
     /// <summary>Decorative shapes on the current draft (synced with <c>_draft.Shapes</c>).</summary>
     public ObservableCollection<ThemeShape> Shapes { get; } = [];
+
+    /// <summary>Editor-space, transparent hit-targets drawn over each shape so any object can be
+    /// clicked directly on the canvas (free-form selection), not just from the OBJECTS list.</summary>
+    public ObservableCollection<ShapeHandleItem> ShapeHandles { get; } = [];
+
+    private void RebuildShapeHandles()
+    {
+        ShapeHandles.Clear();
+        for (var i = 0; i < _draft.Shapes.Count; i++)
+            ShapeHandles.Add(new ShapeHandleItem(i, _draft.Shapes[i], EditorScale));
+    }
+
+    /// <summary>Selects a shape directly (used when its hit-target is clicked on the canvas).</summary>
+    public void SelectShape(int index)
+    {
+        if (index < 0 || index >= _draft.Shapes.Count) return;
+        SelectedShapeIndex = index;
+    }
 
     private int _selectedShapeIndex = -1;
     public int SelectedShapeIndex
@@ -356,8 +404,8 @@ public sealed class ThemeStudioViewModel : ViewModelBase, IDisposable
     private double GeoH { get => ShapeMode ? CurShape!.Height : CurRegion.Height; set { if (ShapeMode) CurShape!.Height = value; else CurRegion.Height = value; } }
 
     // Selected target — editable in design (1920x1080) space.
-    public double SelX { get => GeoX; set { GeoX = Clamp(value, 0, Theme.CanvasWidth - GeoW); AfterRegionEdit(); } }
-    public double SelY { get => GeoY; set { GeoY = Clamp(value, 0, Theme.CanvasHeight - GeoH); AfterRegionEdit(); } }
+    public double SelX { get => GeoX; set { GeoX = ThemePlacement.ClampPosition(value, GeoY, GeoW, GeoH, Theme.CanvasWidth, Theme.CanvasHeight, allowBleed: ShapeMode).X; AfterRegionEdit(); } }
+    public double SelY { get => GeoY; set { GeoY = ThemePlacement.ClampPosition(GeoX, value, GeoW, GeoH, Theme.CanvasWidth, Theme.CanvasHeight, allowBleed: ShapeMode).Y; AfterRegionEdit(); } }
     public double SelWidth { get => GeoW; set { GeoW = Clamp(value, 20, Theme.CanvasWidth - GeoX); AfterRegionEdit(); } }
     public double SelHeight { get => GeoH; set { GeoH = Clamp(value, 20, Theme.CanvasHeight - GeoY); AfterRegionEdit(); } }
     public bool SelVisible
@@ -394,7 +442,7 @@ public sealed class ThemeStudioViewModel : ViewModelBase, IDisposable
     // Shape-only properties.
     public bool IsShapeSelected => ShapeMode;
     public bool IsRegionSelected => !ShapeMode;
-    public string SelObjectName => ShapeMode ? $"Shape {_selectedShapeIndex + 1}" : _selectedRegion.ToString();
+    public string SelObjectName => ShapeMode ? ShapeLabel(_selectedShapeIndex) : _selectedRegion.ToString();
     public string SelShapeColor { get => CurShape?.Color ?? "#80FFFFFF"; set { if (CurShape is not null) { CurShape.Color = value; AfterRegionEdit(); } } }
     public double SelShapeCorner { get => CurShape?.CornerRadius ?? 0; set { if (CurShape is not null) { CurShape.CornerRadius = value; AfterRegionEdit(); } } }
     public double SelShapeOpacity { get => CurShape?.Opacity ?? 1.0; set { if (CurShape is not null) { CurShape.Opacity = value; AfterRegionEdit(); } } }
@@ -433,11 +481,19 @@ public sealed class ThemeStudioViewModel : ViewModelBase, IDisposable
     public double SelBoxW => GeoW * EditorScale;
     public double SelBoxH => GeoH * EditorScale;
 
+    /// <summary>Live "width × height" readout (design px) shown beside the selection box.</summary>
+    public string SelSizeLabel => $"{Math.Round(GeoW)} × {Math.Round(GeoH)}";
+
     /// <summary>Drag the selected target by an editor-space delta (from the move thumb).</summary>
     public void MoveSelected(double dxEditor, double dyEditor)
     {
-        GeoX = Clamp(GeoX + dxEditor / EditorScale, 0, Theme.CanvasWidth - GeoW);
-        GeoY = Clamp(GeoY + dyEditor / EditorScale, 0, Theme.CanvasHeight - GeoH);
+        // Shapes/images may bleed past the frame (so a full-frame imported lower-third can be nudged
+        // into place); text regions stay fully inside. See ThemePlacement for the rules.
+        var (nx, ny) = ThemePlacement.ClampPosition(
+            GeoX + dxEditor / EditorScale, GeoY + dyEditor / EditorScale,
+            GeoW, GeoH, Theme.CanvasWidth, Theme.CanvasHeight, allowBleed: ShapeMode);
+        GeoX = nx;
+        GeoY = ny;
         AfterRegionEdit();
     }
 
@@ -479,7 +535,7 @@ public sealed class ThemeStudioViewModel : ViewModelBase, IDisposable
         {
             nameof(SelX), nameof(SelY), nameof(SelWidth), nameof(SelHeight), nameof(SelVisible),
             nameof(SelHAlign), nameof(SelVAlign), nameof(SelAutoFit), nameof(SelMinFontSize), nameof(SelMaxFontSize),
-            nameof(SelBoxX), nameof(SelBoxY), nameof(SelBoxW), nameof(SelBoxH),
+            nameof(SelBoxX), nameof(SelBoxY), nameof(SelBoxW), nameof(SelBoxH), nameof(SelSizeLabel),
             nameof(IsShapeSelected), nameof(IsRegionSelected),
             nameof(SelShapeColor), nameof(SelShapeCorner), nameof(SelShapeOpacity),
             nameof(SelShapeImagePath), nameof(SelShapeImageFit),
@@ -513,6 +569,9 @@ public sealed class ThemeStudioViewModel : ViewModelBase, IDisposable
             nameof(FooterBoxX), nameof(FooterBoxY), nameof(FooterBoxW), nameof(FooterBoxH), nameof(FooterBoxVisible),
         })
             this.RaisePropertyChanged(p);
+
+        // Keep the shape hit-targets glued to their shapes as they move/resize or the canvas rescales.
+        foreach (var h in ShapeHandles) h.Refresh(EditorScale);
     }
 
     private static double Clamp(double v, double lo, double hi) => Math.Max(lo, Math.Min(hi, Math.Max(lo, v)));
@@ -702,7 +761,7 @@ public sealed class ThemeStudioViewModel : ViewModelBase, IDisposable
 public enum RegionKind { Title, Body, Footer }
 
 /// <summary>An entry in the studio's unified object list (a text region or a shape).</summary>
-public sealed class LayoutObjectItem
+public sealed class LayoutObjectItem : ViewModelBase
 {
     public string Name { get; init; } = "";
     public bool IsShape { get; init; }
@@ -712,6 +771,69 @@ public sealed class LayoutObjectItem
     /// <summary>True when a text region has been hidden (deleted) from the layout.</summary>
     public bool Hidden { get; init; }
 
+    /// <summary>Only shapes can be renamed; the three text regions keep their fixed names.</summary>
+    public bool CanRename { get; init; }
+
+    /// <summary>Invoked with the new name when an inline rename is committed.</summary>
+    public Action<LayoutObjectItem, string>? RenameAction { get; init; }
+
     /// <summary>List label, annotated when the object is hidden.</summary>
     public string Display => Hidden ? $"{Name} (hidden)" : Name;
+
+    private bool _isEditing;
+    public bool IsEditing
+    {
+        get => _isEditing;
+        set => this.RaiseAndSetIfChanged(ref _isEditing, value);
+    }
+
+    private string _editName = "";
+    public string EditName
+    {
+        get => _editName;
+        set => this.RaiseAndSetIfChanged(ref _editName, value);
+    }
+
+    /// <summary>Enter inline-edit mode (double-click). No-op for non-renamable rows.</summary>
+    public void BeginEdit()
+    {
+        if (!CanRename) return;
+        EditName = Name;
+        IsEditing = true;
+    }
+
+    /// <summary>Commit the typed name back to the model (via <see cref="RenameAction"/>).</summary>
+    public void CommitEdit()
+    {
+        if (!IsEditing) return;
+        IsEditing = false;
+        RenameAction?.Invoke(this, EditName);
+    }
+
+    /// <summary>Abandon the edit without changing the name.</summary>
+    public void CancelEdit() => IsEditing = false;
+}
+
+/// <summary>A transparent, editor-space rectangle laid over a shape so it can be clicked directly on
+/// the canvas. Geometry mirrors the underlying <see cref="ThemeShape"/> scaled to editor space.</summary>
+public sealed class ShapeHandleItem(int index, ThemeShape shape, double scale) : ViewModelBase
+{
+    private double _scale = scale;
+
+    public int Index { get; } = index;
+
+    public double EX => shape.X * _scale;
+    public double EY => shape.Y * _scale;
+    public double EW => shape.Width * _scale;
+    public double EH => shape.Height * _scale;
+
+    /// <summary>Re-reads the shape geometry at the given editor scale and notifies the canvas.</summary>
+    public void Refresh(double newScale)
+    {
+        _scale = newScale;
+        this.RaisePropertyChanged(nameof(EX));
+        this.RaisePropertyChanged(nameof(EY));
+        this.RaisePropertyChanged(nameof(EW));
+        this.RaisePropertyChanged(nameof(EH));
+    }
 }

@@ -31,6 +31,9 @@
     </Style>
     <Style Selector="TextBox">
       <Setter Property="FontSize" Value="12" />
+      <!-- Allow path/value boxes to shrink inside the narrow inspector instead of forcing the
+           panel wider than its column (which the panel then clips on the right). -->
+      <Setter Property="MinWidth" Value="0" />
     </Style>
     <Style Selector="ComboBox">
       <Setter Property="FontSize" Value="12" />
@@ -73,21 +76,20 @@
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="Background" Value="#11FFFFFF" />
     </Style>
-    <!-- Layout editor: resize handles -->
+    <!-- Layout editor: resize handles (Photoshop-style small white squares with a hairline) -->
     <Style Selector="Thumb.handle">
-      <Setter Property="Width" Value="11" />
-      <Setter Property="Height" Value="11" />
-      <Setter Property="Background" Value="#F472B6" />
+      <Setter Property="Width" Value="10" />
+      <Setter Property="Height" Value="10" />
       <Setter Property="Template">
         <ControlTemplate>
-          <Border Background="{TemplateBinding Background}" CornerRadius="2"
-                  BorderBrush="White" BorderThickness="1" />
+          <Border Background="White" CornerRadius="1.5"
+                  BorderBrush="#0E7490" BorderThickness="1" BoxShadow="0 1 2 0 #40000000" />
         </ControlTemplate>
       </Setter>
     </Style>
-    <!-- Layout editor: move handle (fills the selected box) -->
+    <!-- Layout editor: move handle (fills the selected box, invisible but grabbable) -->
     <Style Selector="Thumb.move">
-      <Setter Property="Background" Value="#22F472B6" />
+      <Setter Property="Background" Value="Transparent" />
       <Setter Property="Cursor" Value="SizeAll" />
       <Setter Property="Template">
         <ControlTemplate>
@@ -152,7 +154,12 @@
     </Border>
 
     <!-- ============ MAIN AREA ============ -->
-    <Grid Grid.Row="1" ColumnDefinitions="232,*,330">
+    <Grid Grid.Row="1">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="232" />
+        <ColumnDefinition Width="*" MinWidth="360" />
+        <ColumnDefinition Width="360" MinWidth="340" />
+      </Grid.ColumnDefinitions>
 
       <!-- LEFT: themes + objects + assignments -->
       <Border Grid.Column="0" Background="#181C24" BorderBrush="#2A303C" BorderThickness="0,0,1,0" Padding="12">
@@ -183,16 +190,22 @@
 
           <!-- objects list fills the middle -->
           <TextBlock DockPanel.Dock="Top" Text="OBJECTS" Classes="section" Margin="0,12,0,4" />
-          <ListBox ItemsSource="{Binding LayoutObjects}" SelectedItem="{Binding SelectedObject}">
+          <ListBox ItemsSource="{Binding LayoutObjects}" SelectedItem="{Binding SelectedObject}"
+                   ToolTip.Tip="Double-click a shape's name to rename it">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:LayoutObjectItem">
-                <StackPanel Orientation="Horizontal" Spacing="8">
+                <StackPanel Orientation="Horizontal" Spacing="8" Background="Transparent"
+                            DoubleTapped="OnObjectDoubleTapped">
                   <Border Width="18" Height="18" CornerRadius="3" Background="#2A303C"
                           BorderBrush="#3A4150" BorderThickness="1" VerticalAlignment="Center"
                           IsVisible="{Binding !IsShape}" />
                   <Border Width="18" Height="6" CornerRadius="2" Background="#6E7682" VerticalAlignment="Center"
                           IsVisible="{Binding IsShape}" />
-                  <TextBlock Text="{Binding Display}" Foreground="#D6DAE2" FontSize="12.5" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding Display}" Foreground="#D6DAE2" FontSize="12.5" VerticalAlignment="Center"
+                             IsVisible="{Binding !IsEditing}" />
+                  <TextBox Text="{Binding EditName}" IsVisible="{Binding IsEditing}" FontSize="12.5"
+                           MinWidth="0" Padding="3,0" Margin="-2,0,0,0" VerticalAlignment="Center"
+                           KeyDown="OnRenameKeyDown" LostFocus="OnRenameCommit" />
                 </StackPanel>
               </DataTemplate>
             </ListBox.ItemTemplate>
@@ -215,6 +228,26 @@
 
               <!-- Editing overlay -->
               <Canvas Width="{Binding EditorCanvasWidth}" Height="{Binding EditorCanvasHeight}" Background="Transparent">
+                <!-- Transparent shape hit-targets (bottom layer) so any image/shape is click-selectable. -->
+                <ItemsControl ItemsSource="{Binding ShapeHandles}"
+                              Width="{Binding EditorCanvasWidth}" Height="{Binding EditorCanvasHeight}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><Canvas /></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.Styles>
+                    <Style Selector="ItemsControl > ContentPresenter" x:DataType="vm:ShapeHandleItem">
+                      <Setter Property="Canvas.Left" Value="{Binding EX}" />
+                      <Setter Property="Canvas.Top" Value="{Binding EY}" />
+                    </Style>
+                  </ItemsControl.Styles>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ShapeHandleItem">
+                      <Border Background="Transparent" Width="{Binding EW}" Height="{Binding EH}"
+                              Tag="{Binding Index}" PointerPressed="OnShapeBoxPressed" Cursor="SizeAll" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
                 <Border Classes="regionBox" Tag="Title" PointerPressed="OnRegionBoxPressed"
                         Canvas.Left="{Binding TitleBoxX}" Canvas.Top="{Binding TitleBoxY}"
                         Width="{Binding TitleBoxW}" Height="{Binding TitleBoxH}"
@@ -241,23 +274,30 @@
                 <Grid Canvas.Left="{Binding SelBoxX}" Canvas.Top="{Binding SelBoxY}"
                       Width="{Binding SelBoxW}" Height="{Binding SelBoxH}">
                   <Thumb Classes="move" DragDelta="OnMoveThumb" />
-                  <Border BorderBrush="#F472B6" BorderThickness="1.5" IsHitTestVisible="False" />
+                  <Border BorderBrush="#22D3EE" BorderThickness="1" IsHitTestVisible="False" />
+
+                  <!-- live width × height readout (design px) -->
+                  <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,-21,0,0"
+                          Background="#E60E7490" CornerRadius="3" Padding="6,1" IsHitTestVisible="False">
+                    <TextBlock Text="{Binding SelSizeLabel}" FontSize="10.5" FontWeight="SemiBold" Foreground="White" />
+                  </Border>
+
                   <Thumb Classes="handle" Tag="tl" DragDelta="OnResizeThumb"
-                         HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-6,-6,0,0" />
+                         HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-5,-5,0,0" />
                   <Thumb Classes="handle" Tag="t" DragDelta="OnResizeThumb"
-                         HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,-6,0,0" />
+                         HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,-5,0,0" />
                   <Thumb Classes="handle" Tag="tr" DragDelta="OnResizeThumb"
-                         HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-6,-6,0" />
+                         HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-5,-5,0" />
                   <Thumb Classes="handle" Tag="l" DragDelta="OnResizeThumb"
-                         HorizontalAlignment="Left" VerticalAlignment="Center" Margin="-6,0,0,0" />
+                         HorizontalAlignment="Left" VerticalAlignment="Center" Margin="-5,0,0,0" />
                   <Thumb Classes="handle" Tag="r" DragDelta="OnResizeThumb"
-                         HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-6,0" />
+                         HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-5,0" />
                   <Thumb Classes="handle" Tag="bl" DragDelta="OnResizeThumb"
-                         HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="-6,0,0,-6" />
+                         HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="-5,0,0,-5" />
                   <Thumb Classes="handle" Tag="b" DragDelta="OnResizeThumb"
-                         HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,-6" />
+                         HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,-5" />
                   <Thumb Classes="handle" Tag="br" DragDelta="OnResizeThumb"
-                         HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-6,-6" />
+                         HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-5,-5" />
                 </Grid>
               </Canvas>
             </Panel>
@@ -265,7 +305,7 @@
           </Panel>
 
           <TextBlock Grid.Row="1" Margin="0,0,0,12"
-                     Text="Select an object on the left, then drag the pink box to move it or grab a handle to resize. Click a region outline to select it."
+                     Text="Click any object on the canvas to select it, then drag to move or grab a handle to resize. Double-click a layer in the list to rename it."
                      Foreground="#5C6470" FontSize="11" TextWrapping="Wrap"
                      HorizontalAlignment="Center" TextAlignment="Center" MaxWidth="540" />
         </Grid>
@@ -278,7 +318,7 @@
           <!-- selected object header -->
           <Border Grid.Row="0" Background="#0E1014" CornerRadius="6" Padding="10,7" Margin="14,14,14,6">
             <StackPanel Orientation="Horizontal" Spacing="8">
-              <Ellipse Width="9" Height="9" Fill="#F472B6" VerticalAlignment="Center" />
+              <Ellipse Width="9" Height="9" Fill="#22D3EE" VerticalAlignment="Center" />
               <TextBlock Text="{Binding SelObjectName}" Foreground="#ECEEF2" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
             </StackPanel>
           </Border>
@@ -326,7 +366,7 @@
                     <Slider Minimum="0" Maximum="200" Value="{Binding SelRegionCorner}" />
                     <TextBlock Classes="lbl" Text="Box image (custom artwork behind this text only)" />
                     <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
-                      <TextBox Grid.Column="0" Text="{Binding SelRegionBgImagePath}" Watermark="No image" />
+                      <TextBox Grid.Column="0" Text="{Binding SelRegionBgImagePath}" Watermark="No image" MinWidth="0" />
                       <Button Grid.Column="1" Content="Browse" FontSize="12" Click="OnBrowseRegionImageClicked" />
                       <Button Grid.Column="2" Content="Clear" FontSize="12" Click="OnClearRegionImageClicked" />
                     </Grid>
@@ -368,7 +408,7 @@
                     <TextBlock Text="IMAGE FILL" Classes="section" Margin="0,16,0,4" />
                     <TextBlock Classes="lbl" Text="Image (painted over the fill color)" />
                     <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
-                      <TextBox Grid.Column="0" Text="{Binding SelShapeImagePath}" Watermark="No image" />
+                      <TextBox Grid.Column="0" Text="{Binding SelShapeImagePath}" Watermark="No image" MinWidth="0" />
                       <Button Grid.Column="1" Content="Browse" FontSize="12" Click="OnBrowseShapeImageClicked" />
                       <Button Grid.Column="2" Content="Clear" FontSize="12" Click="OnClearShapeImageClicked" />
                     </Grid>
@@ -479,7 +519,7 @@
                   <TextBox Text="{Binding BackgroundColor}" Margin="0,6,0,0" Watermark="#FF101418" />
                   <TextBlock Classes="lbl" Text="Image" />
                   <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                    <TextBox Grid.Column="0" Text="{Binding BackgroundImagePath}" />
+                    <TextBox Grid.Column="0" Text="{Binding BackgroundImagePath}" MinWidth="0" />
                     <Button Grid.Column="1" Content="Browse" FontSize="12" Click="OnBrowseImageClicked" />
                   </Grid>
                   <TextBlock Classes="lbl" Text="Image fit" />

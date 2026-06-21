@@ -462,6 +462,51 @@
               </StackPanel>
               </StackPanel>
 
+              <!-- ── FOLDERS (Media mode) ────────────────────────────────── -->
+              <StackPanel IsVisible="{Binding IsMediaMode}">
+              <Border Classes="sectionHeader">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Grid.Column="0" Classes="sectionLabel" Text="FOLDERS" />
+                  <Button Grid.Column="1" Classes="hdrIcon" Content="&#43;" Command="{Binding MediaPlayback.BeginNameFolderCommand}"
+                          ToolTip.Tip="Create a folder to group media" />
+                </Grid>
+              </Border>
+
+              <!-- Inline "name your folder" row (toggled by the + button) -->
+              <Border IsVisible="{Binding MediaPlayback.IsNamingFolder}" Padding="8,8" Background="#14181F">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBox Grid.Column="0" Text="{Binding MediaPlayback.NewFolderName}" Watermark="Name this folder…"
+                           FontSize="12" Padding="8,6">
+                    <TextBox.KeyBindings>
+                      <KeyBinding Gesture="Enter" Command="{Binding MediaPlayback.CreateFolderCommand}" />
+                    </TextBox.KeyBindings>
+                  </TextBox>
+                  <Button Grid.Column="1" Content="&#43;" Command="{Binding MediaPlayback.CreateFolderCommand}" Classes="ghost"
+                          FontSize="14" Padding="9,3" Margin="5,0,0,0" ToolTip.Tip="Create folder" />
+                </Grid>
+              </Border>
+
+              <ListBox Classes="navList" ItemsSource="{Binding MediaPlayback.Folders}"
+                       SelectedItem="{Binding MediaPlayback.SelectedFolder}">
+                <ListBox.ItemsPanel>
+                  <ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="op:MediaFolderOption">
+                    <Grid ColumnDefinitions="Auto,*" Background="Transparent">
+                      <Border Grid.Column="0" Background="#15303A" CornerRadius="5" Width="22" Height="22"
+                              VerticalAlignment="Center" Margin="0,0,9,0">
+                        <TextBlock Text="&#128193;" FontSize="11" Foreground="#22D3EE"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      </Border>
+                      <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="#E6E9EE" FontSize="13"
+                                 TextTrimming="CharacterEllipsis" MaxLines="1" VerticalAlignment="Center" />
+                    </Grid>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+              </StackPanel>
+
               <!-- ── PLAYLISTS ───────────────────────────────────────────── -->
               <Border Classes="sectionHeader" Margin="0,4,0,0">
                 <Grid ColumnDefinitions="*,Auto,Auto">
@@ -1202,36 +1247,7 @@
               </Grid>
             </Border>
 
-            <!-- Folder sidebar: All media / Uncategorized / user collections -->
-            <Border DockPanel.Dock="Left" Width="172" Background="#15191F" BorderBrush="#2A303C" BorderThickness="0,0,1,0">
-              <DockPanel Margin="8">
-                <TextBlock DockPanel.Dock="Top" Text="Folders" Foreground="#959DAB" FontSize="11"
-                           FontWeight="SemiBold" Margin="4,2,0,8" />
-
-                <!-- New folder: type a name, press Enter or tap + -->
-                <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
-                  <TextBox Grid.Column="0" Text="{Binding NewFolderName}" Watermark="New folder…" FontSize="12"
-                           Padding="7,5">
-                    <TextBox.KeyBindings>
-                      <KeyBinding Gesture="Enter" Command="{Binding CreateFolderCommand}" />
-                    </TextBox.KeyBindings>
-                  </TextBox>
-                  <Button Grid.Column="1" Content="+" Command="{Binding CreateFolderCommand}" Classes="ghost"
-                          FontSize="14" Padding="9,3" Margin="5,0,0,0" ToolTip.Tip="Create folder" />
-                </Grid>
-
-                <ListBox ItemsSource="{Binding Folders}" SelectedItem="{Binding SelectedFolder}"
-                         Background="Transparent" BorderThickness="0" FontSize="12">
-                  <ListBox.ItemTemplate>
-                    <DataTemplate x:DataType="op:MediaFolderOption">
-                      <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" Padding="2,3" />
-                    </DataTemplate>
-                  </ListBox.ItemTemplate>
-                </ListBox>
-              </DockPanel>
-            </Border>
-
-            <!-- Media bin -->
+            <!-- Media bin (folders now live in the shared left sidebar, per mode) -->
             <ScrollViewer Padding="10" HorizontalScrollBarVisibility="Disabled">
               <ItemsControl ItemsSource="{Binding Items}">
                 <ItemsControl.ItemsPanel>

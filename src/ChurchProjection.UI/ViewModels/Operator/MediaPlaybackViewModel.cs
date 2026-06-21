@@ -56,6 +56,7 @@ public sealed class MediaPlaybackViewModel : ReactiveObject, IDisposable
     private MediaTargetOption? _selectedTarget;
     private MediaFolderOption _selectedFolder;
     private string _newFolderName = string.Empty;
+    private bool _isNamingFolder;
 
     private bool _hasLiveOnTarget;
     private bool _hasAnyLive;
@@ -87,6 +88,9 @@ public sealed class MediaPlaybackViewModel : ReactiveObject, IDisposable
     public ReactiveCommand<Unit, Unit> SkipForwardCommand { get; }
     public ReactiveCommand<Unit, Unit> CreateFolderCommand { get; }
 
+    /// <summary>Toggles the inline "name your folder" row in the sidebar (mirrors the Playlists +).</summary>
+    public ReactiveCommand<Unit, Unit> BeginNameFolderCommand { get; }
+
     public MediaPlaybackViewModel(IAnnouncementService service, ObservableCollection<OutputRow> outputs)
     {
         _service = service;
@@ -108,6 +112,7 @@ public sealed class MediaPlaybackViewModel : ReactiveObject, IDisposable
         SkipBackCommand = ReactiveCommand.Create(() => _service.SkipSeconds(TargetKey, -10));
         SkipForwardCommand = ReactiveCommand.Create(() => _service.SkipSeconds(TargetKey, 10));
         CreateFolderCommand = ReactiveCommand.CreateFromTask(CreateFolderAsync);
+        BeginNameFolderCommand = ReactiveCommand.Create(() => { IsNamingFolder = !IsNamingFolder; });
 
         _selectedFolder = new MediaFolderOption(null, "All media", IsAll: true);
         RebuildFolders(_service.Collections);
@@ -174,6 +179,13 @@ public sealed class MediaPlaybackViewModel : ReactiveObject, IDisposable
         set => this.RaiseAndSetIfChanged(ref _newFolderName, value);
     }
 
+    /// <summary>True while the inline "name your folder" row is showing in the sidebar.</summary>
+    public bool IsNamingFolder
+    {
+        get => _isNamingFolder;
+        set => this.RaiseAndSetIfChanged(ref _isNamingFolder, value);
+    }
+
     private async Task CreateFolderAsync()
     {
         var name = (NewFolderName ?? string.Empty).Trim();
@@ -181,6 +193,7 @@ public sealed class MediaPlaybackViewModel : ReactiveObject, IDisposable
 
         var created = await _service.CreateCollectionAsync(name);
         NewFolderName = string.Empty;
+        IsNamingFolder = false;
 
         // Jump into the new folder so the operator can immediately import into it.
         SelectedFolder = Folders.FirstOrDefault(f => f.Id == created.Id) ?? _selectedFolder;
