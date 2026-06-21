@@ -19,4 +19,18 @@ public sealed class AnnouncementMedia
     public string Name { get; set; } = string.Empty;
     public string Path { get; set; } = string.Empty;
     public AnnouncementMediaKind Kind { get; set; }
+
+    /// <summary>The collection (folder) this asset belongs to, or null for "Uncategorized". Null on
+    /// older libraries so existing media keeps working and simply shows as uncategorized.</summary>
+    public string? CollectionId { get; set; }
+}
+
+/// <summary>
+/// A single-level named folder for grouping media assets (e.g. "Easter graphics"). Purely
+/// organizational — it has no effect on routing or playback.
+/// </summary>
+public sealed class MediaCollection
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N")[..8];
+    public string Name { get; set; } = string.Empty;
 }

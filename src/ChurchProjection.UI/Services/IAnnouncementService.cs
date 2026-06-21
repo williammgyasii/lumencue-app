@@ -34,6 +34,19 @@ public interface IAnnouncementService
     /// <summary>Emits whenever the library list changes (add/remove).</summary>
     IObservable<IReadOnlyList<AnnouncementMedia>> ItemsChanged { get; }
 
+    /// <summary>All collections (folders) media can be grouped into.</summary>
+    IReadOnlyList<MediaCollection> Collections { get; }
+
+    /// <summary>Emits whenever the set of collections changes (created/removed).</summary>
+    IObservable<IReadOnlyList<MediaCollection>> CollectionsChanged { get; }
+
+    /// <summary>Creates a new (empty) collection with the given name and returns it.</summary>
+    Task<MediaCollection> CreateCollectionAsync(string name);
+
+    /// <summary>Moves a media item into a collection (or to no folder / "All media" when
+    /// <paramref name="collectionId"/> is null). No-op if the item isn't found.</summary>
+    Task MoveToCollectionAsync(string mediaId, string? collectionId);
+
     /// <summary>Emits whenever a target's live media changes (target key + item, item null = cleared).</summary>
     IObservable<(string Target, AnnouncementMedia? Item)> LiveChanged { get; }
 
@@ -45,8 +58,10 @@ public interface IAnnouncementService
 
     Task LoadAsync();
 
-    /// <summary>Adds a media file to the library (image or video, inferred from extension).</summary>
-    Task<AnnouncementMedia?> AddAsync(string path);
+    /// <summary>Adds a media file to the library (image or video, inferred from extension), optionally
+    /// into a collection. If the same file is already in the library it is not duplicated — the existing
+    /// item is returned instead.</summary>
+    Task<AnnouncementMedia?> AddAsync(string path, string? collectionId = null);
 
     /// <summary>Removes an announcement; clears it from any target where it is live.</summary>
     Task RemoveAsync(AnnouncementMedia item);

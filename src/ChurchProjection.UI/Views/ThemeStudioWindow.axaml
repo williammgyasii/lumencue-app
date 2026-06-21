@@ -163,6 +163,10 @@
             <Button Content="Duplicate" Command="{Binding DuplicateThemeCommand}" FontSize="11" Padding="9,4" />
             <Button Content="Delete" Command="{Binding DeleteThemeCommand}" FontSize="11" Padding="9,4" />
           </StackPanel>
+          <Button DockPanel.Dock="Top" Content="Import design…" Click="OnImportDesignClicked"
+                  IsEnabled="{Binding CanImportDesign}" HorizontalAlignment="Stretch" FontSize="11" Padding="9,4"
+                  Margin="0,0,0,6"
+                  ToolTip.Tip="Import a lower-third graphic (PNG/JPG). It's placed full-width at the bottom of a 1920×1080 green-key frame for your ATEM, with text regions you can position on top." />
           <ListBox DockPanel.Dock="Top" ItemsSource="{Binding ThemeNames}" SelectedItem="{Binding SelectedThemeName}"
                    MaxHeight="150" />
 

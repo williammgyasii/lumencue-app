@@ -536,6 +536,31 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
             menu.Items.Add(item);
         }
 
+        // "Move to folder ▸" submenu: All media (no folder) + each user collection.
+        var moveItem = new MenuItem { Header = "Move to folder" };
+        foreach (var folder in media.Folders)
+        {
+            // Skip the synthetic "Uncategorized" view — "All media (no folder)" already unfiles.
+            if (!folder.IsAll && folder.Id is null) continue;
+
+            var label = folder.IsAll ? "All media (no folder)" : folder.Name;
+            var collectionId = folder.IsAll ? null : folder.Id;
+            var sub = new MenuItem
+            {
+                Header = label,
+                // Tick the folder this file currently lives in.
+                Icon = (tile.Model.CollectionId == collectionId) ? new TextBlock { Text = "\u2713" } : null,
+            };
+            sub.Click += async (_, _) => await media.MoveTileToFolder(tile, collectionId);
+            moveItem.Items.Add(sub);
+        }
+
+        if (moveItem.Items.Count > 0)
+        {
+            if (menu.Items.Count > 0) menu.Items.Add(new Separator());
+            menu.Items.Add(moveItem);
+        }
+
         if (menu.Items.Count == 0) return;
         menu.Open(control);
         e.Handled = true;

@@ -127,6 +127,7 @@ public class App : Application
         services.AddSingleton<IContentLibraryService, ContentLibraryService>();
         services.AddSingleton<IProjectionService, ProjectionService>();
         services.AddSingleton<IThemeService, ThemeService>();
+        services.AddSingleton<IThemeAssetStore>(new ThemeAssetStore(AppPaths.DataDirectory));
         services.AddSingleton<ILiveBackgroundService, LiveBackgroundService>();
         services.AddSingleton<IAnnouncementService, AnnouncementService>();
         services.AddSingleton<ILayerService, LayerService>();

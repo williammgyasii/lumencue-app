@@ -11,6 +11,13 @@ public static class ReleaseNotes
 {
     private static readonly Dictionary<string, string[]> Notes = new()
     {
+        ["0.7.14"] =
+        [
+            "Import your church's own lower-third designs — drop in your artwork and overlay live scripture and titles on top, automatically sized to fit the screen.",
+            "Organise media into folders, and the app now skips files you've already added so your library stays clean.",
+            "A media control bar now stays on screen wherever you are, so you can stop what's playing without hopping back to the Media tab.",
+            "Choose which speaker or audio device a video plays through, and switch it live without interrupting playback.",
+        ],
         ["0.7.13"] =
         [
             "More accurate AI transcription — improved how your microphone audio is processed so spoken words are recognised more reliably.",

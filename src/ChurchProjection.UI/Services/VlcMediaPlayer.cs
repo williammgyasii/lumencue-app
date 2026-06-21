@@ -35,6 +35,9 @@ internal sealed class VlcMediaPlayer : IDisposable
     private readonly MediaPlayer.LibVLCVideoLockCb _lockCb;
     private readonly MediaPlayer.LibVLCVideoDisplayCb _displayCb;
 
+    // The audio device to route to once playback (and the audio output module) actually starts.
+    private readonly string? _audioDeviceId;
+
     private volatile bool _frameReady;
     private MediaPlayer? _player;
     private Media? _media;
@@ -51,11 +54,12 @@ internal sealed class VlcMediaPlayer : IDisposable
     public VlcMediaPlayer(string path, bool loop, string? audioDeviceId, Action<Bitmap> onFrame)
     {
         _onFrame = onFrame;
+        _audioDeviceId = audioDeviceId;
         _lockCb = Lock;
         _displayCb = Display;
         _vlcBuffer = Marshal.AllocHGlobal(BufferSize);
         _buffers = [NewBitmap(), NewBitmap(), NewBitmap()];
-        Start(path, loop, audioDeviceId);
+        Start(path, loop);
     }
 
     /// <summary>True if LibVLC native libraries loaded and playback started.</summary>
@@ -132,14 +136,28 @@ internal sealed class VlcMediaPlayer : IDisposable
         return result;
     }
 
-    /// <summary>Switches the audio output device live (empty = system default).</summary>
+    /// <summary>
+    /// Switches the audio output device on the <b>already-playing</b> player. This is safe (unlike
+    /// routing at initial play): the audio output module exists once playback is underway. Runs off the
+    /// caller thread so a slow native call never blocks the UI, and is guarded against teardown.
+    /// </summary>
     public void SetAudioDevice(string? deviceId)
     {
-        try { _player?.SetOutputDevice(string.IsNullOrWhiteSpace(deviceId) ? null : deviceId); }
-        catch (Exception ex) { Log.Debug(ex, "Failed to set announcement audio device"); }
+        var dev = string.IsNullOrWhiteSpace(deviceId) ? null : deviceId;
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            try
+            {
+                if (_disposed || _player is null) return;
+                Log.Information("[vlc] live set device -> {Dev}", dev ?? "(default)");
+                _player.SetOutputDevice(dev);
+                Log.Information("[vlc] live device set ok");
+            }
+            catch (Exception ex) { Log.Debug(ex, "Failed to set announcement audio device"); }
+        });
     }
 
-    private void Start(string path, bool loop, string? audioDeviceId)
+    private void Start(string path, bool loop)
     {
         try
         {
@@ -149,10 +167,14 @@ internal sealed class VlcMediaPlayer : IDisposable
             if (loop) _media.AddOption(":input-repeat=65535");
             _player.SetVideoFormat("RV32", Width, Height, Stride);
             _player.SetVideoCallbacks(_lockCb, null, _displayCb);
+
+            // NOTE: audio currently plays on the system default output. Per-device routing is disabled
+            // here on purpose — see SetAudioDevice — because the unguarded SetOutputDevice call segfaults.
+            if (!string.IsNullOrWhiteSpace(_audioDeviceId))
+                Log.Debug("Announcement audio device '{Dev}' ignored (system default until module-aware routing lands)", _audioDeviceId);
+
             _player.Play(_media);
             _player.Volume = 100;
-            if (!string.IsNullOrWhiteSpace(audioDeviceId))
-                _player.SetOutputDevice(audioDeviceId);
 
             _timer = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(33) };
             _timer.Tick += OnTick;

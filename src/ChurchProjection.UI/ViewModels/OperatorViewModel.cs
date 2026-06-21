@@ -42,6 +42,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     private readonly IAnnouncementService _announcements;
     private readonly ILayerService _layers;
     private readonly IEntitlementService _entitlements;
+    private readonly IThemeAssetStore _themeAssetStore;
     private readonly Progress<string> _indexProgress;
 
     // The scripture reference currently shown live, so a translation switch can re-render it.
@@ -223,7 +224,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     public ReactiveCommand<Unit, Unit> CheckForUpdatesCommand { get; }
 
     /// <summary>Creates a fresh Theme Studio view model bound to the shared theme service.</summary>
-    public ThemeStudioViewModel CreateThemeStudio() => new(_themes, _liveBackground);
+    public ThemeStudioViewModel CreateThemeStudio() => new(_themes, _liveBackground, _themeAssetStore);
 
     private void OnUpdateState(UpdateState state)
     {
@@ -879,6 +880,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         IAnnouncementService announcements,
         ILayerService layers,
         IEntitlementService entitlements,
+        IThemeAssetStore themeAssetStore,
         IUpdateService? updates = null)
     {
         _projection = projectionService;
@@ -894,6 +896,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         _announcements = announcements;
         _layers = layers;
         _entitlements = entitlements;
+        _themeAssetStore = themeAssetStore;
         Backgrounds = new BackgroundsViewModel(liveBackground);
         MediaPlayback = new Operator.MediaPlaybackViewModel(announcements, Outputs);
 

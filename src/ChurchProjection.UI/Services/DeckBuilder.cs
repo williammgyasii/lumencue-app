@@ -41,16 +41,26 @@ public static class DeckBuilder
 
         var typeface = new Typeface(ResolveFont(theme.FontFamily), FontStyle.Normal,
             theme.Bold ? FontWeight.Bold : FontWeight.Normal);
-        var lineHeight = theme.BodyFontSize * theme.LineHeightMultiplier;
 
         // Paginate against the body region so a smaller/repositioned text box pages correctly.
         var bodyRegion = theme.ResolveRegions().Body;
-        var maxWidth = Math.Max(100, bodyRegion.Width);
-        var maxHeight = Math.Max(80, bodyRegion.Height);
+
+        // Pagination must agree with how the text is actually rendered. When the body auto-fits, the
+        // renderer can shrink text down to MinFontSize, so we paginate at that smallest size — this
+        // keeps a normal verse whole on one slide (the renderer then grows it to fill the box) instead
+        // of splitting it mid-sentence at the larger BodyFontSize. Non-auto-fit themes paginate at
+        // their fixed size exactly as before.
+        var fitFontSize = bodyRegion.AutoFit ? Math.Max(1, bodyRegion.MinFontSize) : theme.BodyFontSize;
+        var lineHeight = fitFontSize * theme.LineHeightMultiplier;
+
+        // The renderer insets the text by the region's padding, so subtract it from the usable box
+        // (otherwise pagination thinks more fits than really does and the text overflows/clips).
+        var maxWidth = Math.Max(100, bodyRegion.Width - bodyRegion.TextPaddingX * 2);
+        var maxHeight = Math.Max(80, bodyRegion.Height - bodyRegion.TextPaddingY * 2);
         var separator = type == SlideType.Scripture ? " " : "\n\n";
         var maxChars = MaxCharsPerSlide;
 
-        var pages = PackBlocks(blocks, separator, typeface, theme.BodyFontSize, maxWidth, maxHeight, lineHeight, maxChars);
+        var pages = PackBlocks(blocks, separator, typeface, fitFontSize, maxWidth, maxHeight, lineHeight, maxChars);
 
         var slides = pages
             .Select(p => new Slide { Type = type, Title = title, Body = p, Footer = footer })

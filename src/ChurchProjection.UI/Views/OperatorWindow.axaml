@@ -147,7 +147,7 @@
     </Style>
   </Window.Styles>
 
-  <Grid RowDefinitions="Auto,*,Auto,Auto,Auto">
+  <Grid RowDefinitions="Auto,*,Auto,Auto,Auto,Auto">
 
     <!-- TOP TOOLBAR (doubles as the window title bar; right inset clears the OS caption buttons) -->
     <!-- Three zones layered in one cell so the center nav is truly window-centered regardless of
@@ -1202,6 +1202,35 @@
               </Grid>
             </Border>
 
+            <!-- Folder sidebar: All media / Uncategorized / user collections -->
+            <Border DockPanel.Dock="Left" Width="172" Background="#15191F" BorderBrush="#2A303C" BorderThickness="0,0,1,0">
+              <DockPanel Margin="8">
+                <TextBlock DockPanel.Dock="Top" Text="Folders" Foreground="#959DAB" FontSize="11"
+                           FontWeight="SemiBold" Margin="4,2,0,8" />
+
+                <!-- New folder: type a name, press Enter or tap + -->
+                <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+                  <TextBox Grid.Column="0" Text="{Binding NewFolderName}" Watermark="New folder…" FontSize="12"
+                           Padding="7,5">
+                    <TextBox.KeyBindings>
+                      <KeyBinding Gesture="Enter" Command="{Binding CreateFolderCommand}" />
+                    </TextBox.KeyBindings>
+                  </TextBox>
+                  <Button Grid.Column="1" Content="+" Command="{Binding CreateFolderCommand}" Classes="ghost"
+                          FontSize="14" Padding="9,3" Margin="5,0,0,0" ToolTip.Tip="Create folder" />
+                </Grid>
+
+                <ListBox ItemsSource="{Binding Folders}" SelectedItem="{Binding SelectedFolder}"
+                         Background="Transparent" BorderThickness="0" FontSize="12">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="op:MediaFolderOption">
+                      <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" Padding="2,3" />
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </DockPanel>
+            </Border>
+
             <!-- Media bin -->
             <ScrollViewer Padding="10" HorizontalScrollBarVisibility="Disabled">
               <ItemsControl ItemsSource="{Binding Items}">
@@ -1589,6 +1618,26 @@
                 ToolTip.Tip="Check for updates">
           <TextBlock Text="{Binding AppVersion}" Foreground="#3C4350" FontSize="11" VerticalAlignment="Center" />
         </Button>
+      </Grid>
+    </Border>
+
+    <!-- PERSISTENT MEDIA BAR - always visible (any mode) while media is live, so the operator can
+         stop/pause it from anywhere (e.g. while preloading scripture in Bible mode). -->
+    <Border Grid.Row="5" Background="#1B202A" Padding="14,8" BorderBrush="#3A2230" BorderThickness="0,1,0,0"
+            IsVisible="{Binding MediaPlayback.HasAnyLive}">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,0,14,0">
+          <Ellipse Width="9" Height="9" Fill="#F43F5E" VerticalAlignment="Center" />
+          <TextBlock Text="MEDIA LIVE" Foreground="#F43F5E" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" />
+        </StackPanel>
+        <TextBlock Grid.Column="1" Text="{Binding MediaPlayback.NowPlaying}" Foreground="#ECEEF2" FontSize="12"
+                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+        <Button Grid.Column="2" Content="{Binding MediaPlayback.PlayPauseGlyph}" Command="{Binding MediaPlayback.PlayPauseCommand}"
+                IsVisible="{Binding MediaPlayback.HasVideoLive}" FontSize="13" Padding="12,5" Margin="0,0,8,0"
+                ToolTip.Tip="Play / pause the live video" />
+        <Button Grid.Column="3" Content="Stop media" Command="{Binding MediaPlayback.ClearAllCommand}"
+                Background="#2A1414" Foreground="#F87171" FontWeight="SemiBold" FontSize="12" Padding="14,6"
+                ToolTip.Tip="Stop media on all screens" />
       </Grid>
     </Border>
 

@@ -19,6 +19,7 @@ namespace ChurchProjection.UI.ViewModels;
 public sealed class ThemeStudioViewModel : ViewModelBase, IDisposable
 {
     private readonly IThemeService _themes;
+    private readonly IThemeAssetStore? _assetStore;
 
     private Theme _draft = new();
     private string? _editingOriginalName;
@@ -51,9 +52,10 @@ public sealed class ThemeStudioViewModel : ViewModelBase, IDisposable
     public ReactiveCommand<Unit, Unit> SendBackwardCommand { get; }
     public ReactiveCommand<Unit, Unit> SendToBackCommand { get; }
 
-    public ThemeStudioViewModel(IThemeService themes, ILiveBackgroundService? liveBackground = null)
+    public ThemeStudioViewModel(IThemeService themes, ILiveBackgroundService? liveBackground = null, IThemeAssetStore? assetStore = null)
     {
         _themes = themes;
+        _assetStore = assetStore;
         Preview = new ProjectorViewModel(new ProjectionService(), themes, null, liveBackground);
 
         FontFamilies = FontManager.Current.SystemFonts
@@ -616,6 +618,33 @@ public sealed class ThemeStudioViewModel : ViewModelBase, IDisposable
         await _themes.AddOrUpdateAsync(copy);
         RefreshThemeNames();
         SelectedThemeName = copy.Name;
+    }
+
+    /// <summary>True once an asset store is available, so the view can enable/disable the import button.</summary>
+    public bool CanImportDesign => _assetStore is not null;
+
+    /// <summary>
+    /// Imports a church's designed lower-third graphic as a new theme. The picked file is copied into
+    /// the app's asset store (so the theme stays self-contained), then <see cref="ThemeImporter"/>
+    /// lays the graphic onto the 1920x1080 frame at full width / bottom-anchored with a green ATEM-key
+    /// background and seeded text regions. The new theme is saved and selected for fine-tuning.
+    /// </summary>
+    /// <param name="sourcePath">The image the operator picked.</param>
+    /// <param name="pixelWidth">Source image width in pixels (from the loaded bitmap).</param>
+    /// <param name="pixelHeight">Source image height in pixels.</param>
+    public async Task ImportDesignAsync(string sourcePath, int pixelWidth, int pixelHeight)
+    {
+        if (_assetStore is null || string.IsNullOrWhiteSpace(sourcePath)) return;
+
+        var storedPath = _assetStore.Save(sourcePath);
+        var baseName = System.IO.Path.GetFileNameWithoutExtension(sourcePath);
+        var name = UniqueName(string.IsNullOrWhiteSpace(baseName) ? "Imported design" : $"{baseName} (imported)");
+
+        var theme = ThemeImporter.FromImage(name, storedPath, pixelWidth, pixelHeight);
+        await _themes.AddOrUpdateAsync(theme);
+
+        RefreshThemeNames();
+        SelectedThemeName = name; // loads the draft + refreshes the live preview
     }
 
     private async Task DeleteThemeAsync()

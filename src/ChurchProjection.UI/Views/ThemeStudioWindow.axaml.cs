@@ -69,6 +69,43 @@ public partial class ThemeStudioWindow : Window
             vm.ResizeSelected(handle, e.Vector.X, e.Vector.Y);
     }
 
+    // Import a church's designed lower-third graphic as a new theme: pick the file, read its real
+    // pixel size (so the importer can map it onto 1920x1080 without shrinking), then hand it to the
+    // view model which copies it into the asset store and builds the theme.
+    private async void OnImportDesignClicked(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not ThemeStudioViewModel vm)
+            return;
+
+        try
+        {
+            var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Import lower-third design",
+                AllowMultiple = false,
+                FileTypeFilter =
+                [
+                    new FilePickerFileType("Images")
+                    {
+                        Patterns = ["*.png", "*.jpg", "*.jpeg", "*.bmp", "*.webp"],
+                    },
+                ],
+            });
+
+            var path = files.FirstOrDefault()?.TryGetLocalPath();
+            if (string.IsNullOrEmpty(path))
+                return;
+
+            using var bitmap = new Avalonia.Media.Imaging.Bitmap(path);
+            var size = bitmap.PixelSize;
+            await vm.ImportDesignAsync(path, size.Width, size.Height);
+        }
+        catch (System.Exception ex)
+        {
+            Serilog.Log.Error(ex, "Failed to import lower-third design");
+        }
+    }
+
     private async void OnBrowseImageClicked(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not ThemeStudioViewModel vm)

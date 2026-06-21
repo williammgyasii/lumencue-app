@@ -24,13 +24,16 @@ namespace ChurchProjection.UI.Services;
 public sealed class AnnouncementService : IAnnouncementService, IDisposable
 {
     private const string LibraryKey = "announcements_json";
+    private const string CollectionsKey = "media_collections_json";
     private const string AudioDeviceKey = "announcement_audio_device";
 
     private static readonly string[] VideoExtensions = [".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi"];
 
     private readonly SettingsRepository _settings;
     private readonly List<AnnouncementMedia> _items = [];
+    private readonly List<MediaCollection> _collections = [];
     private readonly BehaviorSubject<IReadOnlyList<AnnouncementMedia>> _itemsChanged;
+    private readonly BehaviorSubject<IReadOnlyList<MediaCollection>> _collectionsChanged;
     private readonly Subject<(string, AnnouncementMedia?)> _liveChanged = new();
     private readonly ConcurrentDictionary<string, ChannelSlot> _slots = new();
 
@@ -40,11 +43,14 @@ public sealed class AnnouncementService : IAnnouncementService, IDisposable
     {
         _settings = settings;
         _itemsChanged = new BehaviorSubject<IReadOnlyList<AnnouncementMedia>>(Snapshot());
+        _collectionsChanged = new BehaviorSubject<IReadOnlyList<MediaCollection>>(CollectionsSnapshot());
         AudioDevices = VlcMediaPlayer.EnumerateAudioDevices();
     }
 
     public IReadOnlyList<AnnouncementMedia> Items => Snapshot();
     public IObservable<IReadOnlyList<AnnouncementMedia>> ItemsChanged => _itemsChanged;
+    public IReadOnlyList<MediaCollection> Collections => CollectionsSnapshot();
+    public IObservable<IReadOnlyList<MediaCollection>> CollectionsChanged => _collectionsChanged;
     public IObservable<(string Target, AnnouncementMedia? Item)> LiveChanged => _liveChanged;
     public IReadOnlyList<AudioOutputOption> AudioDevices { get; }
     public string AudioDeviceId => _audioDeviceId;
@@ -65,6 +71,18 @@ public sealed class AnnouncementService : IAnnouncementService, IDisposable
             }
             _itemsChanged.OnNext(Snapshot());
 
+            var collectionsJson = await _settings.GetAsync(CollectionsKey);
+            if (!string.IsNullOrWhiteSpace(collectionsJson))
+            {
+                var savedCollections = JsonSerializer.Deserialize<List<MediaCollection>>(collectionsJson);
+                if (savedCollections is not null)
+                {
+                    _collections.Clear();
+                    _collections.AddRange(savedCollections.Where(c => !string.IsNullOrWhiteSpace(c.Name)));
+                }
+            }
+            _collectionsChanged.OnNext(CollectionsSnapshot());
+
             _audioDeviceId = await _settings.GetAsync(AudioDeviceKey) ?? string.Empty;
         }
         catch (Exception ex)
@@ -73,9 +91,13 @@ public sealed class AnnouncementService : IAnnouncementService, IDisposable
         }
     }
 
-    public async Task<AnnouncementMedia?> AddAsync(string path)
+    public async Task<AnnouncementMedia?> AddAsync(string path, string? collectionId = null)
     {
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return null;
+
+        // Don't duplicate a file that's already in the library — reuse the existing tile instead.
+        var existing = MediaLibrary.FindByPath(_items, path);
+        if (existing is not null) return existing;
 
         var ext = Path.GetExtension(path).ToLowerInvariant();
         var item = new AnnouncementMedia
@@ -83,12 +105,43 @@ public sealed class AnnouncementService : IAnnouncementService, IDisposable
             Name = Path.GetFileNameWithoutExtension(path),
             Path = path,
             Kind = VideoExtensions.Contains(ext) ? AnnouncementMediaKind.Video : AnnouncementMediaKind.Image,
+            CollectionId = string.IsNullOrWhiteSpace(collectionId) ? null : collectionId,
         };
 
         _items.Add(item);
         _itemsChanged.OnNext(Snapshot());
         await PersistAsync();
         return item;
+    }
+
+    public async Task<MediaCollection> CreateCollectionAsync(string name)
+    {
+        var trimmed = (name ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(trimmed)) trimmed = "New folder";
+
+        // Reuse an existing folder with the same name (case-insensitive) rather than creating a twin.
+        var existing = _collections.FirstOrDefault(
+            c => string.Equals(c.Name, trimmed, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null) return existing;
+
+        var collection = new MediaCollection { Name = trimmed };
+        _collections.Add(collection);
+        _collectionsChanged.OnNext(CollectionsSnapshot());
+        await PersistCollectionsAsync();
+        return collection;
+    }
+
+    public async Task MoveToCollectionAsync(string mediaId, string? collectionId)
+    {
+        var item = _items.FirstOrDefault(i => i.Id == mediaId);
+        if (item is null) return;
+
+        var target = string.IsNullOrWhiteSpace(collectionId) ? null : collectionId;
+        if (item.CollectionId == target) return;
+
+        item.CollectionId = target;
+        _itemsChanged.OnNext(Snapshot());
+        await PersistAsync();
     }
 
     public async Task RemoveAsync(AnnouncementMedia item)
@@ -240,7 +293,21 @@ public sealed class AnnouncementService : IAnnouncementService, IDisposable
         }
     }
 
+    private async Task PersistCollectionsAsync()
+    {
+        try
+        {
+            await _settings.SetAsync(CollectionsKey, JsonSerializer.Serialize(_collections));
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to persist media collections");
+        }
+    }
+
     private List<AnnouncementMedia> Snapshot() => [.. _items];
+
+    private List<MediaCollection> CollectionsSnapshot() => [.. _collections];
 
     public void Dispose()
     {

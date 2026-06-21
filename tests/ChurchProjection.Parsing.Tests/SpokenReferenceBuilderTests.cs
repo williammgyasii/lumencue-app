@@ -17,8 +17,9 @@ public class SpokenReferenceBuilderTests
         var builder = new SpokenReferenceBuilder(TimeSpan.FromSeconds(30));
         var t = DateTimeOffset.UtcNow;
 
-        // "Matthew" alone is not showable yet (no chapter).
-        Assert.Null(builder.Accept("let's turn to Matthew", t));
+        // Naming the book surfaces its opening verse at once (Matthew 1:1) so the operator can load it
+        // immediately and navigate from there as the chapter/verse follow.
+        Assert.Equal(("Matthew", 1, 1, (int?)null), Tup(builder.Accept("let's turn to Matthew", t)));
 
         // ~15s later: "chapter two" → show the whole chapter.
         t = t.AddSeconds(15);
@@ -37,9 +38,10 @@ public class SpokenReferenceBuilderTests
         var builder = new SpokenReferenceBuilder(TimeSpan.FromSeconds(30));
         var t = DateTimeOffset.UtcNow;
 
-        Assert.Null(builder.Accept("Matthew", t));
+        // Naming the book surfaces Matthew 1:1 right away…
+        Assert.Equal(("Matthew", 1, 1, (int?)null), Tup(builder.Accept("Matthew", t)));
 
-        // The chapter arrives too late — the stale book has expired, so nothing is fabricated.
+        // …but the chapter arrives too late — the stale book has expired, so nothing is fabricated.
         t = t.AddSeconds(31);
         Assert.Null(builder.Accept("chapter two", t));
     }
@@ -58,8 +60,8 @@ public class SpokenReferenceBuilderTests
         var t = DateTimeOffset.UtcNow;
 
         Assert.NotNull(builder.Accept("John chapter three", t));
-        // Switching books mid-thought drops the old chapter and waits for the new one.
-        Assert.Null(builder.Accept("actually Romans", t.AddSeconds(3)));
+        // Switching books mid-thought drops the old chapter and surfaces the new book's opening verse.
+        Assert.Equal(("Romans", 1, 1, (int?)null), Tup(builder.Accept("actually Romans", t.AddSeconds(3))));
         var romans = builder.Accept("chapter eight verse one", t.AddSeconds(6));
         Assert.Equal(("Romans", 8, 1, (int?)null), Tup(romans));
     }
