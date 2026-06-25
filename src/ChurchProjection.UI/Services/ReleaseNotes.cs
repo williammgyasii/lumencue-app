@@ -11,6 +11,11 @@ public static class ReleaseNotes
 {
     private static readonly Dictionary<string, string[]> Notes = new()
     {
+        ["0.7.16"] =
+        [
+            "The app now opens straight to your library — no sign-in needed to get started.",
+            "Everything you project locally — songs, scripture, themes and media — works the moment you launch.",
+        ],
         ["0.7.15"] =
         [
             "Fine-tune imported lower-third designs right in the app — nudge and reposition your artwork freely, even when it fills the whole frame, so there's no more trips back to Photoshop.",

@@ -261,8 +261,31 @@ public class App : Application
         }
         else
         {
-            ShowSignIn();
+            // Sign-in is bypassed for now: rather than gate on the cloud, boot straight into the
+            // operator on a local, unlimited (master) session. A previously-signed-in church keeps
+            // its own organization (so its library stays visible); a fresh install uses the local
+            // default library. No seat token is set, so cloud features stay offline until sign-in returns.
+            await StartLocalAsync(session);
         }
+    }
+
+    /// <summary>Starts the operator without sign-in, on a locally-synthesized unlimited session.</summary>
+    private async Task StartLocalAsync(AuthSession? prior)
+    {
+        if (_services is null) return;
+
+        var local = LocalSession.Master();
+        if (prior is not null && !string.IsNullOrWhiteSpace(prior.OrganizationId))
+        {
+            // Preserve an existing church's content scoping; just grant full local access.
+            local.OrganizationId = prior.OrganizationId;
+            local.OrganizationName = string.IsNullOrWhiteSpace(prior.OrganizationName) ? local.OrganizationName : prior.OrganizationName;
+            local.BranchName = string.IsNullOrWhiteSpace(prior.BranchName) ? local.BranchName : prior.BranchName;
+            _services.GetRequiredService<ITenantContext>().Set(prior.OrganizationId, local.OrganizationName, prior.BranchId);
+        }
+
+        _services.GetRequiredService<IEntitlementService>().Update(local);
+        await StartOperatorAsync(local);
     }
 
     private void ShowSignIn(string? notice = null)
