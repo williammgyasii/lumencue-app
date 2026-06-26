@@ -125,7 +125,6 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     }
 
     public ContentSearchViewModel ContentSearch { get; }
-    public SongImportViewModel SongImport { get; }
     public ServiceQueueViewModel ServiceQueue { get; }
     public TranscriptionViewModel Transcription { get; }
     public TopicalSearchViewModel TopicalSearch { get; }
@@ -980,7 +979,6 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
             .Subscribe(OnUpdateState);
 
         ContentSearch = new ContentSearchViewModel(contentLibrary);
-        SongImport = new SongImportViewModel(contentLibrary);
         ServiceQueue = new ServiceQueueViewModel(projectionService, themes);
         Transcription = new TranscriptionViewModel(transcriptionService, suggestionEngine, projectionService, settings);
         TopicalSearch = new TopicalSearchViewModel(scriptureSearch);
@@ -1094,8 +1092,6 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
                 HasNewSuggestions = true;
         };
 
-        SongImport.SongImported += OnSongImported;
-
         ContentSearch.WhenAnyValue<ContentSearchViewModel, ContentItem?>(x => x.SelectedItem)
             .Subscribe(item =>
             {
@@ -1201,11 +1197,6 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
             .DisposeWith(sub);
 
         _feedSub.Disposable = sub;
-    }
-
-    private void OnSongImported()
-    {
-        _ = ReloadLibraryAsync();
     }
 
     private async Task ReloadLibraryAsync()

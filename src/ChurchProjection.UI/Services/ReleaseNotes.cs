@@ -11,6 +11,12 @@ public static class ReleaseNotes
 {
     private static readonly Dictionary<string, string[]> Notes = new()
     {
+        ["0.7.19"] =
+        [
+            "The song editor now opens full screen with a bigger middle panel, so there's more room to arrange verses, chorus and bridge.",
+            "Adding a song is simpler — every \"add song\" button now opens the same editor, where you paste lyrics and it auto-detects the sections.",
+            "Tidied up the editor: panels snap into place instead of sliding off, and buttons and labels are properly centred.",
+        ],
         ["0.7.18"] =
         [
             "More Bible translations to choose from — The Passion Translation, The Living Bible, ESV, NET, Good News, Amplified (Classic), Easy-to-Read and ASV.",

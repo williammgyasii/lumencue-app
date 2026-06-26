@@ -598,17 +598,4 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
         }
     }
 
-    public async void OnImportSongClicked(object? sender, TappedEventArgs e)
-    {
-        try
-        {
-            if (DataContext is not OperatorViewModel vm) return;
-            var dialog = new SongImportWindow { DataContext = vm.SongImport };
-            await dialog.ShowDialog(this);
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to open song import dialog");
-        }
-    }
 }

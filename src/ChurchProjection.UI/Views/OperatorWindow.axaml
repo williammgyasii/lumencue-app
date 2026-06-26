@@ -609,8 +609,9 @@
             <TextBox Grid.Column="0" Text="{Binding SongSearch.Query}"
                      Watermark="{Binding SearchWatermark}" FontSize="13"
                      IsVisible="{Binding IsSongsMode}" />
-            <Button Grid.Column="1" Classes="ghost" Content="+ Import Song" Tapped="OnImportSongClicked"
-                    Margin="6,0,0,0" IsVisible="{Binding IsSongsMode}" />
+            <Button Grid.Column="1" Classes="ghost" Content="+ Import Song" Tapped="OnNewSongClicked"
+                    Margin="6,0,0,0" IsVisible="{Binding IsSongsMode}"
+                    ToolTip.Tip="Add a song: paste lyrics, auto-detect verses &amp; chorus, preview and save" />
             <Button Grid.Column="2" Classes="ghost" Content="Clear" Command="{Binding ClearResultsCommand}"
                     Margin="6,0,0,0" FontSize="12" IsVisible="{Binding IsBibleMode}"
                     ToolTip.Tip="Clear the scripture results list" />
