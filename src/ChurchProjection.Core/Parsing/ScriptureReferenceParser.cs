@@ -118,15 +118,23 @@ public static partial class ScriptureReferenceParser
         RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex InlineReferencePattern();
 
-    public static ScriptureReference? TryParse(string input)
+    public static ScriptureReference? TryParse(string input) => TryParse(input, allowFuzzyBook: false);
+
+    /// <param name="allowFuzzyBook">
+    /// When true, an unrecognised book token is matched to the nearest canonical book within a small
+    /// edit distance ("matew" → Matthew). Enabled only for the TYPED search box; the live spoken/AI
+    /// path leaves it false so free speech is never auto-corrected into a false reference.
+    /// </param>
+    public static ScriptureReference? TryParse(string input, bool allowFuzzyBook)
     {
         var trimmed = input.Trim();
+        Func<string, string?> resolveBook = allowFuzzyBook ? NormalizeBookFuzzy : NormalizeBook;
 
         // Try verse-level first: "John 3:16"
         var match = VersePattern().Match(trimmed);
         if (match.Success)
         {
-            var book = NormalizeBook(match.Groups["book"].Value.Trim());
+            var book = resolveBook(match.Groups["book"].Value.Trim());
             if (book is null) return null;
 
             return new ScriptureReference(
@@ -140,7 +148,7 @@ public static partial class ScriptureReferenceParser
         var spaceMatch = SpaceVersePattern().Match(trimmed);
         if (spaceMatch.Success)
         {
-            var book = NormalizeBook(spaceMatch.Groups["book"].Value.Trim());
+            var book = resolveBook(spaceMatch.Groups["book"].Value.Trim());
             if (book is not null)
             {
                 return new ScriptureReference(
@@ -155,7 +163,7 @@ public static partial class ScriptureReferenceParser
         var chapterMatch = ChapterPattern().Match(trimmed);
         if (chapterMatch.Success)
         {
-            var book = NormalizeBook(chapterMatch.Groups["book"].Value.Trim());
+            var book = resolveBook(chapterMatch.Groups["book"].Value.Trim());
             if (book is null) return null;
 
             return new ScriptureReference(
@@ -166,6 +174,124 @@ public static partial class ScriptureReferenceParser
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// True when the input reads as a reference the operator is still typing — a book (or fuzzy book)
+    /// token followed only by whitespace/digits, but not yet a complete, parseable reference. The
+    /// typed search uses this to skip the semantic phrase fallback (which otherwise surfaces unrelated
+    /// "central" verses like John 1:1 for a half-typed fragment). Reference intent requires a trailing
+    /// space or a number after the book, so a bare word ("love", "job") stays an ordinary word search.
+    /// </summary>
+    public static bool LooksLikePartialReference(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return false;
+
+        // A complete reference is not "partial" — let the normal lookup handle it.
+        if (TryParse(input, allowFuzzyBook: true) is not null) return false;
+
+        var hasTrailingSpace = char.IsWhiteSpace(input[^1]);
+        var tokens = input.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (tokens.Length == 0) return false;
+
+        var bookTokens = ResolveLeadingBook(tokens, out var book);
+        if (book is null) return false;
+
+        // Everything after the book must be digits (chapter/verse being typed).
+        for (var i = bookTokens; i < tokens.Length; i++)
+            if (!tokens[i].All(char.IsDigit))
+                return false;
+
+        var hasNumberPart = tokens.Length > bookTokens;
+        return hasNumberPart || hasTrailingSpace;
+    }
+
+    private static int ResolveLeadingBook(string[] tokens, out string? book)
+    {
+        book = null;
+        if (tokens.Length == 0) return 0;
+
+        // Numbered books span two tokens ("1 john"); only combine when the 2nd token isn't itself a
+        // number, so we never swallow a chapter into the book ("mark 3").
+        if (tokens.Length >= 2 && !tokens[1].All(char.IsDigit))
+        {
+            var combined = NormalizeBookFuzzy(tokens[0] + " " + tokens[1]);
+            if (combined is not null)
+            {
+                book = combined;
+                return 2;
+            }
+        }
+
+        var single = NormalizeBookFuzzy(tokens[0]);
+        if (single is not null)
+        {
+            book = single;
+            return 1;
+        }
+
+        return 0;
+    }
+
+    /// <summary>Resolves a book token allowing small typos, falling back to <see cref="NormalizeBook"/>
+    /// for exact/alias/prefix matches first. Returns the nearest canonical book within a length-scaled
+    /// edit distance, but only when that nearest book is unambiguous (no ties).</summary>
+    public static string? NormalizeBookFuzzy(string raw)
+    {
+        var exact = NormalizeBook(raw);
+        if (exact is not null) return exact;
+
+        var key = raw.Replace(".", "").Replace(" ", "").Trim().ToLowerInvariant();
+        if (key.Length < 3) return null; // too short to disambiguate safely
+
+        var threshold = key.Length <= 4 ? 1 : 2;
+
+        string? best = null;
+        var bestDistance = int.MaxValue;
+        var tied = false;
+
+        foreach (var canonical in FullBookNames)
+        {
+            var candidate = canonical.Replace(" ", "").ToLowerInvariant();
+            var distance = Levenshtein(key, candidate);
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                best = canonical;
+                tied = false;
+            }
+            else if (distance == bestDistance)
+            {
+                tied = true;
+            }
+        }
+
+        return best is not null && bestDistance <= threshold && !tied ? best : null;
+    }
+
+    private static int Levenshtein(string a, string b)
+    {
+        var n = a.Length;
+        var m = b.Length;
+        if (n == 0) return m;
+        if (m == 0) return n;
+
+        var prev = new int[m + 1];
+        var curr = new int[m + 1];
+        for (var j = 0; j <= m; j++) prev[j] = j;
+
+        for (var i = 1; i <= n; i++)
+        {
+            curr[0] = i;
+            for (var j = 1; j <= m; j++)
+            {
+                var cost = a[i - 1] == b[j - 1] ? 0 : 1;
+                curr[j] = Math.Min(Math.Min(curr[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
+            }
+            (prev, curr) = (curr, prev);
+        }
+
+        return prev[m];
     }
 
     public static List<ScriptureReference> ExtractAll(string text)

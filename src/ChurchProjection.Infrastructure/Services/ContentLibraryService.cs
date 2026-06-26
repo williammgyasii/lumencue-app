@@ -154,10 +154,20 @@ public class ContentLibraryService : IContentLibraryService
 
     public async Task<List<ScripturePassage>> SearchScripturesAsync(string query, string translation = "BSB", CancellationToken cancellationToken = default)
     {
-        var reference = ScriptureReferenceParser.TryParse(query);
+        // Typed search tolerates fat-finger typos ("matew 1 1" → Matthew 1:1); the live spoken path
+        // keeps using the strict TryParse so free speech is never auto-corrected.
+        var reference = ScriptureReferenceParser.TryParse(query, allowFuzzyBook: true);
         if (reference is not null)
         {
             return await GetOrFetchVersesAsync(reference, translation, cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+
+        // The operator is mid-typing a reference (e.g. "mat " before the numbers land). Don't run the
+        // semantic phrase search on the fragment — it surfaces unrelated central verses (John 1:1) that
+        // flash in jarringly. Show nothing until the reference completes or they type a real phrase.
+        if (ScriptureReferenceParser.LooksLikePartialReference(query))
+        {
+            return [];
         }
 
         // Phrase/paraphrase search. The naive whole-phrase LIKE only matches verses that contain the
