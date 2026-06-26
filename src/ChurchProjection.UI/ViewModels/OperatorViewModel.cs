@@ -27,6 +27,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     private const int TopicalTabIndex = 2;
     private const int SongsTabIndex = 3;
     private const int ParaphrasesTabIndex = 4;
+    private const int NotesTabIndex = 5;
     private static readonly TimeSpan PrewarmCacheWait = TimeSpan.FromSeconds(2);
 
     private readonly IProjectionService _projection;
@@ -129,6 +130,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     public TranscriptionViewModel Transcription { get; }
     public TopicalSearchViewModel TopicalSearch { get; }
     public SongSearchViewModel SongSearch { get; }
+    public NotesViewModel Notes { get; }
     public ProPresenterViewModel ProPresenter { get; }
 
     /// <summary>The swappable background media palette (still images + motion loops).</summary>
@@ -637,11 +639,13 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
             if (value == TopicalTabIndex) HasNewTopical = false;
             if (value == ParaphrasesTabIndex) HasNewParaphrases = false;
             if (value == SongsTabIndex) _ = SongSearch.RefreshAsync();
+            if (value == NotesTabIndex) _ = Notes.LoadAsync();
             this.RaisePropertyChanged(nameof(IsLibraryTab));
             this.RaisePropertyChanged(nameof(IsSuggestionsTab));
             this.RaisePropertyChanged(nameof(IsTopicalTab));
             this.RaisePropertyChanged(nameof(IsParaphrasesTab));
             this.RaisePropertyChanged(nameof(IsSongsTab));
+            this.RaisePropertyChanged(nameof(IsNotesTab));
             this.RaisePropertyChanged(nameof(ShowScriptureList));
             this.RaisePropertyChanged(nameof(ShowNowSinging));
         }
@@ -652,6 +656,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     public bool IsTopicalTab => SelectedContentTab == TopicalTabIndex;
     public bool IsParaphrasesTab => SelectedContentTab == ParaphrasesTabIndex;
     public bool IsSongsTab => SelectedContentTab == SongsTabIndex;
+    public bool IsNotesTab => SelectedContentTab == NotesTabIndex;
 
     // ───────────────────────── Top-level workspace mode (Bible vs Songs) ─────────────────────────
     // A service is either displaying scripture or singing. Each mode reconfigures the left sidebar
@@ -903,6 +908,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     public ReactiveCommand<Unit, Unit> ShowTopicalTabCommand { get; }
     public ReactiveCommand<Unit, Unit> ShowParaphrasesTabCommand { get; }
     public ReactiveCommand<Unit, Unit> ShowSongsTabCommand { get; }
+    public ReactiveCommand<Unit, Unit> ShowNotesTabCommand { get; }
     public ReactiveCommand<Unit, Unit> ShowBibleModeCommand { get; }
     public ReactiveCommand<Unit, Unit> ShowSongsModeCommand { get; }
     public ReactiveCommand<Unit, Unit> ShowMediaModeCommand { get; }
@@ -941,6 +947,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         ILayerService layers,
         IEntitlementService entitlements,
         IThemeAssetStore themeAssetStore,
+        NotesRepository notesRepo,
         IUpdateService? updates = null)
     {
         _projection = projectionService;
@@ -983,6 +990,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         Transcription = new TranscriptionViewModel(transcriptionService, suggestionEngine, projectionService, settings);
         TopicalSearch = new TopicalSearchViewModel(scriptureSearch);
         SongSearch = new SongSearchViewModel(songSearch);
+        Notes = new NotesViewModel(notesRepo);
         ProPresenter = new ProPresenterViewModel(proPresenter);
         ProgramPreview = new ProjectorViewModel(_projection, themes, null, liveBackground, announcements, MediaTarget.AllScreens, layers);
 
@@ -1020,6 +1028,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         ShowTopicalTabCommand = ReactiveCommand.Create(() => { SelectedContentTab = TopicalTabIndex; });
         ShowParaphrasesTabCommand = ReactiveCommand.Create(() => { SelectedContentTab = ParaphrasesTabIndex; });
         ShowSongsTabCommand = ReactiveCommand.Create(() => { SelectedContentTab = SongsTabIndex; });
+        ShowNotesTabCommand = ReactiveCommand.Create(() => { SelectedContentTab = NotesTabIndex; });
         ShowBibleModeCommand = ReactiveCommand.Create(EnterBibleMode);
         ShowSongsModeCommand = ReactiveCommand.Create(EnterSongsMode);
         ShowMediaModeCommand = ReactiveCommand.Create(EnterMediaMode);
@@ -1274,6 +1283,28 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         SendItemToLive(slide.Item);
         slide.IsLive = true;
         _lastFollowIndex = NowSingingSlides.IndexOf(slide);
+    }
+
+    /// <summary>Projects a saved note. Routed through the standard themed path (Note rides the Scripture
+    /// theme) so notes look consistent with how scripture/songs are sent, and the live ring tracks it.</summary>
+    public void SendNoteLive(NoteSlideItem? card)
+    {
+        if (card is null) return;
+        var theme = _themes.ResolveFor(SlideType.Note);
+        _projection.ProjectDeck(DeckBuilder.Build(SlideType.Note, card.Title, card.Body, string.Empty, theme));
+        SetLiveSlideType(SlideType.Note);
+
+        // Clear every other surface's live highlight, then mark this note.
+        foreach (var slide in NowSingingSlides) { slide.IsLive = false; slide.IsSuggested = false; }
+        ClearContentLiveHighlights();
+        foreach (var n in Notes.Cards) n.IsLive = false;
+        card.IsLive = true;
+
+        // A manual live action takes precedence over lyric-follow: pause it briefly.
+        _followCooldownUntil = DateTime.UtcNow + FollowCooldown;
+        _followPendingTarget = -1;
+        _followPendingCount = 0;
+        StatusText = $"Live: {card.Title}";
     }
 
     public void SendSuggestionToLive(SuggestionItem? item)

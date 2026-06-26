@@ -181,6 +181,73 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
             vm.SendSlideLive(slide);
     }
 
+    // ----- Notes tab -----
+
+    // Double-clicking a note card sends it live (shows it on screen).
+    public void OnNotesSlideDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (DataContext is OperatorViewModel vm && sender is ListBox { SelectedItem: NoteSlideItem card })
+            vm.SendNoteLive(card);
+    }
+
+    // Right-click note menu: send the note live.
+    public void OnNoteSendLiveMenu(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is OperatorViewModel vm && sender is MenuItem { DataContext: NoteSlideItem card })
+            vm.SendNoteLive(card);
+    }
+
+    // "+ Add note" button: open the note dialog and persist a new note on confirm.
+    public async void OnAddNote(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (DataContext is not OperatorViewModel vm) return;
+            var editor = new NoteEditViewModel("New note", "", "");
+            var dialog = new NoteEditWindow { DataContext = editor };
+            await dialog.ShowDialog(this);
+            if (!editor.Confirmed) return;
+            await vm.Notes.AddNoteAsync(editor.NoteTitle, editor.Body);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to add note");
+        }
+    }
+
+    // Right-click note menu: edit the note's title/body in the dialog.
+    public async void OnEditNoteMenu(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (DataContext is not OperatorViewModel vm) return;
+            if (sender is not MenuItem { DataContext: NoteSlideItem card }) return;
+            var editor = new NoteEditViewModel("Edit note", card.Note.Title, card.Note.Body);
+            var dialog = new NoteEditWindow { DataContext = editor };
+            await dialog.ShowDialog(this);
+            if (!editor.Confirmed) return;
+            await vm.Notes.UpdateNoteAsync(card, editor.NoteTitle, editor.Body);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to edit note");
+        }
+    }
+
+    // Right-click note menu: delete the note.
+    public async void OnDeleteNoteMenu(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (DataContext is OperatorViewModel vm && sender is MenuItem { DataContext: NoteSlideItem card })
+                await vm.Notes.DeleteNoteAsync(card);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to delete note");
+        }
+    }
+
     public void OnStepLivePrev(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (DataContext is OperatorViewModel vm) vm.StepLive(-1);

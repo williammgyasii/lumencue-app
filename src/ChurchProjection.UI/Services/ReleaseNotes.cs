@@ -11,6 +11,12 @@ public static class ReleaseNotes
 {
     private static readonly Dictionary<string, string[]> Notes = new()
     {
+        ["0.7.22"] =
+        [
+            "New Notes tab — write a title and body (great for prayer points). Each saved note becomes a slide card; double-click it to show it on screen.",
+            "Add a note with “+ Add note”, and right-click any note to edit or delete it.",
+            "Notes are styled with your Scripture theme, so they look consistent with how you send scripture and songs.",
+        ],
         ["0.7.21"] =
         [
             "Scripture references read out digit-by-digit — like saying a Psalm as \"one-oh-nine\" for Psalm 109 — are now recognised correctly.",

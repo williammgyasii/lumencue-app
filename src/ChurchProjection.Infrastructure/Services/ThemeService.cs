@@ -61,6 +61,11 @@ public sealed class ThemeService : IThemeService
 
     public string GetAssignment(SlideType slideType)
     {
+        // Notes deliberately have no theme of their own: they ride on the Scripture theme so projected
+        // notes look consistent with how scripture/songs are sent, with nothing extra to configure.
+        if (slideType == SlideType.Note)
+            slideType = SlideType.Scripture;
+
         if (_assignments.TryGetValue(slideType, out var name) && GetByName(name) is not null)
             return name;
         return _themes.FirstOrDefault()?.Name ?? "House - Dark";

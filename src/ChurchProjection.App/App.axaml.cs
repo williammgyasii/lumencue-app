@@ -75,6 +75,7 @@ public class App : Application
         services.AddSingleton<ScriptureRepository>();
         services.AddSingleton<SongRepository>();
         services.AddSingleton<SettingsRepository>();
+        services.AddSingleton<NotesRepository>();
         services.AddSingleton<BibleCacheService>();
         services.AddSingleton<FreeBibleApiClient>(sp =>
             new FreeBibleApiClient(sp.GetRequiredService<BibleCacheService>()));

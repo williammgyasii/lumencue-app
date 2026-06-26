@@ -8,7 +8,8 @@ public enum SlideType
     Announcement,
     Media,
     Countdown,
-    Clock
+    Clock,
+    Note
 }
 
 public class Slide
@@ -46,6 +47,14 @@ public class Slide
     public static Slide FromText(string title, string body) => new()
     {
         Type = SlideType.Announcement,
+        Title = title,
+        Body = body
+    };
+
+    /// <summary>A free-text note (e.g. prayer points). Styled by the Note theme on the projector.</summary>
+    public static Slide FromNote(string title, string body) => new()
+    {
+        Type = SlideType.Note,
         Title = title,
         Body = body
     };
