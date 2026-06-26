@@ -11,6 +11,11 @@ public static class ReleaseNotes
 {
     private static readonly Dictionary<string, string[]> Notes = new()
     {
+        ["0.7.21"] =
+        [
+            "Scripture references read out digit-by-digit — like saying a Psalm as \"one-oh-nine\" for Psalm 109 — are now recognised correctly.",
+            "The Message (MSG) now jumps to the exact verse you ask for instead of the whole chapter, even where it groups verses together — and passages you'd already downloaded refresh automatically so they're fixed too.",
+        ],
         ["0.7.20"] =
         [
             "Scripture references read out digit-by-digit are now understood — saying a Psalm as \"one-oh-nine\" correctly finds Psalm 109 instead of getting lost in the spaces.",
