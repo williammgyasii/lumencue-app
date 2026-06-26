@@ -120,7 +120,9 @@ public class SongSlideItem : ReactiveObject
         Item = new ContentItem
         {
             Type = ContentItemType.Song,
-            Title = $"{song.Title} — {label}",
+            // Projected title is just the song name; the section (Chorus / Verse 5 …) stays in the
+            // operator's Now Singing card (Label + colored bar) and in Tag, but never on screen.
+            Title = song.Title,
             Subtitle = song.Artist ?? "",
             Body = pageText,
             Tag = label,

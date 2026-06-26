@@ -15,6 +15,9 @@ public class TopicalSearchViewModel : ViewModelBase
 {
     private static readonly TimeSpan SearchDebounce = TimeSpan.FromMilliseconds(350);
     private const int MaxResults = 12;
+    // The detected lane is a running history of passages the preacher has echoed; cap it so a long
+    // sermon doesn't grow it without bound. Newest sits on top.
+    private const int MaxDetected = 15;
 
     private readonly IScriptureSearchService _search;
     private CancellationTokenSource? _searchCts;
@@ -23,7 +26,9 @@ public class TopicalSearchViewModel : ViewModelBase
     private string _statusText = "Describe a passage, or let the AI catch a request.";
     private bool _isSearching;
     private ContentItem? _selectedItem;
+    private ContentItem? _selectedDetectedItem;
     private bool _hasResults;
+    private bool _hasDetected;
 
     public string Translation { get; set; } = "BSB";
 
@@ -57,7 +62,24 @@ public class TopicalSearchViewModel : ViewModelBase
         private set => this.RaiseAndSetIfChanged(ref _hasResults, value);
     }
 
+    public ContentItem? SelectedDetectedItem
+    {
+        get => _selectedDetectedItem;
+        set => this.RaiseAndSetIfChanged(ref _selectedDetectedItem, value);
+    }
+
+    /// <summary>True once the preacher has paraphrased at least one passage this session.</summary>
+    public bool HasDetected
+    {
+        get => _hasDetected;
+        private set => this.RaiseAndSetIfChanged(ref _hasDetected, value);
+    }
+
     public ObservableCollection<ContentItem> Results { get; } = [];
+
+    /// <summary>Verses auto-detected from the preacher paraphrasing scripture. Separate from the
+    /// operator's manual <see cref="Results"/> so live detection never clobbers a manual search.</summary>
+    public ObservableCollection<ContentItem> DetectedResults { get; } = [];
 
     public TopicalSearchViewModel(IScriptureSearchService search)
     {
@@ -67,6 +89,35 @@ public class TopicalSearchViewModel : ViewModelBase
             .Throttle(SearchDebounce)
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(q => _ = RunSearchAsync(q, isAuto: false));
+    }
+
+    /// <summary>Adds auto-detected paraphrase matches to the detected lane (newest first), skipping any
+    /// verse already shown and trimming to the cap. Must be called on the UI thread.</summary>
+    public void AddDetections(IReadOnlyList<ParaphraseDetection> detections)
+    {
+        foreach (var d in detections)
+        {
+            var p = d.Passage;
+            var key = $"{p.Book}|{p.Chapter}|{p.VerseStart}";
+            if (DetectedResults.Any(i => i.Source is ScripturePassage sp && $"{sp.Book}|{sp.Chapter}|{sp.VerseStart}" == key))
+                continue;
+
+            DetectedResults.Insert(0, new ContentItem
+            {
+                Type = ContentItemType.Scripture,
+                Title = p.Reference,
+                Subtitle = p.Translation,
+                Body = p.Text,
+                Tag = p.Translation,
+                Footer = $"{p.Reference} ({p.Translation})",
+                Source = p,
+            });
+
+            while (DetectedResults.Count > MaxDetected)
+                DetectedResults.RemoveAt(DetectedResults.Count - 1);
+        }
+
+        HasDetected = DetectedResults.Count > 0;
     }
 
     /// <summary>Runs a search for a topic the AI detected in speech, surfacing it in the tab.</summary>

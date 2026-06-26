@@ -1,3 +1,4 @@
+using System.Reactive.Subjects;
 using ChurchProjection.Core.Models.Content;
 using ChurchProjection.Core.Parsing;
 using ChurchProjection.Core.Services;
@@ -35,6 +36,18 @@ public class FuzzyAiMatcherService : IAiMatcherService
 
     // Written from the UI thread on mode switches; read on the matcher worker. Volatile is enough.
     private volatile bool _includeContentMatches = true;
+
+    // Surfaces references that parsed but don't exist anywhere in the Bible (book + chapter recognised
+    // but no verses, not even the chapter). The UI turns these into a transient "doesn't exist" toast.
+    private readonly Subject<ReferenceNotFound> _referenceNotFound = new();
+    public IObservable<ReferenceNotFound> ReferenceNotFound => _referenceNotFound;
+
+    // De-dupe the not-found signal: the same missing reference recurs across overlapping interim and
+    // final transcript windows, so without this a single mis-spoken "John 99" would toast repeatedly.
+    private static readonly TimeSpan NotFoundDedupeWindow = TimeSpan.FromSeconds(15);
+    private readonly object _notFoundLock = new();
+    private string? _lastNotFoundLabel;
+    private DateTimeOffset _lastNotFoundAt;
 
     public string CurrentTranslation
     {
@@ -164,8 +177,14 @@ public class FuzzyAiMatcherService : IAiMatcherService
             // leaving the operator thinking the reference was missed entirely. If the chapter itself
             // exists, fall back to it (labelled as the chapter, never a wrong specific verse) so the
             // recognised book + chapter stays actionable.
+            var chapterExists = false;
             if (!isWholeChapter && r.VerseStart > 0)
-                await AddOutOfRangeChapterFallbackAsync(r, suggestions, cancellationToken).ConfigureAwait(false);
+                chapterExists = await AddOutOfRangeChapterFallbackAsync(r, suggestions, cancellationToken).ConfigureAwait(false);
+
+            // Nothing at all resolved — not the verse, not the chapter. The reference simply isn't in
+            // the Bible (e.g. "John 99"), so tell the operator rather than going silent.
+            if (!chapterExists)
+                EmitReferenceNotFound(r);
             return;
         }
 
@@ -206,14 +225,16 @@ public class FuzzyAiMatcherService : IAiMatcherService
 
     // Surfaces the chapter when a spoken verse was out of range. The chapter was just hydrated into the
     // cache by the failed verse lookup, so this is an instant local hit (no extra network round-trip).
-    private async Task AddOutOfRangeChapterFallbackAsync(ScriptureReference r, List<AiSuggestion> suggestions, CancellationToken cancellationToken)
+    // Returns true when the chapter exists (a fallback suggestion was added), false when it does not —
+    // letting the caller distinguish "verse out of range" from "reference doesn't exist at all".
+    private async Task<bool> AddOutOfRangeChapterFallbackAsync(ScriptureReference r, List<AiSuggestion> suggestions, CancellationToken cancellationToken)
     {
         var chapterRef = new ScriptureReference(r.Book, r.Chapter, VerseStart: 1, VerseEnd: ScriptureReference.WholeChapterSentinel);
         var chapterVerses = await _contentLibrary
             .GetOrFetchVersesAsync(chapterRef, CurrentTranslation, localOnly: false, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
-        if (chapterVerses.Count == 0) return;
+        if (chapterVerses.Count == 0) return false;
 
         var first = chapterVerses[0];
         suggestions.Add(new AiSuggestion(
@@ -223,6 +244,29 @@ public class FuzzyAiMatcherService : IAiMatcherService
             Footer: $"{first.Book} {first.Chapter} ({first.Translation}) — verse {r.VerseStart} not found",
             Score: 0.9,
             MatchType: "scripture_reference"));
+        return true;
+    }
+
+    // Announces a reference that resolved to nothing, suppressing repeats of the same reference within
+    // a short window. The compare-and-set must be atomic, so just this tiny section takes a lock; the
+    // surrounding match path stays lock-free.
+    private void EmitReferenceNotFound(ScriptureReference r)
+    {
+        var label = r.VerseEnd is >= ScriptureReference.WholeChapterSentinel
+            ? $"{r.Book} {r.Chapter}"
+            : r.ToShortString();
+
+        var now = DateTimeOffset.UtcNow;
+        lock (_notFoundLock)
+        {
+            if (_lastNotFoundLabel == label && now - _lastNotFoundAt < NotFoundDedupeWindow)
+                return;
+            _lastNotFoundLabel = label;
+            _lastNotFoundAt = now;
+        }
+
+        Log.Information("Spoken reference {Reference} does not exist in the Bible", label);
+        _referenceNotFound.OnNext(new ReferenceNotFound(label));
     }
 
     private void AddFuzzySuggestions(string transcriptChunk, List<AiSuggestion> suggestions, CancellationToken cancellationToken)

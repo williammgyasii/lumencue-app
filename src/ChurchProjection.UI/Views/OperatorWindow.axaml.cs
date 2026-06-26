@@ -466,7 +466,7 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
             vm.DeletePlaylist(playlist);
     }
 
-    public async void OnSettingsClicked(object? sender, TappedEventArgs e)
+    public async void OnSettingsClicked(object? sender, RoutedEventArgs e)
     {
         try
         {
@@ -480,7 +480,7 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
         }
     }
 
-    public async void OnPreServiceClicked(object? sender, TappedEventArgs e)
+    public async void OnPreServiceClicked(object? sender, RoutedEventArgs e)
     {
         try
         {

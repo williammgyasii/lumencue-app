@@ -153,32 +153,39 @@
     <!-- Three zones layered in one cell so the center nav is truly window-centered regardless of
          how wide the left (identity/status) and right (controls) clusters are. -->
     <Border Grid.Row="0" Background="#14181F" Padding="16,9,148,9" BorderBrush="#2A303C" BorderThickness="0,0,0,1">
-      <Grid>
-        <!-- LEFT: identity + live status + session -->
-        <StackPanel HorizontalAlignment="Left" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+      <!-- Three real columns (left identity/status | flexible center nav | right controls) so the
+           clusters reserve their own space and can never overlap, no matter how wide each gets. -->
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <!-- LEFT: identity + a single combined status pill (live state · account · sync) -->
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
           <Border Width="28" Height="28" CornerRadius="7" ClipToBounds="True">
             <Image Source="/Assets/logo.png" Width="28" Height="28" Stretch="UniformToFill" />
           </Border>
           <TextBlock Classes="h2" Text="LumenCue" Foreground="#ECEEF2" FontSize="16" VerticalAlignment="Center"
                      Margin="0,0,4,0" />
-          <Border Background="#22C55E" CornerRadius="10" Padding="10,4" IsVisible="{Binding IsLive}">
-            <TextBlock Text="LIVE" Foreground="White" FontSize="11" FontWeight="Bold" />
-          </Border>
-          <Border Background="#232932" CornerRadius="10" Padding="10,4" IsVisible="{Binding !IsLive}">
-            <TextBlock Text="BLANK" Foreground="#6E7682" FontSize="11" FontWeight="SemiBold" />
-          </Border>
+          <!-- Combined status pill: replaces the former three separate chips (LIVE/BLANK, account, sync). -->
           <Border Background="#232932" CornerRadius="10" Padding="10,4">
-            <TextBlock Text="{Binding SyncStatus}" Foreground="#959DAB" FontSize="11" />
-          </Border>
-          <Border Background="#232932" CornerRadius="10" Padding="10,4"
-                  ToolTip.Tip="Signed-in organization and branch">
-            <TextBlock Text="{Binding AccountLabel}" Foreground="#C2C8D2" FontSize="11"
-                       MaxWidth="240" TextTrimming="CharacterEllipsis" />
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" IsVisible="{Binding IsLive}">
+                <Ellipse Width="8" Height="8" Fill="#22C55E" VerticalAlignment="Center" />
+                <TextBlock Text="LIVE" Foreground="#FFFFFF" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" IsVisible="{Binding !IsLive}">
+                <Ellipse Width="8" Height="8" Fill="#4B5563" VerticalAlignment="Center" />
+                <TextBlock Text="BLANK" Foreground="#6E7682" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+              </StackPanel>
+              <Border Width="1" Height="14" Background="#3A414D" VerticalAlignment="Center" />
+              <TextBlock Text="{Binding AccountLabel}" Foreground="#C2C8D2" FontSize="11"
+                         MaxWidth="200" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                         ToolTip.Tip="Signed-in organization and branch" />
+              <Border Width="1" Height="14" Background="#3A414D" VerticalAlignment="Center" />
+              <TextBlock Text="{Binding SyncStatus}" Foreground="#959DAB" FontSize="11" VerticalAlignment="Center" />
+            </StackPanel>
           </Border>
           <Border Background="#3A2A12" CornerRadius="10" Padding="10,4" IsVisible="{Binding ShowEntitlementBanner}"
                   ToolTip.Tip="Subscription status">
             <TextBlock Text="{Binding EntitlementBannerText}" Foreground="#F59E0B" FontSize="11"
-                       MaxWidth="380" TextTrimming="CharacterEllipsis" />
+                       MaxWidth="300" TextTrimming="CharacterEllipsis" />
           </Border>
           <!-- Always-on AI minutes remaining this month (turns amber as the allowance runs low). -->
           <Panel IsVisible="{Binding ShowAiMinutes}">
@@ -200,7 +207,7 @@
         </StackPanel>
 
         <!-- CENTER: workspace modes — a service is either showing scripture or singing -->
-        <StackPanel HorizontalAlignment="Center" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+        <StackPanel Grid.Column="1" HorizontalAlignment="Center" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
           <!-- Bible mode -->
           <Panel>
             <Button Classes="topNav" Command="{Binding ShowBibleModeCommand}"
@@ -263,20 +270,8 @@
           </Button>
         </StackPanel>
 
-        <!-- RIGHT: operational controls -->
-        <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-          <Button Classes="ghost" Content="Upgrade" Command="{Binding UpgradeCommand}" Padding="10,6" FontSize="12"
-                  Foreground="#F59E0B" FontWeight="SemiBold" IsVisible="{Binding ShowUpgrade}"
-                  ToolTip.Tip="See plans and upgrade for more AI minutes and premium features" />
-          <Button Classes="ghost" Content="Pre-service" Tapped="OnPreServiceClicked" Padding="10,6" FontSize="12"
-                  ToolTip.Tip="Put a live countdown or clock on the screen before the service starts" />
-          <Button Classes="ghost" Content="Settings" Tapped="OnSettingsClicked" Padding="10,6" FontSize="12" />
-          <Button Classes="ghost" Content="Sign in" Command="{Binding SignInCommand}" Padding="10,6" FontSize="12"
-                  IsVisible="{Binding !IsSignedIn}"
-                  ToolTip.Tip="Sign in to your branch to enable live AI transcription, premium Bible translations and sync" />
-          <Button Classes="ghost" Content="Sign out" Command="{Binding SignOutCommand}" Padding="10,6" FontSize="12"
-                  IsVisible="{Binding IsSignedIn}"
-                  ToolTip.Tip="Release this device's seat and return to the sign-in screen" />
+        <!-- RIGHT: live-critical controls stay visible; secondary actions move into the More menu. -->
+        <StackPanel Grid.Column="2" HorizontalAlignment="Right" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
           <Button Classes="ghost" Command="{Binding ToggleScreenOutputCommand}" FontSize="12" Padding="10,6"
                   ToolTip.Tip="Turn the projector screen output on/off. When off, the physical screen reverts to the desktop / another source — different from Blank, which keeps the feed live but shows black.">
             <Panel>
@@ -291,6 +286,19 @@
             </Panel>
           </Button>
           <Button Classes="danger" Content="Blank" Command="{Binding BlankCommand}" FontSize="12" Padding="12,6" />
+          <!-- Overflow menu for lower-frequency actions (keeps the bar uncluttered). -->
+          <Button Classes="ghost" Content="More" Padding="10,6" FontSize="12" ToolTip.Tip="More actions">
+            <Button.Flyout>
+              <MenuFlyout Placement="BottomEdgeAlignedRight">
+                <MenuItem Header="Upgrade" Command="{Binding UpgradeCommand}" IsVisible="{Binding ShowUpgrade}" />
+                <MenuItem Header="Pre-service" Click="OnPreServiceClicked" />
+                <MenuItem Header="Settings" Click="OnSettingsClicked" />
+                <Separator />
+                <MenuItem Header="Sign in" Command="{Binding SignInCommand}" IsVisible="{Binding !IsSignedIn}" />
+                <MenuItem Header="Sign out" Command="{Binding SignOutCommand}" IsVisible="{Binding IsSignedIn}" />
+              </MenuFlyout>
+            </Button.Flyout>
+          </Button>
         </StackPanel>
       </Grid>
     </Border>
@@ -603,6 +611,9 @@
                      IsVisible="{Binding IsSongsMode}" />
             <Button Grid.Column="1" Classes="ghost" Content="+ Import Song" Tapped="OnImportSongClicked"
                     Margin="6,0,0,0" IsVisible="{Binding IsSongsMode}" />
+            <Button Grid.Column="2" Classes="ghost" Content="Clear" Command="{Binding ClearResultsCommand}"
+                    Margin="6,0,0,0" FontSize="12" IsVisible="{Binding IsBibleMode}"
+                    ToolTip.Tip="Clear the scripture results list" />
           </Grid>
 
           <!-- Tab bar: Library / AI Suggestions -->
@@ -950,6 +961,11 @@
                                  IsVisible="{Binding CanUseAi}" />
                     </StackPanel>
                   </Border>
+                  <Border DockPanel.Dock="Top" Padding="8,4">
+                    <Button Classes="ghost" Content="Clear list" Command="{Binding ClearSuggestionsCommand}"
+                            HorizontalAlignment="Right" FontSize="11" Padding="8,4"
+                            ToolTip.Tip="Remove all AI suggestions from this list (does not change what is live)" />
+                  </Border>
                   <ListBox x:Name="SuggestionsListBox"
                            ItemsSource="{Binding Transcription.Suggestions}"
                            SelectedItem="{Binding Transcription.SelectedSuggestion}"
@@ -1038,6 +1054,63 @@
                                FontSize="13" Padding="8,6" CornerRadius="6" />
                       <TextBlock Text="{Binding StatusText}" Foreground="#959DAB" FontSize="11" FontStyle="Italic" />
                     </StackPanel>
+                  </Border>
+                  <!-- Detected-while-preaching lane: auto paraphrase matches, split from the manual
+                       results above so live detection never clobbers the operator's own search. -->
+                  <Border DockPanel.Dock="Bottom" IsVisible="{Binding HasDetected}" MaxHeight="320"
+                          Background="#0F1320" BorderBrush="#2A303C" BorderThickness="0,1,0,0">
+                    <DockPanel>
+                      <Border DockPanel.Dock="Top" Padding="10,7" Background="#141A29">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <TextBlock Text="&#x2728;" FontSize="12" Foreground="#A78BFA" VerticalAlignment="Center" />
+                          <TextBlock Text="Detected while preaching" Foreground="#C7B6F5" FontSize="12"
+                                     FontWeight="SemiBold" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </Border>
+                      <ListBox x:Name="DetectedListBox"
+                               ItemsSource="{Binding DetectedResults}"
+                               SelectedItem="{Binding SelectedDetectedItem}"
+                               Tapped="OnTopicalListTapped"
+                               DoubleTapped="OnTopicalListDoubleTapped"
+                               Background="Transparent" BorderThickness="0" Padding="8,6"
+                               ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.Styles>
+                          <Style Selector="ListBoxItem">
+                            <Setter Property="Padding" Value="0" />
+                            <Setter Property="Margin" Value="0,3" />
+                            <Setter Property="Background" Value="Transparent" />
+                          </Style>
+                        </ListBox.Styles>
+                        <ListBox.ItemTemplate>
+                          <DataTemplate x:DataType="content:ContentItem">
+                            <Border Background="#161A22" CornerRadius="8" BorderBrush="#2A303C" BorderThickness="1"
+                                    Padding="10,7" ToolTip.Tip="Double-click to send this verse live">
+                              <Border.ContextMenu>
+                                <ContextMenu>
+                                  <MenuItem Header="Send to Live" Click="OnSendContentToLiveMenu" />
+                                  <MenuItem Header="Bookmark Verse" Click="OnBookmarkScriptureMenu"
+                                            IsVisible="{Binding IsScripture}" />
+                                  <MenuItem Header="Show Full Chapter" Click="OnShowFullChapterFromContent"
+                                            IsVisible="{Binding IsScripture}" />
+                                </ContextMenu>
+                              </Border.ContextMenu>
+                              <StackPanel Spacing="3">
+                                <Grid ColumnDefinitions="*,Auto">
+                                  <TextBlock Grid.Column="0" Text="{Binding Title}" Foreground="#ECEEF2" FontSize="12"
+                                             FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxLines="1" VerticalAlignment="Center" />
+                                  <Border Grid.Column="1" Background="#241B3A" CornerRadius="4" Padding="6,1" Margin="6,0,0,0"
+                                          VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Tag}" Foreground="#A78BFA" FontSize="9" FontWeight="Medium" />
+                                  </Border>
+                                </Grid>
+                                <TextBlock Text="{Binding Body}" Foreground="#9AA3B2" FontSize="11"
+                                           TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                              </StackPanel>
+                            </Border>
+                          </DataTemplate>
+                        </ListBox.ItemTemplate>
+                      </ListBox>
+                    </DockPanel>
                   </Border>
                   <ListBox x:Name="TopicalListBox"
                            ItemsSource="{Binding Results}"
@@ -1688,6 +1761,19 @@
             BorderBrush="#2A303C" BorderThickness="1" Padding="16,12"
             BoxShadow="0 8 28 0 #80000000">
       <TextBlock Text="{Binding UpdateMessage}" Foreground="#ECEEF2" FontSize="12" VerticalAlignment="Center" />
+    </Border>
+
+    <!-- WARNING TOAST (e.g. a referenced verse/chapter that isn't in the Bible) - auto-dismisses. -->
+    <Border Grid.RowSpan="5"
+            IsVisible="{Binding HasToast}"
+            HorizontalAlignment="Center" VerticalAlignment="Bottom"
+            Margin="0,0,0,64" Background="#2A2113" CornerRadius="10"
+            BorderBrush="#E0A23C" BorderThickness="1.5" Padding="16,12"
+            BoxShadow="0 8 28 0 #80000000">
+      <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+        <TextBlock Text="&#x26A0;" Foreground="#E0A23C" FontSize="14" VerticalAlignment="Center" />
+        <TextBlock Text="{Binding ToastMessage}" Foreground="#F4E4C2" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+      </StackPanel>
     </Border>
 
     <!-- UPGRADE PROMPT (reusable paywall dialog) — shown for trial/feature/usage upsell. -->

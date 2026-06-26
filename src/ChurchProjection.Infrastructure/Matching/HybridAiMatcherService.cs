@@ -42,6 +42,8 @@ public class HybridAiMatcherService : IAiMatcherService
         set => _fuzzy.IncludeContentMatches = value;
     }
 
+    public IObservable<ReferenceNotFound> ReferenceNotFound => _fuzzy.ReferenceNotFound;
+
     public void NoteSpokenSegment(string finalSegmentText) => _fuzzy.NoteSpokenSegment(finalSegmentText);
 
     public Task<List<AiSuggestion>> NavigateAsync(NavCommand command, CancellationToken cancellationToken = default)

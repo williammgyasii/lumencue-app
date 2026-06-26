@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
 using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using ChurchProjection.Core.Models.Content;
+using ChurchProjection.Core.Parsing;
 using ChurchProjection.Core.Services;
 using ReactiveUI;
 using Serilog;
@@ -45,6 +47,13 @@ public class ContentSearchViewModel : ViewModelBase
         ["BSB", "KJV", "NIV", "NKJV", "NLT", "ASV", "LSV", "WEB", "FBV", "DRA", "GNV", "RV", "T4T"];
 
     public ObservableCollection<ContentItem> Results { get; } = [];
+
+    private readonly Subject<string> _invalidReference = new();
+
+    /// <summary>Emits a ready-to-show message when a typed query parses as a real reference but returns
+    /// no scripture (e.g. "Genesis 99"). The operator shell turns it into a transient toast. Plain
+    /// keyword searches that simply find nothing do not fire this.</summary>
+    public IObservable<string> InvalidReference => _invalidReference;
 
     public ContentSearchViewModel(IContentLibraryService contentLibrary)
     {
@@ -109,7 +118,8 @@ public class ContentSearchViewModel : ViewModelBase
             Results.Add(new ContentItem
             {
                 Type = ContentItemType.Song,
-                Title = $"{song.Title} — {section.Label}",
+                // Title is just the song name; the section (Verse 5 / Chorus …) shows via the Tag badge.
+                Title = song.Title,
                 Subtitle = song.Artist ?? "",
                 Body = section.Text,
                 Tag = section.Label,
@@ -140,6 +150,15 @@ public class ContentSearchViewModel : ViewModelBase
         {
             var wholeChapter = new ScriptureReference(book, chapter, VerseStart: 1, VerseEnd: ScriptureReference.WholeChapterSentinel);
             var verses = await _contentLibrary.GetOrFetchVersesAsync(wholeChapter, SelectedTranslation);
+
+            // Preloading a chapter that doesn't exist (e.g. auto-loaded from a mis-heard reference)
+            // resolves to nothing — warn rather than silently showing an empty list.
+            if (verses.Count == 0)
+            {
+                var notice = InvalidReferenceNotice.For($"{book} {chapter}", hadResults: false);
+                if (notice is not null)
+                    _invalidReference.OnNext(notice);
+            }
 
             Results.Clear();
             ContentItem? origin = null;
@@ -173,6 +192,22 @@ public class ContentSearchViewModel : ViewModelBase
         }
     }
 
+    /// <summary>Wipes the results list (and search box) without kicking off a fresh "load all" search.
+    /// Used by the operator's Clear button when a service has piled up a lot of looked-up verses.</summary>
+    public void ClearResults()
+    {
+        _searchCts?.Cancel();
+        _searchCts?.Dispose();
+        _searchCts = null;
+
+        Results.Clear();
+        SelectedItem = null;
+
+        // Suppress the resulting empty-query search so we just clear rather than reload everything.
+        _suppressedQuery = string.Empty;
+        SearchQuery = string.Empty;
+    }
+
     private async Task RunSearchAsync(string query)
     {
         // Latest-wins: cancel any search still running for a previous query.
@@ -197,6 +232,12 @@ public class ContentSearchViewModel : ViewModelBase
             var scriptures = await _contentLibrary.SearchScripturesAsync(query, SelectedTranslation, token);
             var songs = await _contentLibrary.SearchSongsAsync(query, token);
             if (token.IsCancellationRequested) return;
+
+            // A query that reads as a concrete reference but matched no scripture is a non-existent
+            // verse/chapter (e.g. "John 99"); a plain keyword search with no hits never trips this.
+            var notice = InvalidReferenceNotice.For(query, scriptures.Count > 0);
+            if (notice is not null)
+                _invalidReference.OnNext(notice);
 
             Results.Clear();
 

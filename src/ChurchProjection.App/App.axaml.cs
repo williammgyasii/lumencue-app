@@ -170,6 +170,7 @@ public class App : Application
         services.AddSingleton<IAiMatcherService, HybridAiMatcherService>();
         services.AddSingleton<ISuggestionEngine, SuggestionEngine>();
         services.AddSingleton<IScriptureSearchService, ScriptureSearchService>();
+        services.AddSingleton<IScriptureParaphraseWatcher, ScriptureParaphraseWatcher>();
         services.AddSingleton<ISongSearchService, SongSearchService>();
         services.AddSingleton<IUpdateService>(new VelopackUpdateService(config));
         services.AddSingleton<OperatorViewModel>();

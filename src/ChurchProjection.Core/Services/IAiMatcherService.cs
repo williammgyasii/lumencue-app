@@ -49,7 +49,19 @@ public interface IAiMatcherService
     /// refined verse); otherwise an empty list. Fed from the per-utterance segment stream.
     /// </summary>
     Task<List<AiSuggestion>> AccumulateSpokenAsync(string finalSegmentText, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Fires when a spoken reference parsed to a real book + chapter but resolved to no verses at all
+    /// (not even the chapter exists) — i.e. the preacher named a passage that isn't in the Bible. The
+    /// UI surfaces this as a transient "doesn't exist" toast. Already de-duplicated so a reference
+    /// repeated across sliding transcript windows fires at most once per short window.
+    /// </summary>
+    IObservable<ReferenceNotFound> ReferenceNotFound { get; }
 }
+
+/// <summary>A scripture reference that was requested but does not exist in the Bible.</summary>
+/// <param name="Reference">Human-readable reference, e.g. "John 99:5".</param>
+public record ReferenceNotFound(string Reference);
 
 public record AiSuggestion(
     string ContentId,

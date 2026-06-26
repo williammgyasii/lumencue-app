@@ -35,6 +35,8 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     private readonly BibleCacheService _bibleCache;
     private readonly IThemeService _themes;
     private readonly IScriptureSearchService _scriptureSearch;
+    private readonly IScriptureParaphraseWatcher _paraphraseWatcher;
+    private CancellationTokenSource? _paraphraseCts;
     private readonly ITranscriptionService _transcriptionService;
     private readonly IContentLibraryService _contentLibrary;
     private readonly IProPresenterService _proPresenter;
@@ -47,6 +49,11 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
 
     // The scripture reference currently shown live, so a translation switch can re-render it.
     private ScriptureReference? _liveScriptureRef;
+
+    // The chapter we've already auto-loaded into the Scripture tab, so projecting another verse from
+    // the same chapter doesn't reload it. Lets the operator instantly hop to adjacent verses (the
+    // preacher's "give me 35 … 34 … 37" flow) without re-fetching.
+    private (string Book, int Chapter)? _preloadedChapter;
 
     // The content/suggestion item currently highlighted as live in the operator UI, so we can
     // clear its ring when a different item goes live.
@@ -91,6 +98,8 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
 
     private readonly IUpdateService? _updates;
     private IDisposable? _updateMessageTimer;
+    private IDisposable? _toastTimer;
+    private string? _toastMessage;
     private bool _updateAvailable;
     private string _updateVersion = string.Empty;
     private string? _updateMessage;
@@ -176,6 +185,32 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     }
 
     public bool HasUpdateMessage => !string.IsNullOrEmpty(_updateMessage);
+
+    /// <summary>Transient warning toast (e.g. a referenced verse/chapter that isn't in the Bible);
+    /// auto-clears after a few seconds.</summary>
+    public string? ToastMessage
+    {
+        get => _toastMessage;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _toastMessage, value);
+            this.RaisePropertyChanged(nameof(HasToast));
+        }
+    }
+
+    public bool HasToast => !string.IsNullOrEmpty(_toastMessage);
+
+    // Shows a transient warning toast. Re-showing resets the dismiss timer so a burst keeps the
+    // latest message visible for its full duration rather than vanishing early.
+    private void ShowToast(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message)) return;
+        ToastMessage = message;
+        _toastTimer?.Dispose();
+        _toastTimer = Observable.Timer(TimeSpan.FromSeconds(4))
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(_ => ToastMessage = null);
+    }
 
     /// <summary>True while a check is in flight (About page spinner / disabled buttons).</summary>
     public bool IsCheckingForUpdate
@@ -851,6 +886,8 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     public ReactiveCommand<Unit, Unit> AddAllToQueueCommand { get; }
     public ReactiveCommand<Unit, Unit> ShowLibraryTabCommand { get; }
     public ReactiveCommand<Unit, Unit> ShowSuggestionsTabCommand { get; }
+    public ReactiveCommand<Unit, Unit> ClearSuggestionsCommand { get; }
+    public ReactiveCommand<Unit, Unit> ClearResultsCommand { get; }
     public ReactiveCommand<Unit, Unit> ShowTopicalTabCommand { get; }
     public ReactiveCommand<Unit, Unit> ShowSongsTabCommand { get; }
     public ReactiveCommand<Unit, Unit> ShowBibleModeCommand { get; }
@@ -883,6 +920,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         BibleCacheService bibleCache,
         IThemeService themes,
         IScriptureSearchService scriptureSearch,
+        IScriptureParaphraseWatcher paraphraseWatcher,
         ISongSearchService songSearch,
         IProPresenterService proPresenter,
         ILiveBackgroundService liveBackground,
@@ -898,6 +936,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         _bibleCache = bibleCache;
         _themes = themes;
         _scriptureSearch = scriptureSearch;
+        _paraphraseWatcher = paraphraseWatcher;
         _transcriptionService = transcriptionService;
         _contentLibrary = contentLibrary;
         _proPresenter = proPresenter;
@@ -964,6 +1003,8 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         TogglePlaylistsSectionCommand = ReactiveCommand.Create(() => { PlaylistsExpanded = !PlaylistsExpanded; });
         ShowLibraryTabCommand = ReactiveCommand.Create(() => { SelectedContentTab = 0; });
         ShowSuggestionsTabCommand = ReactiveCommand.Create(() => { SelectedContentTab = SuggestionsTabIndex; });
+        ClearSuggestionsCommand = ReactiveCommand.Create(() => { Transcription.Suggestions.Clear(); HasNewSuggestions = false; });
+        ClearResultsCommand = ReactiveCommand.Create(() => { ContentSearch.ClearResults(); _preloadedChapter = null; });
         ShowTopicalTabCommand = ReactiveCommand.Create(() => { SelectedContentTab = TopicalTabIndex; });
         ShowSongsTabCommand = ReactiveCommand.Create(() => { SelectedContentTab = SongsTabIndex; });
         ShowBibleModeCommand = ReactiveCommand.Create(EnterBibleMode);
@@ -982,6 +1023,24 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         _transcriptionService.Segments
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(OnFollowSegment);
+
+        // Continuous paraphrase detection: while the mic is live, scan finalized utterances for verses
+        // the preacher is paraphrasing and surface confident matches in the Find Scripture tab's
+        // detected lane. Throttled to settle on whole sentences; the heavy lifting + precision rules
+        // live in the watcher. Tied entirely to listening — when Segments stops, so does detection.
+        _transcriptionService.Segments
+            .Throttle(TimeSpan.FromMilliseconds(600))
+            .Subscribe(s => _ = DetectParaphraseAsync(s.Text));
+
+        // "Doesn't exist" warnings → transient toast. Two sources, same UX: spoken references the AI
+        // matcher resolved to nothing, and operator-typed references that returned no scripture.
+        _aiMatcher.ReferenceNotFound
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(r => ShowToast($"{r.Reference} isn't in the Bible"));
+
+        ContentSearch.InvalidReference
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(ShowToast);
 
         // Reflect mic state in the follow status (e.g. "start the mic to begin" → "Listening…").
         Transcription.WhenAnyValue(x => x.IsListening)
@@ -1223,6 +1282,23 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         _liveSuggestionItem = item;
         item.IsLive = true;
         StatusText = $"Live: {item.Title}";
+
+        // Preload the whole chapter into the Scripture tab so the operator can instantly hop to nearby
+        // verses the preacher calls out next (e.g. "now give me 34 … 37") without waiting on the AI.
+        PreloadChapter(_liveScriptureRef);
+    }
+
+    /// <summary>Loads the chapter behind a just-projected verse into the Scripture tab, quietly (without
+    /// stealing the operator's current tab). Skips work if that chapter is already loaded.</summary>
+    private void PreloadChapter(ScriptureReference? reference)
+    {
+        if (reference is null) return;
+
+        var key = (reference.Book, reference.Chapter);
+        if (_preloadedChapter == key) return;
+        _preloadedChapter = key;
+
+        _ = ContentSearch.LoadFullChapterAsync(reference.Book, reference.Chapter, reference.VerseStart);
     }
 
     /// <summary>Tracks the live slide's type and refreshes the program-preview theme picker so it
@@ -1339,6 +1415,42 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         SelectedContentTab = 0;
         StatusText = $"Loading {book} {chapter}...";
         _ = ContentSearch.LoadFullChapterAsync(book, chapter, originVerse);
+    }
+
+    // Runs one finalized utterance through the paraphrase watcher (latest-wins: a fresher utterance
+    // cancels an in-flight scan). Confident matches land in the Find Scripture tab's detected lane.
+    private async Task DetectParaphraseAsync(string text)
+    {
+        CancellationToken token;
+        try
+        {
+            _paraphraseCts?.Cancel();
+            _paraphraseCts?.Dispose();
+            var cts = new CancellationTokenSource();
+            _paraphraseCts = cts;
+            token = cts.Token;
+        }
+        catch (ObjectDisposedException) { return; }
+
+        try
+        {
+            var translation = ContentSearch.SelectedTranslation;
+            var detections = await _paraphraseWatcher.DetectAsync(text, translation, token).ConfigureAwait(false);
+            if (detections.Count == 0 || token.IsCancellationRequested) return;
+
+            Dispatcher.UIThread.Post(() =>
+            {
+                TopicalSearch.AddDetections(detections);
+                // Nudge the "Find Scripture" tab badge if the operator is looking elsewhere.
+                if (SelectedContentTab != TopicalTabIndex)
+                    HasNewTopical = true;
+            });
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Live paraphrase detection failed");
+        }
     }
 
     // Routes a spoken utterance to its handler: a translation switch ("...in the King James") or a
@@ -1751,7 +1863,9 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     private static ContentItem SectionToItem(Song song, SongSection section) => new()
     {
         Type = ContentItemType.Song,
-        Title = $"{song.Title} — {section.Label}",
+        // Title is just the song name; the section (Verse 5 / Chorus …) is carried in Tag and
+        // surfaced as a separate badge, so the live label and projector don't read "Song — Verse 5".
+        Title = song.Title,
         Subtitle = song.Artist ?? "",
         Body = section.Text,
         Tag = section.Label,
