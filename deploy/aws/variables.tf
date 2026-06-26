@@ -29,13 +29,13 @@ variable "image_tag" {
 variable "db_public_access" {
   description = "TEMP: expose RDS publicly, restricted to admin_cidr only. Set false before onboarding real users."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "admin_cidrs" {
   description = "Public IPs in CIDR form (e.g. 1.2.3.4/32) allowed to reach RDS while db_public_access is true. Add entries (home, work); never swap."
   type        = list(string)
-  default     = []
+  default     = ["50.223.237.104/32"]
 }
 
 variable "domain_name" {
