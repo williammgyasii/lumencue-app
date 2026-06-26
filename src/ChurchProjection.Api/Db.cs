@@ -220,6 +220,7 @@ public static class Db
             await SeedAsync(conn, logger);
             await conn.ExecuteAsync("delete from schema_meta; insert into schema_meta (version) values (@V);",
                 new { V = SchemaVersion });
+            await EnsureMasterTenantAsync(conn, logger);
 
             logger.LogInformation("Schema rebuilt to version {Version}.", SchemaVersion);
             return;
@@ -229,7 +230,65 @@ public static class Db
         // then apply additive migrations (idempotent) so schema evolves without data loss.
         await conn.ExecuteAsync(Schema);
         await conn.ExecuteAsync(Migrations);
+        await EnsureMasterTenantAsync(conn, logger);
         logger.LogInformation("Schema ready (version {Version}); migrations applied.", SchemaVersion);
+    }
+
+    // The in-house "unlimited" admin tenant. Created idempotently on every startup so it always
+    // exists regardless of seed history, on the master plan with a large seat/STT allowance.
+    // Sign in with organization='lumen', branch='master'.
+    private const string MasterOrgId = "lumen";
+    private const string MasterBranchId = "master";
+    private const string MasterPassword = "LumenMaster2026!";
+    private const int MasterSeats = 999;
+    private const string MasterFeatures = "{\"video_backgrounds\":true,\"shared_library\":true,\"multi_campus\":true}";
+
+    private static async Task EnsureMasterTenantAsync(NpgsqlConnection conn, ILogger logger)
+    {
+        // The master plan must exist for the subscription FK; keep it authoritative.
+        await conn.ExecuteAsync(
+            """
+            insert into plans (code, name, seats_default, stt_minutes_per_month, price_usd_month, features)
+            values ('master', 'Master', 999, 100000, 0, @Features::jsonb)
+            on conflict (code) do nothing
+            """,
+            new { Features = MasterFeatures });
+
+        await conn.ExecuteAsync(
+            "insert into organizations (id, name) values (@Org, 'LumenCue') on conflict (id) do nothing",
+            new { Org = MasterOrgId });
+
+        // Only set the password on first creation, so a later rotation isn't clobbered on redeploy.
+        await conn.ExecuteAsync(
+            """
+            insert into branches (organization_id, id, name, password_hash)
+            values (@Org, @Branch, 'Master', @Hash)
+            on conflict (organization_id, id) do nothing
+            """,
+            new { Org = MasterOrgId, Branch = MasterBranchId, Hash = Passwords.Hash(MasterPassword) });
+
+        await conn.ExecuteAsync(
+            """
+            insert into subscriptions (organization_id, branch_id, plan_code, quantity, status, current_period_end)
+            values (@Org, @Branch, 'master', @Qty, 'active', now() + interval '3650 days')
+            on conflict (organization_id, branch_id) do update set
+                plan_code = 'master', quantity = @Qty, status = 'active',
+                current_period_end = now() + interval '3650 days', updated_at = now()
+            """,
+            new { Org = MasterOrgId, Branch = MasterBranchId, Qty = MasterSeats });
+
+        await conn.ExecuteAsync(
+            """
+            insert into entitlements (organization_id, branch_id, seats, stt_minutes_per_month, features)
+            values (@Org, @Branch, @Seats, 100000, @Features::jsonb)
+            on conflict (organization_id, branch_id) do update set
+                seats = @Seats, stt_minutes_per_month = 100000, features = @Features::jsonb, updated_at = now()
+            """,
+            new { Org = MasterOrgId, Branch = MasterBranchId, Seats = MasterSeats, Features = MasterFeatures });
+
+        logger.LogInformation(
+            "Ensured master tenant org='{Org}' branch='{Branch}' (master plan, {Seats} seats).",
+            MasterOrgId, MasterBranchId, MasterSeats);
     }
 
     private static async Task SeedAsync(NpgsqlConnection conn, ILogger logger)
