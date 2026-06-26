@@ -11,6 +11,12 @@ public static class ReleaseNotes
 {
     private static readonly Dictionary<string, string[]> Notes = new()
     {
+        ["0.7.18"] =
+        [
+            "More Bible translations to choose from — The Passion Translation, The Living Bible, ESV, NET, Good News, Amplified (Classic), Easy-to-Read and ASV.",
+            "Pick a translation once and it downloads in the background, then works fully offline like the rest.",
+            "Verses detected while you're preaching now have their own \"Paraphrases\" tab, so they no longer crowd your scripture search.",
+        ],
         ["0.7.17"] =
         [
             "Sign in is now optional — the app still opens straight to your library, with a new \"Sign in\" button up top whenever you're ready.",
