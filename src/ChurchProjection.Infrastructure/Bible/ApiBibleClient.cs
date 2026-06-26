@@ -14,8 +14,13 @@ public partial class ApiBibleClient : IBibleApiService
 
     private readonly HttpClient _http;
 
-    [GeneratedRegex(@"\[(\d+)\]")]
+    // Matches a verse-number marker, including a grouped span like "[1-3]" that paraphrase
+    // translations (MSG, sometimes AMP/NLT) emit when several verses are merged into one block.
+    [GeneratedRegex(@"\[(\d+)(?:-(\d+))?\]")]
     private static partial Regex VerseMarkerRegex();
+
+    // Guards against a malformed marker (e.g. "[1-200]") fanning out into an absurd number of rows.
+    private const int MaxGroupSpan = 50;
 
     // Confirmed bible_ids for the API.Bible Pro plan (verified live against /v1/bibles).
     private static readonly Dictionary<string, string> TranslationIds = new(StringComparer.OrdinalIgnoreCase)
@@ -168,7 +173,15 @@ public partial class ApiBibleClient : IBibleApiService
         }
     }
 
-    private static List<ScripturePassage> ParseChapterContent(string content, string book, int chapter, string translation, string chapterId)
+    /// <summary>
+    /// Splits a chapter's text content into one <see cref="ScripturePassage"/> per verse. A grouped
+    /// marker like "[1-3]" (used by paraphrase translations such as MSG, where verses are merged into
+    /// a single block) is expanded into a row for each verse in the span — every row carrying that
+    /// block's text. This keeps each row a normal single verse, so asking for any verse inside the
+    /// group ("Psalm 109:2") still resolves to the group's text instead of falling back to the whole
+    /// chapter. Public for unit testing of the marker parsing.
+    /// </summary>
+    public static List<ScripturePassage> ParseChapterContent(string content, string book, int chapter, string translation, string chapterId)
     {
         var matches = VerseMarkerRegex().Matches(content);
         if (matches.Count == 0)
@@ -177,8 +190,17 @@ public partial class ApiBibleClient : IBibleApiService
         var verses = new List<ScripturePassage>(matches.Count);
         for (int i = 0; i < matches.Count; i++)
         {
-            if (!int.TryParse(matches[i].Groups[1].Value, out var verseNum))
+            if (!int.TryParse(matches[i].Groups[1].Value, out var verseStart))
                 continue;
+
+            var verseEnd = verseStart;
+            if (matches[i].Groups[2].Success
+                && int.TryParse(matches[i].Groups[2].Value, out var groupEnd)
+                && groupEnd >= verseStart
+                && groupEnd - verseStart <= MaxGroupSpan)
+            {
+                verseEnd = groupEnd;
+            }
 
             var textStart = matches[i].Index + matches[i].Length;
             var textEnd = i + 1 < matches.Count ? matches[i + 1].Index : content.Length;
@@ -186,16 +208,19 @@ public partial class ApiBibleClient : IBibleApiService
             if (text.Length == 0)
                 continue;
 
-            verses.Add(new ScripturePassage
+            for (var verseNum = verseStart; verseNum <= verseEnd; verseNum++)
             {
-                Translation = translation,
-                Book = book,
-                Chapter = chapter,
-                VerseStart = verseNum,
-                VerseEnd = null,
-                Text = text,
-                ApiBibleId = $"{chapterId}.{verseNum}",
-            });
+                verses.Add(new ScripturePassage
+                {
+                    Translation = translation,
+                    Book = book,
+                    Chapter = chapter,
+                    VerseStart = verseNum,
+                    VerseEnd = null,
+                    Text = text,
+                    ApiBibleId = $"{chapterId}.{verseNum}",
+                });
+            }
         }
 
         return verses;
@@ -207,7 +232,7 @@ public partial class ApiBibleClient : IBibleApiService
     private static string CleanText(string raw)
     {
         var text = Regex.Replace(raw, @"\s+", " ").Trim();
-        text = Regex.Replace(text, @"\[\d+\]", "");
+        text = Regex.Replace(text, @"\[\d+(?:-\d+)?\]", "");
         text = Regex.Replace(text, @"^[¶\s]+", "");
         return text.Trim();
     }

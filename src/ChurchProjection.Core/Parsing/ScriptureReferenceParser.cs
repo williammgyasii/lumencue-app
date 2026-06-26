@@ -345,9 +345,54 @@ public static partial class ScriptureReferenceParser
         lower = Regex.Replace(lower, @"\b(the book of|book of)\b", " ");
 
         lower = ReplaceSpokenNumbers(lower);
+        lower = CoalesceSpelledDigits(lower);
 
         lower = Regex.Replace(lower, @"\s+", " ").Trim();
         return lower;
+    }
+
+    /// <summary>
+    /// Joins a run of consecutive single spoken digits into one number when the speaker is clearly
+    /// spelling a number out digit-by-digit — e.g. "1 0 9" (spoken "one zero nine") → "109",
+    /// "1 1 9" → "119". Speech engines often emit these as separate single-digit tokens, which the
+    /// positional parser would otherwise read as chapter+verse and miss the real reference.
+    ///
+    /// Deliberately conservative: a run is merged only when it contains a 0 (never a valid standalone
+    /// chapter or verse) or is three-or-more digits long. A two-digit run with no zero ("3 6") is left
+    /// untouched so a genuine "chapter three verse six" is not mangled into 36.
+    /// </summary>
+    public static string CoalesceSpelledDigits(string text)
+    {
+        var tokens = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var result = new List<string>();
+        var run = new List<string>();
+
+        void FlushRun()
+        {
+            if (run.Count == 0) return;
+            var hasZero = run.Contains("0");
+            if (run.Count >= 3 || (run.Count >= 2 && hasZero))
+                result.Add(string.Concat(run));
+            else
+                result.AddRange(run);
+            run.Clear();
+        }
+
+        foreach (var token in tokens)
+        {
+            if (token.Length == 1 && char.IsDigit(token[0]))
+            {
+                run.Add(token);
+            }
+            else
+            {
+                FlushRun();
+                result.Add(token);
+            }
+        }
+        FlushRun();
+
+        return string.Join(" ", result);
     }
 
     /// <summary>Converts spoken cardinal numbers ("twenty three") into digits ("23"), leaving other

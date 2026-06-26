@@ -209,6 +209,9 @@ public sealed class SpokenReferenceBuilder
         lower = Regex.Replace(lower, @"\b(second|2nd)\b", "2");
         lower = Regex.Replace(lower, @"\b(third|3rd)\b", "3");
         lower = ScriptureReferenceParser.ReplaceSpokenNumbers(lower);
+        // A number spelled digit-by-digit ("one zero nine" → "1 0 9") is glued back into one number
+        // (109) before the positional scan, so a chapter/verse like Psalm 109 is not lost as 1:9.
+        lower = ScriptureReferenceParser.CoalesceSpelledDigits(lower);
         // A hyphen between two numbers is a spoken/smart-formatted range ("verse 1-7"); turn it into
         // an explicit "to" connector so the scanner reads it as start→end.
         lower = Regex.Replace(lower, @"(\d)\s*[-\u2013\u2014]\s*(\d)", "$1 to $2");
