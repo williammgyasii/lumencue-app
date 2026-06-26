@@ -271,7 +271,11 @@
           <Button Classes="ghost" Content="Pre-service" Tapped="OnPreServiceClicked" Padding="10,6" FontSize="12"
                   ToolTip.Tip="Put a live countdown or clock on the screen before the service starts" />
           <Button Classes="ghost" Content="Settings" Tapped="OnSettingsClicked" Padding="10,6" FontSize="12" />
+          <Button Classes="ghost" Content="Sign in" Command="{Binding SignInCommand}" Padding="10,6" FontSize="12"
+                  IsVisible="{Binding !IsSignedIn}"
+                  ToolTip.Tip="Sign in to your branch to enable live AI transcription, premium Bible translations and sync" />
           <Button Classes="ghost" Content="Sign out" Command="{Binding SignOutCommand}" Padding="10,6" FontSize="12"
+                  IsVisible="{Binding IsSignedIn}"
                   ToolTip.Tip="Release this device's seat and return to the sign-in screen" />
           <Button Classes="ghost" Command="{Binding ToggleScreenOutputCommand}" FontSize="12" Padding="10,6"
                   ToolTip.Tip="Turn the projector screen output on/off. When off, the physical screen reverts to the desktop / another source — different from Blank, which keeps the feed live but shows black.">

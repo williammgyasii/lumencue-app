@@ -336,9 +336,17 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     /// <summary>Raised when the operator chooses Sign out; the app layer clears the session and re-gates.</summary>
     public event Action? SignOutRequested;
 
+    /// <summary>Raised when the operator chooses Sign in from local mode; the app layer opens sign-in.</summary>
+    public event Action? SignInRequested;
+
+    private bool _isSignedIn;
+    /// <summary>True when running on a real cloud session (show "Sign out"); false in local mode (show "Sign in").</summary>
+    public bool IsSignedIn { get => _isSignedIn; private set => this.RaiseAndSetIfChanged(ref _isSignedIn, value); }
+
     /// <summary>Updates the displayed account/seat status after sign-in.</summary>
     public void SetAccount(string organizationName, string branchName, int seatsUsed, int seatCount)
     {
+        IsSignedIn = !string.IsNullOrWhiteSpace(organizationName);
         if (string.IsNullOrWhiteSpace(organizationName))
         {
             AccountLabel = "Local library";
@@ -849,6 +857,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     public ReactiveCommand<Unit, Unit> ShowSongsModeCommand { get; }
     public ReactiveCommand<Unit, Unit> ShowMediaModeCommand { get; }
     public ReactiveCommand<Unit, Unit> SignOutCommand { get; }
+    public ReactiveCommand<Unit, Unit> SignInCommand { get; }
 
     /// <summary>Opens the generic upgrade prompt (from the top-bar Upgrade button / status banner).</summary>
     public ReactiveCommand<Unit, Unit> UpgradeCommand { get; }
@@ -992,6 +1001,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         syncScheduler.StatusChanged += info =>
             RxApp.MainThreadScheduler.Schedule(() => SyncStatus = DescribeSync(info));
         SignOutCommand = ReactiveCommand.Create(() => SignOutRequested?.Invoke());
+        SignInCommand = ReactiveCommand.Create(() => SignInRequested?.Invoke());
 
         UpgradeCommand = ReactiveCommand.Create(() => RequestUpgrade(null));
         RequestUpgradeCommand = ReactiveCommand.Create<string?>(RequestUpgrade);

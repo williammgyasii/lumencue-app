@@ -1,4 +1,5 @@
 using ChurchProjection.Core.Models.Tenancy;
+using ChurchProjection.Core.Services;
 using Xunit;
 
 namespace ChurchProjection.Parsing.Tests;
@@ -33,13 +34,12 @@ public class LocalSessionTests
     }
 
     [Fact]
-    public void Master_is_offline_and_names_the_account_for_the_top_bar()
+    public void Master_is_offline_on_the_local_default_org_with_no_token()
     {
         var session = LocalSession.Master();
 
-        Assert.Equal("", session.Token);                       // no cloud seat token
-        Assert.False(string.IsNullOrWhiteSpace(session.OrganizationName));
-        Assert.False(string.IsNullOrWhiteSpace(session.BranchName));
+        Assert.Equal("", session.Token);                                    // no cloud seat token
+        Assert.Equal(ITenantContext.DefaultOrganizationId, session.OrganizationId); // local library scope
         Assert.True(session.SeatCount > 0);
     }
 }

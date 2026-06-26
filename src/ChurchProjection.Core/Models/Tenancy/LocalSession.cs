@@ -18,9 +18,11 @@ public static class LocalSession
     {
         Token = "",
         OrganizationId = ITenantContext.DefaultOrganizationId,
-        OrganizationName = "LumenCue",
+        // Blank org/branch names so the operator shows the neutral "Local library" label (and the
+        // optional "Sign in" affordance), rather than implying a real signed-in account.
+        OrganizationName = "",
         BranchId = "local",
-        BranchName = "Local",
+        BranchName = "",
         DeviceId = "",
         SeatCount = 999,
         SeatsUsed = 1,

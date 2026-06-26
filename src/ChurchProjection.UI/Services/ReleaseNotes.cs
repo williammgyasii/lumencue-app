@@ -11,6 +11,11 @@ public static class ReleaseNotes
 {
     private static readonly Dictionary<string, string[]> Notes = new()
     {
+        ["0.7.17"] =
+        [
+            "Sign in is now optional — the app still opens straight to your library, with a new \"Sign in\" button up top whenever you're ready.",
+            "Sign in to turn on live AI transcription, premium Bible translations and library sync across your machines.",
+        ],
         ["0.7.16"] =
         [
             "The app now opens straight to your library — no sign-in needed to get started.",

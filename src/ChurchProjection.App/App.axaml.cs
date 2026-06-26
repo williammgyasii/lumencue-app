@@ -277,11 +277,10 @@ public class App : Application
         var local = LocalSession.Master();
         if (prior is not null && !string.IsNullOrWhiteSpace(prior.OrganizationId))
         {
-            // Preserve an existing church's content scoping; just grant full local access.
+            // Preserve an existing church's library scoping, but keep the account display neutral
+            // ("Local library" + "Sign in") since there's no real seat token in local mode.
             local.OrganizationId = prior.OrganizationId;
-            local.OrganizationName = string.IsNullOrWhiteSpace(prior.OrganizationName) ? local.OrganizationName : prior.OrganizationName;
-            local.BranchName = string.IsNullOrWhiteSpace(prior.BranchName) ? local.BranchName : prior.BranchName;
-            _services.GetRequiredService<ITenantContext>().Set(prior.OrganizationId, local.OrganizationName, prior.BranchId);
+            _services.GetRequiredService<ITenantContext>().Set(prior.OrganizationId, prior.OrganizationName, prior.BranchId);
         }
 
         _services.GetRequiredService<IEntitlementService>().Update(local);
@@ -320,6 +319,7 @@ public class App : Application
         if (!_signOutWired)
         {
             operatorVm.SignOutRequested += OnSignOutRequested;
+            operatorVm.SignInRequested += OnSignInRequested;
             _signOutWired = true;
         }
 
@@ -391,6 +391,24 @@ public class App : Application
         catch (Exception ex)
         {
             Log.Error(ex, "Sign-out failed");
+        }
+    }
+
+    /// <summary>From local (signed-out) mode, opens the sign-in window so the church can claim a seat
+    /// and unlock cloud features (live AI transcription, premium Bible, sync). A successful sign-in
+    /// reopens the operator on the real session via <see cref="ShowSignIn"/>'s SignedIn handler.</summary>
+    private void OnSignInRequested()
+    {
+        if (_services is null) return;
+        try
+        {
+            _services.GetRequiredService<ISyncScheduler>().Stop();     // local sync (no token) — stop before re-gating
+            ShowSignIn();                                              // open sign-in before closing operator (keep >= 1 window)
+            _services.GetRequiredService<WindowManager>().CloseAll();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Sign-in (from local mode) failed to open");
         }
     }
 
