@@ -26,6 +26,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     private const int SuggestionsTabIndex = 1;
     private const int TopicalTabIndex = 2;
     private const int SongsTabIndex = 3;
+    private const int ParaphrasesTabIndex = 4;
     private static readonly TimeSpan PrewarmCacheWait = TimeSpan.FromSeconds(2);
 
     private readonly IProjectionService _projection;
@@ -84,6 +85,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     private int _aiSuggestionCount;
     private bool _hasNewSuggestions;
     private bool _hasNewTopical;
+    private bool _hasNewParaphrases;
     private string _projectorFontSize = "Large";
     private string _projectorBackground = "Black";
     private string _projectorLayout = "Full Screen";
@@ -634,10 +636,12 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
             this.RaiseAndSetIfChanged(ref _selectedContentTab, value);
             if (value == SuggestionsTabIndex) HasNewSuggestions = false;
             if (value == TopicalTabIndex) HasNewTopical = false;
+            if (value == ParaphrasesTabIndex) HasNewParaphrases = false;
             if (value == SongsTabIndex) _ = SongSearch.RefreshAsync();
             this.RaisePropertyChanged(nameof(IsLibraryTab));
             this.RaisePropertyChanged(nameof(IsSuggestionsTab));
             this.RaisePropertyChanged(nameof(IsTopicalTab));
+            this.RaisePropertyChanged(nameof(IsParaphrasesTab));
             this.RaisePropertyChanged(nameof(IsSongsTab));
             this.RaisePropertyChanged(nameof(ShowScriptureList));
             this.RaisePropertyChanged(nameof(ShowNowSinging));
@@ -647,6 +651,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     public bool IsLibraryTab => SelectedContentTab == 0;
     public bool IsSuggestionsTab => SelectedContentTab == SuggestionsTabIndex;
     public bool IsTopicalTab => SelectedContentTab == TopicalTabIndex;
+    public bool IsParaphrasesTab => SelectedContentTab == ParaphrasesTabIndex;
     public bool IsSongsTab => SelectedContentTab == SongsTabIndex;
 
     // ───────────────────────── Top-level workspace mode (Bible vs Songs) ─────────────────────────
@@ -730,6 +735,14 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     {
         get => _hasNewTopical;
         set => this.RaiseAndSetIfChanged(ref _hasNewTopical, value);
+    }
+
+    /// <summary>Lights the Paraphrases tab badge when a verse is auto-detected from speech while the
+    /// operator is on another tab. Cleared when they open the Paraphrases tab.</summary>
+    public bool HasNewParaphrases
+    {
+        get => _hasNewParaphrases;
+        set => this.RaiseAndSetIfChanged(ref _hasNewParaphrases, value);
     }
 
     public int AiSuggestionCount
@@ -889,6 +902,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     public ReactiveCommand<Unit, Unit> ClearSuggestionsCommand { get; }
     public ReactiveCommand<Unit, Unit> ClearResultsCommand { get; }
     public ReactiveCommand<Unit, Unit> ShowTopicalTabCommand { get; }
+    public ReactiveCommand<Unit, Unit> ShowParaphrasesTabCommand { get; }
     public ReactiveCommand<Unit, Unit> ShowSongsTabCommand { get; }
     public ReactiveCommand<Unit, Unit> ShowBibleModeCommand { get; }
     public ReactiveCommand<Unit, Unit> ShowSongsModeCommand { get; }
@@ -1006,6 +1020,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         ClearSuggestionsCommand = ReactiveCommand.Create(() => { Transcription.Suggestions.Clear(); HasNewSuggestions = false; });
         ClearResultsCommand = ReactiveCommand.Create(() => { ContentSearch.ClearResults(); _preloadedChapter = null; });
         ShowTopicalTabCommand = ReactiveCommand.Create(() => { SelectedContentTab = TopicalTabIndex; });
+        ShowParaphrasesTabCommand = ReactiveCommand.Create(() => { SelectedContentTab = ParaphrasesTabIndex; });
         ShowSongsTabCommand = ReactiveCommand.Create(() => { SelectedContentTab = SongsTabIndex; });
         ShowBibleModeCommand = ReactiveCommand.Create(EnterBibleMode);
         ShowSongsModeCommand = ReactiveCommand.Create(EnterSongsMode);
@@ -1441,9 +1456,9 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
             Dispatcher.UIThread.Post(() =>
             {
                 TopicalSearch.AddDetections(detections);
-                // Nudge the "Find Scripture" tab badge if the operator is looking elsewhere.
-                if (SelectedContentTab != TopicalTabIndex)
-                    HasNewTopical = true;
+                // Nudge the "Paraphrases" tab badge if the operator is looking elsewhere.
+                if (SelectedContentTab != ParaphrasesTabIndex)
+                    HasNewParaphrases = true;
             });
         }
         catch (OperationCanceledException) { }

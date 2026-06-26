@@ -679,6 +679,29 @@
                     <Border Height="2" VerticalAlignment="Bottom" Background="#38BDF8"
                             IsVisible="{Binding IsTopicalTab}" />
                   </Panel>
+                  <!-- AI Paraphrases tab (Bible mode): verses auto-detected from live preaching -->
+                  <Panel IsVisible="{Binding IsBibleMode}">
+                    <Button Command="{Binding ShowParaphrasesTabCommand}" Padding="16,10" CornerRadius="0"
+                            Background="Transparent" BorderThickness="0" Cursor="Hand">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="&#x2728;" FontSize="12" Foreground="#A78BFA" VerticalAlignment="Center" />
+                          <Panel>
+                            <TextBlock Text="Paraphrases" FontSize="13" FontWeight="SemiBold" Foreground="#ECEEF2"
+                                       IsVisible="{Binding IsParaphrasesTab}" />
+                            <TextBlock Text="Paraphrases" FontSize="13" FontWeight="SemiBold" Foreground="#6E7682"
+                                       IsVisible="{Binding !IsParaphrasesTab}" />
+                          </Panel>
+                        </StackPanel>
+                        <Border Background="#A78BFA" CornerRadius="10" Padding="7,2" VerticalAlignment="Center"
+                                IsVisible="{Binding HasNewParaphrases}">
+                          <TextBlock Text="{Binding TopicalSearch.DetectedResults.Count}" Foreground="White" FontSize="11" FontWeight="Bold" />
+                        </Border>
+                      </StackPanel>
+                    </Button>
+                    <Border Height="2" VerticalAlignment="Bottom" Background="#A78BFA"
+                            IsVisible="{Binding IsParaphrasesTab}" />
+                  </Panel>
                   <!-- Songs (lyric search) tab (Songs mode) -->
                   <Panel IsVisible="{Binding IsSongsMode}">
                     <Button Command="{Binding ShowSongsTabCommand}" Padding="16,10" CornerRadius="0"
@@ -1055,63 +1078,6 @@
                       <TextBlock Text="{Binding StatusText}" Foreground="#959DAB" FontSize="11" FontStyle="Italic" />
                     </StackPanel>
                   </Border>
-                  <!-- Detected-while-preaching lane: auto paraphrase matches, split from the manual
-                       results above so live detection never clobbers the operator's own search. -->
-                  <Border DockPanel.Dock="Bottom" IsVisible="{Binding HasDetected}" MaxHeight="320"
-                          Background="#0F1320" BorderBrush="#2A303C" BorderThickness="0,1,0,0">
-                    <DockPanel>
-                      <Border DockPanel.Dock="Top" Padding="10,7" Background="#141A29">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                          <TextBlock Text="&#x2728;" FontSize="12" Foreground="#A78BFA" VerticalAlignment="Center" />
-                          <TextBlock Text="Detected while preaching" Foreground="#C7B6F5" FontSize="12"
-                                     FontWeight="SemiBold" VerticalAlignment="Center" />
-                        </StackPanel>
-                      </Border>
-                      <ListBox x:Name="DetectedListBox"
-                               ItemsSource="{Binding DetectedResults}"
-                               SelectedItem="{Binding SelectedDetectedItem}"
-                               Tapped="OnTopicalListTapped"
-                               DoubleTapped="OnTopicalListDoubleTapped"
-                               Background="Transparent" BorderThickness="0" Padding="8,6"
-                               ScrollViewer.VerticalScrollBarVisibility="Auto">
-                        <ListBox.Styles>
-                          <Style Selector="ListBoxItem">
-                            <Setter Property="Padding" Value="0" />
-                            <Setter Property="Margin" Value="0,3" />
-                            <Setter Property="Background" Value="Transparent" />
-                          </Style>
-                        </ListBox.Styles>
-                        <ListBox.ItemTemplate>
-                          <DataTemplate x:DataType="content:ContentItem">
-                            <Border Background="#161A22" CornerRadius="8" BorderBrush="#2A303C" BorderThickness="1"
-                                    Padding="10,7" ToolTip.Tip="Double-click to send this verse live">
-                              <Border.ContextMenu>
-                                <ContextMenu>
-                                  <MenuItem Header="Send to Live" Click="OnSendContentToLiveMenu" />
-                                  <MenuItem Header="Bookmark Verse" Click="OnBookmarkScriptureMenu"
-                                            IsVisible="{Binding IsScripture}" />
-                                  <MenuItem Header="Show Full Chapter" Click="OnShowFullChapterFromContent"
-                                            IsVisible="{Binding IsScripture}" />
-                                </ContextMenu>
-                              </Border.ContextMenu>
-                              <StackPanel Spacing="3">
-                                <Grid ColumnDefinitions="*,Auto">
-                                  <TextBlock Grid.Column="0" Text="{Binding Title}" Foreground="#ECEEF2" FontSize="12"
-                                             FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxLines="1" VerticalAlignment="Center" />
-                                  <Border Grid.Column="1" Background="#241B3A" CornerRadius="4" Padding="6,1" Margin="6,0,0,0"
-                                          VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Tag}" Foreground="#A78BFA" FontSize="9" FontWeight="Medium" />
-                                  </Border>
-                                </Grid>
-                                <TextBlock Text="{Binding Body}" Foreground="#9AA3B2" FontSize="11"
-                                           TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
-                              </StackPanel>
-                            </Border>
-                          </DataTemplate>
-                        </ListBox.ItemTemplate>
-                      </ListBox>
-                    </DockPanel>
-                  </Border>
                   <ListBox x:Name="TopicalListBox"
                            ItemsSource="{Binding Results}"
                            SelectedItem="{Binding SelectedItem}"
@@ -1182,6 +1148,75 @@
                       </DataTemplate>
                     </ListBox.ItemTemplate>
                   </ListBox>
+                 </DockPanel>
+                </DockPanel>
+
+                <!-- AI Paraphrases tab content: verses auto-detected from live preaching. On its own
+                     tab so it never crowds the manual Find Scripture results. -->
+                <DockPanel IsVisible="{Binding IsParaphrasesTab}">
+                 <DockPanel DataContext="{Binding TopicalSearch}">
+                  <Border DockPanel.Dock="Top" Padding="10,8" Background="#141A29" BorderBrush="#2A303C" BorderThickness="0,0,0,1">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBlock Text="&#x2728;" FontSize="12" Foreground="#A78BFA" VerticalAlignment="Center" />
+                      <TextBlock Text="Detected while preaching" Foreground="#C7B6F5" FontSize="12"
+                                 FontWeight="SemiBold" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </Border>
+                  <Panel>
+                    <!-- Listening / empty state -->
+                    <StackPanel IsVisible="{Binding !HasDetected}" Spacing="8" Margin="24"
+                                HorizontalAlignment="Center" VerticalAlignment="Center">
+                      <TextBlock Text="&#x2728;" FontSize="28" Foreground="#3A3360" HorizontalAlignment="Center" />
+                      <TextBlock Text="Paraphrased verses will appear here" Foreground="#6E7682" FontSize="13"
+                                 FontWeight="SemiBold" HorizontalAlignment="Center" />
+                      <TextBlock Text="When the preacher paraphrases a passage, matching verses surface here automatically while the mic is listening."
+                                 Foreground="#5A626E" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="320" />
+                    </StackPanel>
+                    <ListBox x:Name="DetectedListBox"
+                             IsVisible="{Binding HasDetected}"
+                             ItemsSource="{Binding DetectedResults}"
+                             SelectedItem="{Binding SelectedDetectedItem}"
+                             Tapped="OnTopicalListTapped"
+                             DoubleTapped="OnTopicalListDoubleTapped"
+                             Background="Transparent" BorderThickness="0" Padding="8,8"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                      <ListBox.Styles>
+                        <Style Selector="ListBoxItem">
+                          <Setter Property="Padding" Value="0" />
+                          <Setter Property="Margin" Value="0,3" />
+                          <Setter Property="Background" Value="Transparent" />
+                        </Style>
+                      </ListBox.Styles>
+                      <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="content:ContentItem">
+                          <Border Background="#161A22" CornerRadius="8" BorderBrush="#2A303C" BorderThickness="1"
+                                  Padding="10,7" ToolTip.Tip="Double-click to send this verse live">
+                            <Border.ContextMenu>
+                              <ContextMenu>
+                                <MenuItem Header="Send to Live" Click="OnSendContentToLiveMenu" />
+                                <MenuItem Header="Bookmark Verse" Click="OnBookmarkScriptureMenu"
+                                          IsVisible="{Binding IsScripture}" />
+                                <MenuItem Header="Show Full Chapter" Click="OnShowFullChapterFromContent"
+                                          IsVisible="{Binding IsScripture}" />
+                              </ContextMenu>
+                            </Border.ContextMenu>
+                            <StackPanel Spacing="3">
+                              <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="{Binding Title}" Foreground="#ECEEF2" FontSize="12"
+                                           FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxLines="1" VerticalAlignment="Center" />
+                                <Border Grid.Column="1" Background="#241B3A" CornerRadius="4" Padding="6,1" Margin="6,0,0,0"
+                                        VerticalAlignment="Center">
+                                  <TextBlock Text="{Binding Tag}" Foreground="#A78BFA" FontSize="9" FontWeight="Medium" />
+                                </Border>
+                              </Grid>
+                              <TextBlock Text="{Binding Body}" Foreground="#9AA3B2" FontSize="11"
+                                         TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                          </Border>
+                        </DataTemplate>
+                      </ListBox.ItemTemplate>
+                    </ListBox>
+                  </Panel>
                  </DockPanel>
                 </DockPanel>
 
