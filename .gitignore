@@ -17,3 +17,14 @@ vosk-model*/
 appsettings.*.json
 !appsettings.json
 publish/
+# Generated/hosted Bible translation files (uploaded to S3, not source). Also avoids committing
+# copyrighted translation text into the repo.
+TPT.json
+TLB.json
+AMPC.json
+ERV.json
+ESV.json
+GNT.json
+NET.json
+ASV.json
+*.bible.json

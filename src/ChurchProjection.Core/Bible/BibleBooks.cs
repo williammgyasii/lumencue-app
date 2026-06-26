@@ -36,6 +36,15 @@ public static class BibleBooks
     public static IReadOnlyDictionary<string, string> IdToName { get; } =
         NameToId.ToDictionary(kvp => kvp.Value, kvp => kvp.Key, StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>The 66 canonical books in order (Genesis = index 0 … Revelation = index 65). Used to
+    /// resolve the 1-based book numbers in bundled translation XML files.</summary>
+    public static IReadOnlyList<string> InCanonicalOrder { get; } = NameToId.Keys.ToArray();
+
+    /// <summary>Resolves a 1-based canonical book number (1 = Genesis … 66 = Revelation) to its name,
+    /// or null when the number is outside the 66-book canon.</summary>
+    public static string? NameForNumber(int number) =>
+        number >= 1 && number <= InCanonicalOrder.Count ? InCanonicalOrder[number - 1] : null;
+
     public static bool TryGetId(string bookName, out string id) => NameToId.TryGetValue(bookName, out id!);
 
     public static string GetName(string bookId, string? fallback = null) =>

@@ -41,6 +41,37 @@ public class BibleCacheService
         ("CSB", "Christian Standard Bible"),
     ];
 
+    /// <summary>
+    /// Custom translations we host ourselves as static JSON (not available from the public or premium
+    /// Bible APIs). The app downloads each file once and caches it into local SQLite, exactly like the
+    /// other translations, after which it works fully offline. Add a new hosted Bible by importing it
+    /// (tools/BibleImporter) and adding a row here.
+    /// </summary>
+    private static readonly (string Code, string Name, string Url)[] CustomTranslations =
+    [
+        ("TPT", "The Passion Translation",
+            "https://lumencue-api-bibles-618015514647.s3.us-east-1.amazonaws.com/translations/TPT.json"),
+        ("TLB", "The Living Bible",
+            "https://lumencue-api-bibles-618015514647.s3.us-east-1.amazonaws.com/translations/TLB.json"),
+        ("AMPC", "Amplified Bible, Classic Edition",
+            "https://lumencue-api-bibles-618015514647.s3.us-east-1.amazonaws.com/translations/AMPC.json"),
+        ("ERV", "Easy-to-Read Version",
+            "https://lumencue-api-bibles-618015514647.s3.us-east-1.amazonaws.com/translations/ERV.json"),
+        ("ESV", "English Standard Version",
+            "https://lumencue-api-bibles-618015514647.s3.us-east-1.amazonaws.com/translations/ESV.json"),
+        ("GNT", "Good News Translation",
+            "https://lumencue-api-bibles-618015514647.s3.us-east-1.amazonaws.com/translations/GNT.json"),
+        ("NET", "New English Translation",
+            "https://lumencue-api-bibles-618015514647.s3.us-east-1.amazonaws.com/translations/NET.json"),
+        ("ASV", "American Standard Version",
+            "https://lumencue-api-bibles-618015514647.s3.us-east-1.amazonaws.com/translations/ASV.json"),
+    ];
+
+    private static (string Code, string Name, string Url)? FindCustom(string translation) =>
+        CustomTranslations
+            .Cast<(string Code, string Name, string Url)?>()
+            .FirstOrDefault(c => string.Equals(c!.Value.Code, translation, StringComparison.OrdinalIgnoreCase));
+
     private readonly BehaviorSubject<string> _statusMessage = new("");
     public IObservable<string> StatusMessage => _statusMessage.AsObservable();
 
@@ -81,7 +112,7 @@ public class BibleCacheService
             _freeApiTranslations = newMap;
             Log.Information("Loaded {Count} English translations from bible.helloao.org; offering {Curated} curated picks",
                 newMap.Count, CuratedTranslations.Length);
-            return CuratedTranslations.Select(c => (c.Code, c.Name)).ToList();
+            return OfferedTranslations();
         }
         catch (Exception ex)
         {
@@ -92,11 +123,19 @@ public class BibleCacheService
                     ["BSB"] = "BSB",
                     ["KJV"] = "eng_kjv",
                 });
-            return CuratedTranslations.Select(c => (c.Code, c.Name)).ToList();
+            return OfferedTranslations();
         }
     }
 
-    public bool CanBulkCache(string translation) => _freeApiTranslations.ContainsKey(translation);
+    /// <summary>The translations surfaced in the UI: the curated API-backed picks plus our own hosted
+    /// custom translations.</summary>
+    private static List<(string Id, string Name)> OfferedTranslations() =>
+        CuratedTranslations.Select(c => (c.Code, c.Name))
+            .Concat(CustomTranslations.Select(c => (c.Code, c.Name)))
+            .ToList();
+
+    public bool CanBulkCache(string translation) =>
+        _freeApiTranslations.ContainsKey(translation) || FindCustom(translation) is not null;
 
     public string? ResolveApiId(string shortName) =>
         _freeApiTranslations.TryGetValue(shortName, out var id) ? id : null;
@@ -118,6 +157,14 @@ public class BibleCacheService
 
         try
         {
+            var custom = FindCustom(translation);
+            if (custom is not null)
+            {
+                // Hosted custom translation (e.g. TPT): download our static JSON once and cache it.
+                await DownloadCustomTranslationAsync(custom.Value.Code, custom.Value.Url, ct);
+                return;
+            }
+
             var apiId = ResolveApiId(translation);
             if (apiId is not null)
             {
@@ -137,6 +184,53 @@ public class BibleCacheService
         finally
         {
             _activeDownloads.TryRemove(translation, out _);
+        }
+    }
+
+    /// <summary>Downloads a hosted custom translation (one static JSON file) and bulk-inserts it into
+    /// local SQLite, mirroring the public-domain /complete.json path. After this the translation is
+    /// fully local and never hits the network again.</summary>
+    private async Task DownloadCustomTranslationAsync(string translation, string url, CancellationToken ct)
+    {
+        Log.Information("Downloading custom translation {Translation} from {Url}", translation, url);
+        _statusMessage.OnNext($"Downloading {translation}...");
+
+        try
+        {
+            var json = await _http.GetStringAsync(url, ct).ConfigureAwait(false);
+            var file = CustomBibleFile.FromJson(json);
+
+            var passages = file.Verses
+                .Select(v => new Core.Models.Content.ScripturePassage
+                {
+                    Translation = translation,
+                    Book = v.Book,
+                    Chapter = v.Chapter,
+                    VerseStart = v.Verse,
+                    VerseEnd = null,
+                    Text = v.Text,
+                })
+                .ToList();
+
+            var chapterCount = file.Verses.Select(v => (v.Book, v.Chapter)).Distinct().Count();
+            await MarkCacheStartedAsync(translation, chapterCount, ct).ConfigureAwait(false);
+
+            const int batchSize = 2000;
+            for (var i = 0; i < passages.Count; i += batchSize)
+            {
+                ct.ThrowIfCancellationRequested();
+                await _repo.BulkInsertAsync(passages.GetRange(i, Math.Min(batchSize, passages.Count - i))).ConfigureAwait(false);
+                _statusMessage.OnNext($"Downloading {translation}... {Math.Min(i + batchSize, passages.Count):N0}/{passages.Count:N0} verses");
+            }
+
+            await MarkCacheCompleteAsync(translation, chapterCount, ct).ConfigureAwait(false);
+            Log.Information("Custom translation cached: {Translation} ({Verses} verses)", translation, passages.Count);
+            _statusMessage.OnNext($"{translation} cached ({passages.Count:N0} verses)");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.Error(ex, "Failed to download custom translation {Translation}", translation);
+            _statusMessage.OnNext($"Cache failed for {translation}");
         }
     }
 
