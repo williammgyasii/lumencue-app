@@ -71,6 +71,7 @@ vpk upload github \
   --outputDir "$RELEASE_DIR" \
   --releaseName "LumenCue $VERSION" \
   --tag "v$VERSION" \
+  --merge \
   --publish
 
 echo "==> Released v$VERSION for Mac."

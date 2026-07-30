@@ -111,6 +111,7 @@ vpk upload github `
     --outputDir   $ReleaseDir `
     --releaseName "LumenCue $Version" `
     --tag         "v$Version" `
+    --merge `
     --publish
 if ($LASTEXITCODE -ne 0) { throw "vpk upload github failed" }
 
