@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using ChurchProjection.Core.Models.Content;
+using ChurchProjection.Core.Models.Slides;
 using ChurchProjection.Infrastructure.Data;
 using ReactiveUI;
 using Serilog;
@@ -55,12 +56,12 @@ public class NotesViewModel : ViewModelBase
     }
 
     /// <summary>Creates a new note and refreshes the cards.</summary>
-    public async Task AddNoteAsync(string title, string body)
+    public async Task AddNoteAsync(string title, string body, NoteSplitMode splitMode = NoteSplitMode.OneParagraphPerSlide)
     {
         if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body)) return;
         try
         {
-            await _repo.InsertAsync(new Note { Title = title.Trim(), Body = body });
+            await _repo.InsertAsync(new Note { Title = title.Trim(), Body = body, SplitMode = splitMode });
             await LoadAsync();
             StatusText = "Note added.";
         }
@@ -72,12 +73,13 @@ public class NotesViewModel : ViewModelBase
     }
 
     /// <summary>Updates an existing note's title/body and refreshes the cards.</summary>
-    public async Task UpdateNoteAsync(NoteSlideItem card, string title, string body)
+    public async Task UpdateNoteAsync(NoteSlideItem card, string title, string body, NoteSplitMode splitMode)
     {
         try
         {
             card.Note.Title = title.Trim();
             card.Note.Body = body;
+            card.Note.SplitMode = splitMode;
             await _repo.UpdateAsync(card.Note);
             await LoadAsync();
             StatusText = "Note saved.";
@@ -115,16 +117,54 @@ public class NoteSlideItem : ReactiveObject
     {
         Note = note;
         Preview = (note.Body ?? string.Empty).Replace("\r", "").Replace('\n', ' ');
+        SlideCount = CountSlides(note);
     }
 
     public Note Note { get; }
     public string Title => string.IsNullOrWhiteSpace(Note.Title) ? "Untitled note" : Note.Title;
     public string Body => Note.Body;
+    public int SlideCount { get; }
 
     /// <summary>Single-line body preview for the card face.</summary>
     public string Preview { get; }
 
+    public string SlideCountLabel => SlideCount == 1 ? "1 slide" : $"{SlideCount} slides";
+
+    private static int CountSlides(Note note)
+    {
+        if (note.SplitMode == NoteSplitMode.AutoFit)
+            return Math.Max(1, note.Body.Split("\n\n", StringSplitOptions.RemoveEmptyEntries).Length);
+        return Math.Max(1, NoteSlidePlanner.PlanBodies(note.Body, note.SplitMode).Count);
+    }
+
     /// <summary>True when this note is the one currently on the live output.</summary>
+    public bool IsLive
+    {
+        get => _isLive;
+        set => this.RaiseAndSetIfChanged(ref _isLive, value);
+    }
+}
+
+/// <summary>One projected page within an opened note (shown in the Notes slide breakdown).</summary>
+public class NotePageSlideItem : ReactiveObject
+{
+    private bool _isLive;
+
+    public NotePageSlideItem(NoteSlideItem parent, int index, string body, int total)
+    {
+        Parent = parent;
+        Index = index;
+        Body = body;
+        Label = total == 1 ? "Slide 1" : $"Slide {index + 1} of {total}";
+        Preview = body.Replace("\r", "").Replace('\n', ' ');
+    }
+
+    public NoteSlideItem Parent { get; }
+    public int Index { get; }
+    public string Label { get; }
+    public string Body { get; }
+    public string Preview { get; }
+
     public bool IsLive
     {
         get => _isLive;

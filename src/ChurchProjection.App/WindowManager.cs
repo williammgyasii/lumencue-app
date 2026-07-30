@@ -22,6 +22,7 @@ public class WindowManager
 {
     private const string LayoutKey = "output_layout";
     private const string PpOutputKey = "propresenter";
+    private const string NdiOutputKey = "ndi";
     private const string WindowedKey = "windowed";
 
     private readonly OperatorViewModel _operatorVm;
@@ -32,9 +33,11 @@ public class WindowManager
     private readonly ILiveBackgroundService _liveBackground;
     private readonly IAnnouncementService _announcements;
     private readonly ILayerService _layers;
+    private readonly INdiOutputService _ndi;
 
     private readonly Dictionary<string, DisplayWindow> _windows = [];
     private IDisposable? _ppFeedSub;
+    private ProjectorViewModel? _ndiViewModel;
     private bool _screenOutputEnabled = true;
 
     private OperatorWindow? _operatorWindow;
@@ -48,7 +51,8 @@ public class WindowManager
         SettingsRepository settings,
         ILiveBackgroundService liveBackground,
         IAnnouncementService announcements,
-        ILayerService layers)
+        ILayerService layers,
+        INdiOutputService ndi)
     {
         _operatorVm = operatorVm;
         _projection = projection;
@@ -58,6 +62,7 @@ public class WindowManager
         _liveBackground = liveBackground;
         _announcements = announcements;
         _layers = layers;
+        _ndi = ndi;
     }
 
     public async void ShowAll()
@@ -97,8 +102,12 @@ public class WindowManager
             _operatorVm.Outputs.Add(new OutputRow(d.Key, kind, d.Name, d, _operatorVm.ThemeOptions));
         }
         _operatorVm.Outputs.Add(new OutputRow(PpOutputKey, OutputKind.ProPresenter, "ProPresenter", null, _operatorVm.ThemeOptions));
+        _operatorVm.Outputs.Add(new OutputRow(NdiOutputKey, OutputKind.Ndi, "NDI (OBS)", null, _operatorVm.ThemeOptions));
 
         var saved = await LoadLayoutAsync();
+        var ndiSourceName = await _settings.GetAsync("ndi_source_name");
+        if (!string.IsNullOrWhiteSpace(ndiSourceName))
+            _ndi.SourceName = ndiSourceName;
         ApplySavedLayout(saved, displays);
 
         // React to every screen's on/off, view (theme), and name changes.
@@ -118,8 +127,10 @@ public class WindowManager
             .Subscribe(enabled =>
             {
                 _screenOutputEnabled = enabled;
-                foreach (var row in _operatorVm.Outputs.Where(o => o.Kind != OutputKind.ProPresenter))
+                foreach (var row in _operatorVm.Outputs.Where(o => o.Kind is OutputKind.Display or OutputKind.Windowed))
                     ApplyDisplay(row);
+                var ndiRow = _operatorVm.Outputs.FirstOrDefault(o => o.Kind == OutputKind.Ndi);
+                if (ndiRow is not null) ApplyNdi(ndiRow);
                 Log.Information("Screen output {State}", enabled ? "enabled" : "disabled");
             });
 
@@ -190,6 +201,9 @@ public class WindowManager
             case OutputKind.ProPresenter:
                 ApplyProPresenter(row);
                 break;
+            case OutputKind.Ndi:
+                ApplyNdi(row);
+                break;
             default:
                 ApplyDisplay(row);
                 break;
@@ -252,6 +266,27 @@ public class WindowManager
             });
 
         Log.Information("ProPresenter output → program feed");
+    }
+
+    private void ApplyNdi(OutputRow row)
+    {
+        _ndi.Stop();
+        _ndiViewModel?.Dispose();
+        _ndiViewModel = null;
+
+        if (!row.IsActive || !_screenOutputEnabled)
+            return;
+
+        if (!_ndi.IsAvailable)
+        {
+            Log.Warning("NDI output requested but unavailable: {Reason}", _ndi.UnavailableReason);
+            return;
+        }
+
+        _ndiViewModel = new ProjectorViewModel(
+            _projection, _themes, row.ThemeOverride, _liveBackground, _announcements, NdiOutputKey, _layers);
+        _ndi.Start(_ndiViewModel);
+        Log.Information("NDI output → program feed as '{Source}'", _ndi.SourceName);
     }
 
     private void PositionWindow(ProjectorWindow window, DisplayOption opt)

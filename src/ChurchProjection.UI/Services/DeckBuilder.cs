@@ -1,5 +1,6 @@
 using System.Globalization;
 using Avalonia.Media;
+using ChurchProjection.Core.Models.Content;
 using ChurchProjection.Core.Models.Slides;
 using ChurchProjection.Core.Models.Theme;
 
@@ -19,6 +20,22 @@ public static class DeckBuilder
     /// box (so long passages page instead of being clipped). Applies to every deck built.
     /// </summary>
     public static int MaxCharsPerSlide { get; set; }
+
+    /// <summary>Builds a note deck using the note's chosen split mode.</summary>
+    public static SlideDeck BuildNote(string title, string body, string footer, Theme theme, NoteSplitMode splitMode)
+    {
+        if (splitMode == NoteSplitMode.AutoFit)
+            return Build(SlideType.Note, title, body, footer, theme);
+
+        var bodies = NoteSlidePlanner.PlanBodies(body, splitMode);
+        if (bodies.Count == 0)
+            return SlideDeck.Single(new Slide { Type = SlideType.Note, Title = title, Body = body, Footer = footer });
+
+        var slides = bodies
+            .Select(b => new Slide { Type = SlideType.Note, Title = title, Body = b, Footer = footer })
+            .ToList();
+        return new SlideDeck(slides);
+    }
 
     public static SlideDeck Build(SlideType type, string title, string body, string footer, Theme theme, int linesPerSlide = 0)
     {

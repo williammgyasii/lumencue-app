@@ -9,7 +9,9 @@
     <PackageReference Include="Avalonia.ReactiveUI" Version="11.3.8" />
     <PackageReference Include="Avalonia.Controls.ColorPicker" Version="11.3.8" />
     <PackageReference Include="LibVLCSharp" Version="3.9.7.1" />
-    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.23.1" />
+    <PackageReference Include="NDILibDotNetCoreBase" Version="2024.7.22.1" />
+    <PackageReference Include="VideoLAN.LibVLC.Mac" Version="3.1.2" Condition="$([MSBuild]::IsOSPlatform('OSX'))" />
+    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.23.1" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
   </ItemGroup>
 
   <ItemGroup>
@@ -19,6 +21,20 @@
   <ItemGroup>
     <ProjectReference Include="..\ChurchProjection.Core\ChurchProjection.Core.csproj" />
     <ProjectReference Include="..\ChurchProjection.Infrastructure\ChurchProjection.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <!-- Copy native NDI runtime when the SDK is installed locally (not bundled in NuGet). -->
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX')) AND Exists('/Library/NDI SDK for Apple/lib/macOS/libndi.dylib')">
+    <!-- NDILibDotNetCoreBase P/Invokes "NDILib" → libNDILib.dylib on macOS -->
+    <Content Include="/Library/NDI SDK for Apple/lib/macOS/libndi.dylib"
+             Link="libNDILib.dylib"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="/Library/NDI SDK for Apple/lib/macOS/libndi.dylib"
+             Link="NDILib.dylib"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="/Library/NDI SDK for Apple/lib/macOS/libndi.dylib"
+             Link="libndi.dylib"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

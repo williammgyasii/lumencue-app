@@ -1,6 +1,6 @@
 name: Release
 
-# Cuts a Velopack release whenever a version tag (e.g. v0.6.7) is pushed.
+# Cuts a Velopack release whenever a version tag (e.g. v0.7.23) is pushed.
 # Manual runs are also supported via the "Run workflow" button (provide a version).
 on:
   push:
@@ -9,15 +9,14 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to release (e.g. 0.6.7)"
+        description: "Version to release (e.g. 0.7.23)"
         required: true
 
-# Needed so the built-in token can create the GitHub Release and upload assets.
 permissions:
   contents: write
 
 jobs:
-  release:
+  release-windows:
     runs-on: windows-latest
 
     steps:
@@ -43,7 +42,7 @@ jobs:
         shell: pwsh
         run: |
           $version = "${{ steps.ver.outputs.version }}"
-          if ($version -notmatch '^\d+\.\d+\.\d+') { throw "Invalid version '$version' (expected e.g. 0.6.7)." }
+          if ($version -notmatch '^\d+\.\d+\.\d+') { throw "Invalid version '$version' (expected e.g. 0.7.23)." }
           $csproj = "src/ChurchProjection.App/ChurchProjection.App.csproj"
           $text = Get-Content $csproj -Raw
           $text = $text -replace '<Version>.*?</Version>', "<Version>$version</Version>"
@@ -52,11 +51,41 @@ jobs:
           Set-Content $csproj -Value $text -NoNewline
           Write-Host "Stamped version $version into $csproj."
 
-      # No secrets are injected into the build: the app ships zero credentials and reaches all
-      # services through the cloud API at runtime. Releases are pushed to the PUBLIC
-      # williammgyasii/lumencue-releases repo, which needs a cross-repo write token (RELEASES_TOKEN)
-      # since the built-in GITHUB_TOKEN only has access to this (source) repo.
-      - name: Build & publish release
+      - name: Build & publish Windows release
         shell: pwsh
         run: |
           installer/build-release.ps1 -Version "${{ steps.ver.outputs.version }}" -Token "${{ secrets.RELEASES_TOKEN }}"
+
+  release-mac:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Stamp version into csproj
+        run: |
+          version="${{ steps.ver.outputs.version }}"
+          csproj="src/ChurchProjection.App/ChurchProjection.App.csproj"
+          sed -i '' "s|<Version>.*</Version>|<Version>$version</Version>|" "$csproj"
+          sed -i '' "s|<FileVersion>.*</FileVersion>|<FileVersion>$version</FileVersion>|" "$csproj"
+          sed -i '' "s|<InformationalVersion>.*</InformationalVersion>|<InformationalVersion>$version</InformationalVersion>|" "$csproj"
+
+      - name: Build & publish Mac release
+        run: |
+          chmod +x installer/build-release-mac.sh
+          installer/build-release-mac.sh "${{ steps.ver.outputs.version }}" "${{ secrets.RELEASES_TOKEN }}"

@@ -18,6 +18,8 @@ public class SemanticEmbeddingService : IDisposable
     private BertTokenizer? _tokenizer;
     private bool _ready;
     private readonly SemaphoreSlim _initLock = new(1, 1);
+    // ONNX InferenceSession is not thread-safe; concurrent Run() calls crash native mutexes on macOS.
+    private readonly object _inferLock = new();
 
     public bool IsReady => _ready;
 
@@ -31,7 +33,9 @@ public class SemanticEmbeddingService : IDisposable
     public async Task InitializeAsync()
     {
         if (_ready) return;
+        var acquired = false;
         await _initLock.WaitAsync().ConfigureAwait(false);
+        acquired = true;
         try
         {
             if (_ready) return;
@@ -77,7 +81,8 @@ public class SemanticEmbeddingService : IDisposable
         }
         finally
         {
-            _initLock.Release();
+            if (acquired)
+                _initLock.Release();
         }
     }
 
@@ -105,14 +110,17 @@ public class SemanticEmbeddingService : IDisposable
                 NamedOnnxValue.CreateFromTensor("token_type_ids", typeTensor),
             };
 
-            using var results = _session.Run(inputs);
-            var output = results.First(r => r.Name == "last_hidden_state");
-            var tensor = output.AsTensor<float>();
+            lock (_inferLock)
+            {
+                using var results = _session.Run(inputs);
+                var output = results.First(r => r.Name == "last_hidden_state");
+                var tensor = output.AsTensor<float>();
 
-            var embedding = MeanPool(tensor, attentionMask, inputIds.Length);
-            Normalize(embedding);
+                var embedding = MeanPool(tensor, attentionMask, inputIds.Length);
+                Normalize(embedding);
 
-            return embedding;
+                return embedding;
+            }
         }
         catch (Exception ex)
         {

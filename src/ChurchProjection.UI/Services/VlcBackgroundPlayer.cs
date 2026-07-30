@@ -71,7 +71,7 @@ internal sealed class VlcBackgroundPlayer : IDisposable
         {
             if (_libVlc is null)
             {
-                LibVLCSharp.Shared.Core.Initialize();
+                LibVlcBootstrap.EnsureInitialized();
                 _libVlc = new LibVLC("--no-audio", "--quiet");
             }
         }

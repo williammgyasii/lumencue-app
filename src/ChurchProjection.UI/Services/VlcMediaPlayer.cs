@@ -102,7 +102,7 @@ internal sealed class VlcMediaPlayer : IDisposable
         {
             if (_libVlc is null)
             {
-                LibVLCSharp.Shared.Core.Initialize();
+                LibVlcBootstrap.EnsureInitialized();
                 // Audio enabled (no --no-audio) so announcement clips can play sound.
                 _libVlc = new LibVLC("--quiet");
             }

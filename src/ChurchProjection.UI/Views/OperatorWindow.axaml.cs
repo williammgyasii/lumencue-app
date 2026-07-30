@@ -34,24 +34,31 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
         if (e.Source is TextBox) return; // never hijack typing / caret movement
 
         var inNowSinging = vm.ShowNowSinging && vm.HasNowSinging;
+        var inOpenNote = vm.IsNotesTab && vm.HasOpenNote;
 
         switch (e.Key)
         {
             case Key.Right:
-                if (inNowSinging) vm.StepLive(+1); else vm.AdvanceForward();
+                if (inNowSinging) vm.StepLive(+1);
+                else if (inOpenNote) vm.StepNoteLive(+1);
+                else vm.AdvanceForward();
                 e.Handled = true;
                 break;
             case Key.Left:
-                if (inNowSinging) vm.StepLive(-1); else vm.AdvanceBackward();
+                if (inNowSinging) vm.StepLive(-1);
+                else if (inOpenNote) vm.StepNoteLive(-1);
+                else vm.AdvanceBackward();
                 e.Handled = true;
                 break;
             // Up/Down only drive live stepping inside Now Singing; elsewhere they stay free for
             // normal list navigation (search results, queue, etc.).
             case Key.Down:
                 if (inNowSinging) { vm.StepLive(+1); e.Handled = true; }
+                else if (inOpenNote) { vm.StepNoteLive(+1); e.Handled = true; }
                 break;
             case Key.Up:
                 if (inNowSinging) { vm.StepLive(-1); e.Handled = true; }
+                else if (inOpenNote) { vm.StepNoteLive(-1); e.Handled = true; }
                 break;
         }
     }
@@ -183,14 +190,55 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
 
     // ----- Notes tab -----
 
-    // Double-clicking a note card sends it live (shows it on screen).
-    public void OnNotesSlideDoubleTapped(object? sender, TappedEventArgs e)
+    // Clicking a note card opens its slide breakdown.
+    public void OnNotesSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (DataContext is OperatorViewModel vm && sender is ListBox { SelectedItem: NoteSlideItem card })
-            vm.SendNoteLive(card);
+            vm.OpenNote(card);
     }
 
-    // Right-click note menu: send the note live.
+    // Double-clicking a slide sends it live.
+    public void OnNotePageDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (DataContext is OperatorViewModel vm && sender is ListBox { SelectedItem: NotePageSlideItem page })
+            vm.SendNotePageLive(page);
+    }
+
+    public void OnNotePageKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (DataContext is not OperatorViewModel vm) return;
+        if (e.Key is Key.Enter or Key.Space)
+        {
+            if (sender is ListBox { SelectedItem: NotePageSlideItem page })
+                vm.SendNotePageLive(page);
+            e.Handled = true;
+        }
+    }
+
+    public void OnCloseOpenNote(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is OperatorViewModel vm)
+            vm.CloseOpenNote();
+    }
+
+    public void OnStepNoteLivePrev(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is OperatorViewModel vm) vm.StepNoteLive(-1);
+    }
+
+    public void OnStepNoteLiveNext(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is OperatorViewModel vm) vm.StepNoteLive(+1);
+    }
+
+    public async void OnEditOpenNote(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not OperatorViewModel vm) return;
+        if (vm.OpenNoteCard is not { } card) return;
+        await OpenNoteEditorAsync(vm, card);
+    }
+
+    // Right-click note menu: send the note live (first slide).
     public void OnNoteSendLiveMenu(object? sender, RoutedEventArgs e)
     {
         if (DataContext is OperatorViewModel vm && sender is MenuItem { DataContext: NoteSlideItem card })
@@ -203,11 +251,11 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
         try
         {
             if (DataContext is not OperatorViewModel vm) return;
-            var editor = new NoteEditViewModel("New note", "", "");
-            var dialog = new NoteEditWindow { DataContext = editor };
+            var editor = vm.CreateNoteEditor("New note", "", "", NoteSplitMode.OneParagraphPerSlide);
+            var dialog = new NoteEditorWindow { DataContext = editor };
             await dialog.ShowDialog(this);
             if (!editor.Confirmed) return;
-            await vm.Notes.AddNoteAsync(editor.NoteTitle, editor.Body);
+            await vm.Notes.AddNoteAsync(editor.NoteTitle, editor.Body, editor.SplitMode);
         }
         catch (Exception ex)
         {
@@ -222,16 +270,23 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
         {
             if (DataContext is not OperatorViewModel vm) return;
             if (sender is not MenuItem { DataContext: NoteSlideItem card }) return;
-            var editor = new NoteEditViewModel("Edit note", card.Note.Title, card.Note.Body);
-            var dialog = new NoteEditWindow { DataContext = editor };
-            await dialog.ShowDialog(this);
-            if (!editor.Confirmed) return;
-            await vm.Notes.UpdateNoteAsync(card, editor.NoteTitle, editor.Body);
+            await OpenNoteEditorAsync(vm, card);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to edit note");
         }
+    }
+
+    private async Task OpenNoteEditorAsync(OperatorViewModel vm, NoteSlideItem card)
+    {
+        var editor = vm.CreateNoteEditor("Edit note", card.Note.Title, card.Note.Body, card.Note.SplitMode);
+        var dialog = new NoteEditorWindow { DataContext = editor };
+        await dialog.ShowDialog(this);
+        if (!editor.Confirmed) return;
+        await vm.Notes.UpdateNoteAsync(card, editor.NoteTitle, editor.Body, editor.SplitMode);
+        if (vm.OpenNoteCard == card)
+            vm.OpenNote(card);
     }
 
     // Right-click note menu: delete the note.
@@ -406,6 +461,12 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
     {
         if (DataContext is OperatorViewModel vm && sender is MenuItem { DataContext: SuggestionItem item })
             vm.ShowFullChapter(item);
+    }
+
+    public void OnShowFullBookFromBookmark(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is OperatorViewModel vm && sender is MenuItem { DataContext: SuggestionItem item })
+            vm.ShowFullBook(item);
     }
 
     public void OnToggleBookmarkMenu(object? sender, Avalonia.Interactivity.RoutedEventArgs e)

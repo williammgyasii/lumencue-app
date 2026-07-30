@@ -132,6 +132,7 @@ public class App : Application
         services.AddSingleton<ILiveBackgroundService, LiveBackgroundService>();
         services.AddSingleton<IAnnouncementService, AnnouncementService>();
         services.AddSingleton<ILayerService, LayerService>();
+        services.AddSingleton<INdiOutputService, NdiOutputService>();
         services.AddSingleton<IProPresenterService, ProPresenterService>();
 
         // Speech-to-text is cloud-only: stream to Deepgram using a short-lived token minted by the

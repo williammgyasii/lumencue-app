@@ -1,0 +1,165 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ChurchProjection.UI.ViewModels.Operator"
+        xmlns:views="using:ChurchProjection.UI.Views"
+        x:Class="ChurchProjection.UI.Views.NoteEditorWindow"
+        x:DataType="vm:NoteEditorViewModel"
+        Title="Note Editor"
+        Width="1180" Height="760"
+        MinWidth="980" MinHeight="600"
+        WindowStartupLocation="CenterOwner"
+        Background="#0E1014">
+
+  <Window.Styles>
+    <Style Selector="TextBox">
+      <Setter Property="Background" Value="#181C24" />
+      <Setter Property="Foreground" Value="#ECEEF2" />
+      <Setter Property="BorderBrush" Value="#3C4350" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style Selector="TextBox:focus">
+      <Setter Property="BorderBrush" Value="#7C6CF6" />
+    </Style>
+    <Style Selector="TextBlock.lbl">
+      <Setter Property="Foreground" Value="#D8DCE3" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="Medium" />
+    </Style>
+    <Style Selector="TextBlock.section">
+      <Setter Property="Foreground" Value="#959DAB" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="ComboBox">
+      <Setter Property="Background" Value="#181C24" />
+      <Setter Property="Foreground" Value="#ECEEF2" />
+      <Setter Property="BorderBrush" Value="#3C4350" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="FontSize" Value="13" />
+    </Style>
+  </Window.Styles>
+
+  <DockPanel>
+    <Border DockPanel.Dock="Top" Background="#181C24" Padding="24,16" BorderBrush="#2A303C" BorderThickness="0,0,0,1">
+      <StackPanel Spacing="3">
+        <TextBlock Text="{Binding Heading}" Foreground="#ECEEF2" FontSize="20" FontWeight="SemiBold" />
+        <TextBlock Text="Paste your note, pick how to split it into slides, and preview with your Note theme."
+                   Foreground="#959DAB" FontSize="13" />
+      </StackPanel>
+    </Border>
+
+    <Border DockPanel.Dock="Bottom" Background="#181C24" Padding="24,14" BorderBrush="#2A303C" BorderThickness="0,1,0,0">
+      <Grid ColumnDefinitions="*,Auto,Auto">
+        <TextBlock Grid.Column="0" Text="{Binding SlideCountText}" Foreground="#959DAB"
+                   FontSize="13" VerticalAlignment="Center" />
+        <Button Grid.Column="1" Content="Cancel" Click="OnCancelClicked"
+                Background="#2A303C" Foreground="#D8DCE3" FontWeight="SemiBold"
+                Padding="20,9" CornerRadius="6" FontSize="13" Margin="0,0,8,0" />
+        <Button Grid.Column="2" Content="Save note" Command="{Binding SaveCommand}"
+                Background="#7C6CF6" Foreground="White" FontWeight="SemiBold"
+                Padding="20,9" CornerRadius="6" FontSize="13" />
+      </Grid>
+    </Border>
+
+    <Grid Margin="0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="1.2*" MinWidth="340" />
+        <ColumnDefinition Width="6" />
+        <ColumnDefinition Width="1.8*" MinWidth="380" />
+        <ColumnDefinition Width="6" />
+        <ColumnDefinition Width="1.4*" MinWidth="400" />
+      </Grid.ColumnDefinitions>
+
+      <!-- Left: title + body paste -->
+      <DockPanel Grid.Column="0" Margin="20,18">
+        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,12">
+          <TextBlock Classes="lbl" Text="Title" />
+          <TextBox Text="{Binding NoteTitle}" Watermark="e.g. Fellowship with the Spirit" />
+        </StackPanel>
+
+        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,12">
+          <TextBlock Classes="lbl" Text="Split mode" />
+          <ComboBox ItemsSource="{Binding SplitModeChoices}"
+                    SelectedItem="{Binding SelectedSplitModeChoice}"
+                    HorizontalAlignment="Stretch">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:NoteSplitModeChoice">
+                <TextBlock Text="{Binding Label}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <TextBlock Text="{Binding SplitModeHint}" Foreground="#6E7682" FontSize="11" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <Button DockPanel.Dock="Bottom" Content="Refresh slides" HorizontalAlignment="Stretch"
+                Command="{Binding RefreshSlidesCommand}" Background="#2A303C" Foreground="#ECEEF2"
+                FontWeight="SemiBold" Padding="0,11" CornerRadius="6" FontSize="13" Margin="0,12,0,0" />
+
+        <StackPanel Spacing="6">
+          <TextBlock Classes="lbl" Text="Note text" />
+          <TextBox Text="{Binding Body}" AcceptsReturn="True" TextWrapping="Wrap"
+                   VerticalAlignment="Stretch" Height="380" VerticalContentAlignment="Top"
+                   Watermark="Paste your full note here. Use blank lines between paragraphs. Section headers like 📖, ✍️, or 🙏 PRAYER are supported." />
+        </StackPanel>
+      </DockPanel>
+
+      <GridSplitter Grid.Column="1" Background="#1A1E26" Width="6" />
+
+      <!-- Middle: slide list -->
+      <DockPanel Grid.Column="2" Margin="16,18">
+        <TextBlock DockPanel.Dock="Top" Classes="section" Text="SLIDES" Margin="0,0,0,10" />
+        <ListBox ItemsSource="{Binding Slides}" SelectedItem="{Binding SelectedSlide}"
+                 Background="Transparent" BorderThickness="0">
+          <ListBox.Styles>
+            <Style Selector="ListBoxItem">
+              <Setter Property="Padding" Value="0" />
+              <Setter Property="Margin" Value="0,0,0,8" />
+              <Setter Property="Background" Value="Transparent" />
+            </Style>
+          </ListBox.Styles>
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:NoteSlidePreviewVm">
+              <Border Background="#161A22" CornerRadius="8" BorderBrush="#2A303C" BorderThickness="1" Padding="12">
+                <StackPanel Spacing="6">
+                  <TextBlock Text="{Binding Label}" Foreground="#7C6CF6" FontSize="11" FontWeight="Bold" />
+                  <TextBlock Text="{Binding Preview}" Foreground="#D8DCE3" FontSize="12" TextWrapping="Wrap" MaxLines="4" />
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </DockPanel>
+
+      <GridSplitter Grid.Column="3" Background="#1A1E26" Width="6" />
+
+      <!-- Right: themed preview -->
+      <DockPanel Grid.Column="4" Margin="16,18,20,18">
+        <TextBlock DockPanel.Dock="Top" Classes="section" Text="PREVIEW" Margin="0,0,0,10" />
+
+        <StackPanel DockPanel.Dock="Bottom" Spacing="10" Margin="0,12,0,0">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <Button Grid.Column="0" Content="‹ Prev" Command="{Binding PreviewPrevCommand}"
+                    Background="#2A303C" Foreground="#ECEEF2" FontSize="12" Padding="12,7" CornerRadius="6" />
+            <TextBlock Grid.Column="1" Text="{Binding PreviewPositionText}" Foreground="#959DAB"
+                       FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <Button Grid.Column="2" Content="Next ›" Command="{Binding PreviewNextCommand}"
+                    Background="#2A303C" Foreground="#ECEEF2" FontSize="12" Padding="12,7" CornerRadius="6" />
+          </Grid>
+          <TextBlock Text="Live render using your Note theme." Foreground="#6E7682" FontSize="11"
+                     HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <Border CornerRadius="8" ClipToBounds="True" BorderBrush="#374151" BorderThickness="1"
+                VerticalAlignment="Top" HorizontalAlignment="Center">
+          <Viewbox Stretch="Uniform" Width="400" Height="225">
+            <Border Width="1920" Height="1080">
+              <views:ProjectorView DataContext="{Binding Preview}" />
+            </Border>
+          </Viewbox>
+        </Border>
+      </DockPanel>
+    </Grid>
+  </DockPanel>
+</Window>

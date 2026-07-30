@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
+using ChurchProjection.Core.Bible;
 using ChurchProjection.Core.Models.Content;
 using ChurchProjection.Core.Parsing;
 using ChurchProjection.Core.Services;
@@ -189,6 +190,69 @@ public class ContentSearchViewModel : ViewModelBase
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to load full chapter {Book} {Chapter}", book, chapter);
+        }
+    }
+
+    /// <summary>
+    /// Loads every verse of a book into the results list so the operator can browse the whole book.
+    /// The bookmarked verse (when provided) is highlighted and scrolled into view.
+    /// </summary>
+    public async Task LoadFullBookAsync(string book, int originChapter = 0, int originVerse = 0)
+    {
+        _searchCts?.Cancel();
+        _searchCts?.Dispose();
+        _searchCts = null;
+
+        var chapterCount = BibleBooks.ChapterCountFor(book);
+        if (chapterCount <= 0)
+        {
+            _invalidReference.OnNext($"Could not load {book} — book not recognized.");
+            return;
+        }
+
+        try
+        {
+            Results.Clear();
+            ContentItem? origin = null;
+
+            for (var chapter = 1; chapter <= chapterCount; chapter++)
+            {
+                var wholeChapter = new ScriptureReference(book, chapter, VerseStart: 1, VerseEnd: ScriptureReference.WholeChapterSentinel);
+                var verses = await _contentLibrary.GetOrFetchVersesAsync(wholeChapter, SelectedTranslation);
+                foreach (var s in verses)
+                {
+                    var item = new ContentItem
+                    {
+                        Type = ContentItemType.Scripture,
+                        Title = s.Reference,
+                        Subtitle = s.Translation,
+                        Body = s.Text,
+                        Tag = s.Translation,
+                        Footer = $"{s.Reference} ({s.Translation})",
+                        Source = s,
+                        IsOrigin = originChapter == chapter && originVerse > 0 && s.VerseStart == originVerse,
+                    };
+                    Results.Add(item);
+                    if (item.IsOrigin) origin = item;
+                }
+            }
+
+            if (Results.Count == 0)
+            {
+                var notice = InvalidReferenceNotice.For(book, hadResults: false);
+                if (notice is not null)
+                    _invalidReference.OnNext(notice);
+            }
+
+            if (origin is not null)
+                SelectedItem = origin;
+
+            _suppressedQuery = book;
+            SearchQuery = book;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to load full book {Book}", book);
         }
     }
 

@@ -8,6 +8,7 @@ public enum OutputKind
     Display,
     Windowed,
     ProPresenter,
+    Ndi,
 }
 
 /// <summary>

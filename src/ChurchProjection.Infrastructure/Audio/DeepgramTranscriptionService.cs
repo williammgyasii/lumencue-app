@@ -5,7 +5,6 @@ using Deepgram;
 using Deepgram.Clients.Interfaces.v2;
 using Deepgram.Models.Authenticate.v1;
 using Deepgram.Models.Listen.v2.WebSocket;
-using NAudio.CoreAudioApi;
 using NAudio.Wave;
 using Serilog;
 
@@ -34,7 +33,7 @@ public class DeepgramTranscriptionService : ITranscriptionService
     private bool _sending;
     private DateTimeOffset _lastSpeechUtc = DateTimeOffset.MinValue;
     private IListenWebSocketClient? _wsClient;
-    private WasapiCapture? _capture;
+    private IMicrophoneCapture? _capture;
     private WaveFormat? _captureFormat;
     private readonly SemaphoreSlim _startStopLock = new(1, 1);
 
@@ -95,24 +94,7 @@ public class DeepgramTranscriptionService : ITranscriptionService
     }
 
     public Task<List<string>> GetAvailableDevicesAsync()
-    {
-        var devices = new List<string>();
-        try
-        {
-            using var enumerator = new MMDeviceEnumerator();
-            var endpoints = enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
-            foreach (var device in endpoints)
-            {
-                devices.Add(device.FriendlyName);
-                device.Dispose();
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Failed to enumerate audio devices");
-        }
-        return Task.FromResult(devices);
-    }
+        => Task.FromResult(MicrophoneCaptureFactory.ListInputDevices());
 
     public async Task StartAsync(string? deviceName = null)
     {
@@ -287,25 +269,21 @@ public class DeepgramTranscriptionService : ITranscriptionService
     {
         CleanupCapture();
 
-        MMDevice? selectedDevice = null;
         try
         {
-            using var enumerator = new MMDeviceEnumerator();
-            if (deviceName is not null)
+            _capture = MicrophoneCaptureFactory.Open(deviceName);
+            if (_capture is null)
             {
-                var endpoints = enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
-                selectedDevice = endpoints.FirstOrDefault(d =>
-                    d.FriendlyName.Contains(deviceName, StringComparison.OrdinalIgnoreCase));
+                _statusMessage.OnNext("Audio device error");
+                _captureSampleRate = FallbackSampleRate;
+                return;
             }
-            selectedDevice ??= enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
 
-            _capture = new WasapiCapture(selectedDevice);
             _captureFormat = _capture.WaveFormat;
             _captureSampleRate = _captureFormat.SampleRate > 0 ? _captureFormat.SampleRate : FallbackSampleRate;
 
-            Log.Information("Audio: {Name} @ {Rate}Hz {Bits}bit {Ch}ch (streaming native rate)",
-                selectedDevice.FriendlyName, _captureFormat.SampleRate,
-                _captureFormat.BitsPerSample, _captureFormat.Channels);
+            Log.Information("Audio: @ {Rate}Hz {Bits}bit {Ch}ch (streaming native rate)",
+                _captureFormat.SampleRate, _captureFormat.BitsPerSample, _captureFormat.Channels);
         }
         catch (Exception ex)
         {

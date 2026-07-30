@@ -1,15 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
+    <OutputType Condition="$([MSBuild]::IsOSPlatform('Windows'))">WinExe</OutputType>
+    <OutputType Condition="!$([MSBuild]::IsOSPlatform('Windows'))">Exe</OutputType>
     <RootNamespace>ChurchProjection.App</RootNamespace>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <Product>LumenCue</Product>
     <AssemblyTitle>LumenCue</AssemblyTitle>
     <Company>LumenCue</Company>
-    <Version>0.7.0</Version>
-    <FileVersion>0.7.0</FileVersion>
-    <InformationalVersion>0.7.0</InformationalVersion>
+    <Version>0.7.23</Version>
+    <FileVersion>0.7.23</FileVersion>
+    <InformationalVersion>0.7.23</InformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -45,6 +46,11 @@
     -->
     <None Update="appsettings.local.json" CopyToOutputDirectory="PreserveNewest"
           Condition="Exists('appsettings.local.json') And '$(Configuration)' == 'Debug'" />
+  </ItemGroup>
+
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX')) AND Exists('/Library/NDI SDK for Apple/lib/macOS/libndi.dylib')">
+    <Content Include="/Library/NDI SDK for Apple/lib/macOS/libndi.dylib" Link="libNDILib.dylib" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="/Library/NDI SDK for Apple/lib/macOS/libndi.dylib" Link="NDILib.dylib" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!--

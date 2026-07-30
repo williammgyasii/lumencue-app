@@ -53,6 +53,7 @@ public sealed class ScriptureSearchService : IScriptureSearchService
             return;
 
         await _buildLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        var acquired = true;
         try
         {
             if (IsIndexReady(translation) &&
@@ -110,7 +111,8 @@ public sealed class ScriptureSearchService : IScriptureSearchService
         }
         finally
         {
-            _buildLock.Release();
+            if (acquired)
+                _buildLock.Release();
         }
     }
 

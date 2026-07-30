@@ -287,6 +287,8 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
 
     /// <summary>Creates a fresh song editor (new song). Wire <see cref="SongEditorViewModel.Saved"/> to refresh the library.</summary>
     public SongEditorViewModel CreateSongEditor() => new(_contentLibrary, _themes);
+    public NoteEditorViewModel CreateNoteEditor(string heading, string title, string body, NoteSplitMode splitMode) =>
+        new(_themes, heading, title, body, splitMode);
 
     /// <summary>Reloads the library/search index after a song is saved from the editor.</summary>
     public Task RefreshLibraryAsync() => ReloadLibraryAsync();
@@ -787,6 +789,32 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
 
     public bool HasNowSinging => NowSingingSlides.Count > 0;
 
+    /// <summary>Individual slides of the note currently opened in the Notes tab.</summary>
+    public ObservableCollection<NotePageSlideItem> NowNoteSlides { get; } = [];
+
+    private string? _openNoteTitle;
+    public string? OpenNoteTitle
+    {
+        get => _openNoteTitle;
+        private set => this.RaiseAndSetIfChanged(ref _openNoteTitle, value);
+    }
+
+    public bool HasOpenNote => NowNoteSlides.Count > 0;
+
+    private NoteSlideItem? _openNoteCard;
+    public NoteSlideItem? OpenNoteCard
+    {
+        get => _openNoteCard;
+        private set => this.RaiseAndSetIfChanged(ref _openNoteCard, value);
+    }
+
+    private NotePageSlideItem? _selectedNotePage;
+    public NotePageSlideItem? SelectedNotePage
+    {
+        get => _selectedNotePage;
+        set => this.RaiseAndSetIfChanged(ref _selectedNotePage, value);
+    }
+
     // Operator-adjustable size of the Now Singing slide cards (1.0 = default). Each card scales its
     // own width, preview height and text off this so the operator can make slides bigger to read.
     private double _slideScale = 1.0;
@@ -1202,6 +1230,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
             {
                 HasMultipleSlides = pos.IsMulti;
                 DeckPositionText = pos.IsMulti ? pos.Label : string.Empty;
+                SyncNotePageLiveRing(pos.Index);
             })
             .DisposeWith(sub);
 
@@ -1285,26 +1314,104 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         _lastFollowIndex = NowSingingSlides.IndexOf(slide);
     }
 
-    /// <summary>Projects a saved note. Routed through the standard themed path (Note rides the Scripture
-    /// theme) so notes look consistent with how scripture/songs are sent, and the live ring tracks it.</summary>
+    /// <summary>Projects a saved note deck starting at the first slide.</summary>
     public void SendNoteLive(NoteSlideItem? card)
     {
         if (card is null) return;
+        OpenNote(card);
+        if (NowNoteSlides.Count > 0)
+            SendNotePageLive(NowNoteSlides[0]);
+    }
+
+    /// <summary>Opens a saved note and shows its slide breakdown in the Notes tab.</summary>
+    public void OpenNote(NoteSlideItem? card)
+    {
+        if (card is null)
+        {
+            CloseOpenNote();
+            return;
+        }
+
+        OpenNoteCard = card;
+        OpenNoteTitle = card.Title;
+        NowNoteSlides.Clear();
+
         var theme = _themes.ResolveFor(SlideType.Note);
-        _projection.ProjectDeck(DeckBuilder.Build(SlideType.Note, card.Title, card.Body, string.Empty, theme));
+        IReadOnlyList<string> bodies = card.Note.SplitMode == NoteSplitMode.AutoFit
+            ? DeckBuilder.BuildNote(card.Title, card.Body, string.Empty, theme, NoteSplitMode.AutoFit)
+                .Slides.Select(s => s.Body).ToList()
+            : NoteSlidePlanner.PlanBodies(card.Body, card.Note.SplitMode);
+
+        if (bodies.Count == 0)
+            bodies = [card.Body];
+
+        for (var i = 0; i < bodies.Count; i++)
+            NowNoteSlides.Add(new NotePageSlideItem(card, i, bodies[i], bodies.Count));
+
+        SelectedNotePage = NowNoteSlides.Count > 0 ? NowNoteSlides[0] : null;
+        Notes.SelectedCard = card;
+        this.RaisePropertyChanged(nameof(HasOpenNote));
+        StatusText = $"{card.Title} — {NowNoteSlides.Count} slide{(NowNoteSlides.Count == 1 ? "" : "s")}";
+    }
+
+    /// <summary>Returns to the note library grid from the slide breakdown.</summary>
+    public void CloseOpenNote()
+    {
+        OpenNoteCard = null;
+        OpenNoteTitle = null;
+        NowNoteSlides.Clear();
+        SelectedNotePage = null;
+        Notes.SelectedCard = null;
+        this.RaisePropertyChanged(nameof(HasOpenNote));
+        StatusText = Notes.HasNotes ? "Click a note to open its slides." : "Add a note, then click it to open its slides.";
+    }
+
+    /// <summary>Projects one slide from the opened note and marks it live.</summary>
+    public void SendNotePageLive(NotePageSlideItem? page)
+    {
+        if (page is null || OpenNoteCard is null) return;
+        var card = OpenNoteCard;
+        var theme = _themes.ResolveFor(SlideType.Note);
+        var deck = DeckBuilder.BuildNote(card.Title, card.Body, string.Empty, theme, card.Note.SplitMode);
+        _projection.ProjectDeck(new SlideDeck(deck.Slides, page.Index));
         SetLiveSlideType(SlideType.Note);
 
-        // Clear every other surface's live highlight, then mark this note.
         foreach (var slide in NowSingingSlides) { slide.IsLive = false; slide.IsSuggested = false; }
         ClearContentLiveHighlights();
         foreach (var n in Notes.Cards) n.IsLive = false;
+        foreach (var p in NowNoteSlides) p.IsLive = false;
+        page.IsLive = true;
         card.IsLive = true;
+        SelectedNotePage = page;
 
-        // A manual live action takes precedence over lyric-follow: pause it briefly.
         _followCooldownUntil = DateTime.UtcNow + FollowCooldown;
         _followPendingTarget = -1;
         _followPendingCount = 0;
-        StatusText = $"Live: {card.Title}";
+        StatusText = $"Live: {card.Title} ({page.Label})";
+    }
+
+    private void SyncNotePageLiveRing(int deckIndex)
+    {
+        if (OpenNoteCard is null || NowNoteSlides.Count == 0 || _liveSlideType != SlideType.Note)
+            return;
+
+        for (var i = 0; i < NowNoteSlides.Count; i++)
+            NowNoteSlides[i].IsLive = i == deckIndex;
+        OpenNoteCard.IsLive = true;
+    }
+
+    /// <summary>Steps the live output through the opened note's slides.</summary>
+    public void StepNoteLive(int direction)
+    {
+        if (NowNoteSlides.Count == 0) return;
+        var idx = -1;
+        for (var i = 0; i < NowNoteSlides.Count; i++)
+            if (NowNoteSlides[i].IsLive) { idx = i; break; }
+
+        var next = idx < 0
+            ? (direction > 0 ? 0 : NowNoteSlides.Count - 1)
+            : Math.Clamp(idx + direction, 0, NowNoteSlides.Count - 1);
+        SendNotePageLive(NowNoteSlides[next]);
     }
 
     public void SendSuggestionToLive(SuggestionItem? item)
@@ -1431,6 +1538,18 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         if (item is null) return;
         if (TryParseScriptureId(item.ContentId, out var book, out var chapter, out var verse))
             LoadChapterIntoLibrary(book, chapter, verse);
+        else if (TryParseReferenceText(item.Title, out book, out chapter, out var verseFromTitle))
+            LoadChapterIntoLibrary(book, chapter, verseFromTitle);
+    }
+
+    /// <summary>Loads the entire book behind a bookmark into the Scripture tab.</summary>
+    public void ShowFullBook(SuggestionItem? item)
+    {
+        if (item is null) return;
+        if (TryParseScriptureId(item.ContentId, out var book, out var chapter, out var verse))
+            LoadBookIntoLibrary(book, chapter, verse);
+        else if (TryParseReferenceText(item.Title, out book, out chapter, out var verseFromTitle))
+            LoadBookIntoLibrary(book, chapter, verseFromTitle);
     }
 
     public void ShowFullChapter(ContentItem? item)
@@ -1449,9 +1568,18 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
 
     private void LoadChapterIntoLibrary(string book, int chapter, int originVerse)
     {
+        EnterBibleMode();
         SelectedContentTab = 0;
         StatusText = $"Loading {book} {chapter}...";
         _ = ContentSearch.LoadFullChapterAsync(book, chapter, originVerse);
+    }
+
+    private void LoadBookIntoLibrary(string book, int originChapter, int originVerse)
+    {
+        EnterBibleMode();
+        SelectedContentTab = 0;
+        StatusText = $"Loading {book}...";
+        _ = ContentSearch.LoadFullBookAsync(book, originChapter, originVerse);
     }
 
     // Runs one finalized utterance through the paraphrase watcher (latest-wins: a fresher utterance

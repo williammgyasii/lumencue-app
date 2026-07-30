@@ -8,7 +8,7 @@ namespace ChurchProjection.Infrastructure.Data;
 /// </summary>
 public class NotesRepository
 {
-    private const string SelectColumns = "id, title, body, created_at, updated_at";
+    private const string SelectColumns = "id, title, body, split_mode, created_at, updated_at";
 
     private readonly DatabaseService _db;
 
@@ -32,14 +32,15 @@ public class NotesRepository
             await using var conn = _db.GetConnection();
             note.Id = await conn.QuerySingleAsync<long>(
                 """
-                INSERT INTO notes (title, body, created_at, updated_at)
-                VALUES (@Title, @Body, @CreatedAt, @UpdatedAt);
+                INSERT INTO notes (title, body, split_mode, created_at, updated_at)
+                VALUES (@Title, @Body, @SplitMode, @CreatedAt, @UpdatedAt);
                 SELECT last_insert_rowid();
                 """,
                 new
                 {
                     note.Title,
                     note.Body,
+                    SplitMode = (int)note.SplitMode,
                     CreatedAt = note.CreatedAt.ToString("o"),
                     UpdatedAt = note.UpdatedAt.ToString("o"),
                 }).ConfigureAwait(false);
@@ -60,8 +61,8 @@ public class NotesRepository
         {
             await using var conn = _db.GetConnection();
             await conn.ExecuteAsync(
-                "UPDATE notes SET title = @Title, body = @Body, updated_at = @UpdatedAt WHERE id = @Id",
-                new { note.Title, note.Body, UpdatedAt = note.UpdatedAt.ToString("o"), note.Id })
+                "UPDATE notes SET title = @Title, body = @Body, split_mode = @SplitMode, updated_at = @UpdatedAt WHERE id = @Id",
+                new { note.Title, note.Body, SplitMode = (int)note.SplitMode, UpdatedAt = note.UpdatedAt.ToString("o"), note.Id })
                 .ConfigureAwait(false);
         }
         finally
@@ -90,6 +91,7 @@ public class NotesRepository
         Id = (long)row.id,
         Title = (string)row.title,
         Body = (string)row.body,
+        SplitMode = row.split_mode is null ? NoteSplitMode.AutoFit : (NoteSplitMode)(int)row.split_mode,
         CreatedAt = ParseDate(row.created_at as string),
         UpdatedAt = ParseDate(row.updated_at as string),
     };

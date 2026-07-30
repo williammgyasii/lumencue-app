@@ -11,6 +11,13 @@ public static class ReleaseNotes
 {
     private static readonly Dictionary<string, string[]> Notes = new()
     {
+        ["0.7.23"] =
+        [
+            "LumenCue now runs natively on Mac (Apple Silicon) — install and project from your MacBook or Mac mini.",
+            "NDI output for OBS: turn on the NDI screen in Settings and add “LumenCue Program” as an NDI Source in OBS (DistroAV plugin).",
+            "Notes got a big upgrade — paste long teaching notes, split them into slides by paragraph or section, preview with your theme, and click a note to browse its slides before sending live.",
+            "Bookmarked verses now offer Send to Live, Show in Chapter, and Show Entire Book from the right-click menu.",
+        ],
         ["0.7.22"] =
         [
             "New Notes tab — write a title and body (great for prayer points). Each saved note becomes a slide card; double-click it to show it on screen.",
