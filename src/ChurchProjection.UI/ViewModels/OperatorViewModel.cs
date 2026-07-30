@@ -51,6 +51,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
 
     // The scripture reference currently shown live, so a translation switch can re-render it.
     private ScriptureReference? _liveScriptureRef;
+    private int _translationRefreshGeneration;
 
     // The chapter we've already auto-loaded into the Scripture tab, so projecting another verse from
     // the same chapter doesn't reload it. Lets the operator instantly hop to adjacent verses (the
@@ -1287,6 +1288,11 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     public void SendItemToLive(ContentItem? item)
     {
         if (item is null) return;
+        if (item.IsScripture && string.IsNullOrWhiteSpace(item.Body))
+        {
+            StatusText = "That verse has no text in this translation yet.";
+            return;
+        }
         var type = item.Type.ToSlideType();
         var theme = _themes.ResolveFor(type);
         _projection.ProjectDeck(DeckBuilder.Build(type, item.Title, item.Body, item.Footer, theme, item.LinesPerSlide));
@@ -1450,6 +1456,8 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     private void SetLiveSlideType(SlideType type)
     {
         _liveSlideType = type;
+        if (type != SlideType.Scripture)
+            _liveScriptureRef = null;
         this.RaisePropertyChanged(nameof(LiveThemeName));
     }
 
@@ -1495,17 +1503,37 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     /// Re-renders whatever scripture is currently live into the newly selected translation, so
     /// switching translations updates the verse already on screen — not just the next one.
     /// </summary>
-    private async Task RefreshLiveTranslationAsync(string translation)
+    private async Task RefreshLiveTranslationAsync(string translation, int generation)
     {
+        if (_liveSlideType != SlideType.Scripture || _liveScriptureRef is null)
+            return;
+
         var reference = _liveScriptureRef;
-        if (reference is null) return;
 
         try
         {
             var verses = await _contentLibrary
                 .GetOrFetchVersesAsync(reference, translation, localOnly: false)
                 .ConfigureAwait(true);
-            if (verses.Count == 0) return;
+            if (generation != _translationRefreshGeneration)
+                return;
+
+            if (verses.Count == 0)
+            {
+                var fallback = await _contentLibrary
+                    .GetOrFetchScriptureAsync(reference, translation)
+                    .ConfigureAwait(true);
+                if (generation != _translationRefreshGeneration)
+                    return;
+                if (fallback is not null)
+                    verses = [fallback];
+            }
+
+            if (verses.Count == 0)
+            {
+                StatusText = $"{translation} doesn't have {reference} yet — keeping what's on screen";
+                return;
+            }
 
             var ordered = verses.OrderBy(v => v.VerseStart).ToList();
             var first = ordered[0];
@@ -1517,8 +1545,13 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
             var body = ordered.Count == 1
                 ? first.Text
                 : string.Join(" ", ordered.Select(v => v.Text));
-            var footer = $"{label} ({translation})";
+            if (string.IsNullOrWhiteSpace(body))
+            {
+                StatusText = $"{translation} returned no text for {label} — keeping what's on screen";
+                return;
+            }
 
+            var footer = $"{label} ({translation})";
             var theme = _themes.ResolveFor(SlideType.Scripture);
             _projection.ProjectDeck(DeckBuilder.Build(SlideType.Scripture, label, body, footer, theme));
             StatusText = $"Switched live to {translation}: {label}";
@@ -1526,6 +1559,8 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         catch (Exception ex)
         {
             Log.Warning(ex, "Failed to refresh live scripture into {Translation}", translation);
+            if (generation == _translationRefreshGeneration)
+                StatusText = $"Couldn't load {reference} in {translation} — keeping what's on screen";
         }
     }
 
@@ -2149,7 +2184,8 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
                 TopicalSearch.Translation = t;
                 _ = _settings.SetAsync("bible_translation", t);
                 _ = CacheTranslationAsync(t);
-                _ = RefreshLiveTranslationAsync(t);
+                var generation = Interlocked.Increment(ref _translationRefreshGeneration);
+                _ = RefreshLiveTranslationAsync(t, generation);
             });
 
         _bibleCache.StatusMessage

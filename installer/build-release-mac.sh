@@ -15,10 +15,11 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PROJ="$REPO_ROOT/src/ChurchProjection.App/ChurchProjection.App.csproj"
 APP_OUT="$REPO_ROOT/publish/app-mac"
 RELEASE_DIR="$REPO_ROOT/publish/releases-mac"
-ICON="$REPO_ROOT/src/ChurchProjection.UI/Assets/app-icon.png"
 ICNS="$REPO_ROOT/src/ChurchProjection.App/Assets/app.icns"
 PACK_ID="LumenCue"
 MAIN_EXE="ChurchProjection.App"
+
+export PATH="$PATH:$HOME/.dotnet/tools"
 
 echo "==> Publishing self-contained $RUNTIME build (v$VERSION)..."
 rm -rf "$APP_OUT"

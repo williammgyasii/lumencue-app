@@ -87,5 +87,6 @@ jobs:
 
       - name: Build & publish Mac release
         run: |
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
           chmod +x installer/build-release-mac.sh
           installer/build-release-mac.sh "${{ steps.ver.outputs.version }}" "${{ secrets.RELEASES_TOKEN }}"

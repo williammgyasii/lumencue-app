@@ -11,6 +11,13 @@ public static class ReleaseNotes
 {
     private static readonly Dictionary<string, string[]> Notes = new()
     {
+        ["0.7.24"] =
+        [
+            "Switching Bible translations while a verse is live no longer blanks the slide — if the new translation isn't ready yet, what's on screen stays up.",
+            "Bookmarked verses: right-click for Send to Live, Show in Chapter, or Show Entire Book.",
+            "Notes editor with slide splitting, plus click a note to browse its slides before sending live.",
+            "Mac (Apple Silicon) builds and NDI output for OBS.",
+        ],
         ["0.7.23"] =
         [
             "LumenCue now runs natively on Mac (Apple Silicon) — install and project from your MacBook or Mac mini.",
