@@ -11,6 +11,12 @@ public static class ReleaseNotes
 {
     private static readonly Dictionary<string, string[]> Notes = new()
     {
+        ["0.7.25"] =
+        [
+            "Cloud sign-in, library sync and live transcription are back — the app now connects to our new hosting.",
+            "Custom Bible translations (The Passion Translation, Living Bible, ESV, and others) download again — pick one in Settings and it caches for offline use.",
+            "Blank screen now stays solid black instead of showing your theme's background colour.",
+        ],
         ["0.7.24"] =
         [
             "Switching Bible translations while a verse is live no longer blanks the slide — if the new translation isn't ready yet, what's on screen stays up.",

@@ -197,7 +197,8 @@ public class ProjectorViewModel : ViewModelBase, IActivatableViewModel, IDisposa
                 BodyRegion.SetLiveFrame(frame);
                 FooterRegion.SetLiveFrame(frame);
                 foreach (var shape in Shapes) shape.SetLiveFrame(frame);
-                RefreshBackground();
+                if (!_isBlank)
+                    RefreshBackground();
             })
             .DisposeWith(_subscriptions);
 
@@ -211,13 +212,20 @@ public class ProjectorViewModel : ViewModelBase, IActivatableViewModel, IDisposa
                 SlideFooter = slide.Footer;
                 _currentSlideType = slide.Type;
                 ApplyTheme(ResolveTheme(slide.Type));
+                if (IsBlank)
+                    ApplyBlankScreen();
                 ConfigureLiveClock(slide);
             })
             .DisposeWith(_subscriptions);
 
         _themes.Changed
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(_ => ApplyTheme(ResolveTheme(_currentSlideType)))
+            .Subscribe(_ =>
+            {
+                ApplyTheme(ResolveTheme(_currentSlideType));
+                if (_isBlank)
+                    ApplyBlankScreen();
+            })
             .DisposeWith(_subscriptions);
 
         ApplyTheme(ResolveTheme(SlideType.Blank));
@@ -490,6 +498,12 @@ public class ProjectorViewModel : ViewModelBase, IActivatableViewModel, IDisposa
     /// </summary>
     private void RefreshBackground()
     {
+        if (_isBlank)
+        {
+            ApplyBlankScreen();
+            return;
+        }
+
         if (_liveFrame is not null && _themeIsPlaceholder)
         {
             BackgroundImage = _liveFrame;
@@ -500,6 +514,19 @@ public class ProjectorViewModel : ViewModelBase, IActivatableViewModel, IDisposa
             BackgroundImage = _themeBackgroundImage;
             HasBackgroundImage = _themeBackgroundImage is not null;
         }
+    }
+
+    /// <summary>
+    /// Blank clears slide text but must always output solid black — not the content theme's
+    /// background (e.g. ATEM chroma green for lower-thirds).
+    /// </summary>
+    private void ApplyBlankScreen()
+    {
+        BackgroundBrush = Brushes.Black;
+        _themeIsPlaceholder = false;
+        _themeBackgroundImage = null;
+        BackgroundImage = null;
+        HasBackgroundImage = false;
     }
 
     /// <summary>Applies a per-channel layer snapshot: enable/opacity for every layer plus the overlay logo
