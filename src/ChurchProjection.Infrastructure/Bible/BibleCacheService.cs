@@ -50,21 +50,17 @@ public class BibleCacheService
     private static readonly (string Code, string Name, string Url)[] CustomTranslations =
     [
         ("TPT", "The Passion Translation",
-            "https://lumencue-api-bibles-618015514647.s3.us-east-1.amazonaws.com/translations/TPT.json"),
+            "https://raw.githubusercontent.com/williammgyasii/lumencue-releases/main/bibles/translations/TPT.json"),
         ("TLB", "The Living Bible",
-            "https://lumencue-api-bibles-618015514647.s3.us-east-1.amazonaws.com/translations/TLB.json"),
+            "https://raw.githubusercontent.com/williammgyasii/lumencue-releases/main/bibles/translations/TLB.json"),
         ("AMPC", "Amplified Bible, Classic Edition",
-            "https://lumencue-api-bibles-618015514647.s3.us-east-1.amazonaws.com/translations/AMPC.json"),
-        ("ERV", "Easy-to-Read Version",
-            "https://lumencue-api-bibles-618015514647.s3.us-east-1.amazonaws.com/translations/ERV.json"),
+            "https://raw.githubusercontent.com/williammgyasii/lumencue-releases/main/bibles/translations/AMPC.json"),
         ("ESV", "English Standard Version",
-            "https://lumencue-api-bibles-618015514647.s3.us-east-1.amazonaws.com/translations/ESV.json"),
+            "https://raw.githubusercontent.com/williammgyasii/lumencue-releases/main/bibles/translations/ESV.json"),
         ("GNT", "Good News Translation",
-            "https://lumencue-api-bibles-618015514647.s3.us-east-1.amazonaws.com/translations/GNT.json"),
-        ("NET", "New English Translation",
-            "https://lumencue-api-bibles-618015514647.s3.us-east-1.amazonaws.com/translations/NET.json"),
+            "https://raw.githubusercontent.com/williammgyasii/lumencue-releases/main/bibles/translations/GNT.json"),
         ("ASV", "American Standard Version",
-            "https://lumencue-api-bibles-618015514647.s3.us-east-1.amazonaws.com/translations/ASV.json"),
+            "https://raw.githubusercontent.com/williammgyasii/lumencue-releases/main/bibles/translations/ASV.json"),
     ];
 
     private static (string Code, string Name, string Url)? FindCustom(string translation) =>

@@ -28,3 +28,4 @@ GNT.json
 NET.json
 ASV.json
 *.bible.json
+.hosted-bibles/
