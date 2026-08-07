@@ -8,9 +8,13 @@ using ChurchProjection.Core.Services;
 using Dapper;
 using Npgsql;
 
+// Must run before CreateBuilder — containers (Render/Fly) exhaust inotify limits otherwise.
+Environment.SetEnvironmentVariable("DOTNET_HOSTBUILDER__RELOADCONFIGONCHANGE", "false");
+
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Configuration.AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true);
+if (builder.Environment.IsDevelopment())
+    builder.Configuration.AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true);
 
 // In hosted environments (Fly) bind the port the platform assigns. Locally PORT is unset,
 // so the address from appsettings.json ("http://localhost:5080") is used unchanged.
@@ -27,6 +31,8 @@ if (string.IsNullOrWhiteSpace(connectionString))
     throw new InvalidOperationException(
         "No Neon connection string. Set ConnectionStrings:Neon in appsettings.local.json or the NEON_CONNECTION_STRING environment variable.");
 
+// Render/Fly inject a postgres:// URI; RDS/local use key=value.
+connectionString = ConnectionStrings.Normalize(connectionString);
 var dataSource = new NpgsqlDataSourceBuilder(connectionString).Build();
 builder.Services.AddSingleton(dataSource);
 

@@ -22,7 +22,9 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app ./
 
-# Fly routes to this port; Program.cs binds http://+:$PORT when PORT is set.
+# Render/Fly containers exhaust inotify limits if config reload watchers are enabled.
+ENV DOTNET_HOSTBUILDER__RELOADCONFIGONCHANGE=false
+ENV DOTNET_USE_POLLING_FILE_WATCHER=true
 ENV PORT=8080
 ENV ASPNETCORE_ENVIRONMENT=Production
 EXPOSE 8080

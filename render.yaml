@@ -1,0 +1,34 @@
+# Render Blueprint — LumenCue Cloud API
+# https://render.com/docs/blueprint-spec
+
+databases:
+  - name: lumencue-db
+    databaseName: lumencue
+    user: lumencue
+    plan: free
+    postgresMajorVersion: "16"
+    region: virginia
+
+services:
+  - type: web
+    name: lumencue-api
+    runtime: docker
+    plan: free
+    region: virginia
+    repo: https://github.com/williammgyasii/lumencue-app
+    branch: main
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: NEON_CONNECTION_STRING
+        fromDatabase:
+          name: lumencue-db
+          property: connectionString
+      - key: DEEPGRAM_API_KEY
+        sync: false
+      - key: APIBIBLE_API_KEY
+        sync: false
