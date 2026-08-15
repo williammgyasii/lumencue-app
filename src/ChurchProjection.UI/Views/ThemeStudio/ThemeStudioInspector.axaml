@@ -1,0 +1,631 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ChurchProjection.UI.ViewModels"
+             xmlns:conv="using:ChurchProjection.UI.Converters"
+             x:Class="ChurchProjection.UI.Views.ThemeStudio.ThemeStudioInspector"
+             x:DataType="vm:ThemeStudioViewModel">
+
+  <UserControl.Styles>
+    <Style Selector="Border.propSection">
+      <Setter Property="Background" Value="#1B202A" />
+      <Setter Property="BorderBrush" Value="#2A303C" />
+      <Setter Property="BorderThickness" Value="0,1,0,1" />
+      <Setter Property="Padding" Value="12,6" />
+      <Setter Property="Margin" Value="0,8,0,0" />
+    </Style>
+    <Style Selector="TextBlock.propSectionTitle">
+      <Setter Property="Foreground" Value="#959DAB" />
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+    <Style Selector="TextBlock.propSectionTitle.accentTransform">
+      <Setter Property="Foreground" Value="#22D3EE" />
+    </Style>
+    <Style Selector="TextBlock.propSectionTitle.accentBindings">
+      <Setter Property="Foreground" Value="#F472B6" />
+    </Style>
+    <Style Selector="TextBlock.propSectionTitle.accentTheme">
+      <Setter Property="Foreground" Value="#A78BFA" />
+    </Style>
+    <Style Selector="TextBlock.propSectionTitle.accentCaption">
+      <Setter Property="Foreground" Value="#FBBF24" />
+    </Style>
+    <Style Selector="Border.propRow">
+      <Setter Property="BorderBrush" Value="#232932" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="Padding" Value="0,4" />
+    </Style>
+    <Style Selector="TextBlock.propLabel">
+      <Setter Property="Foreground" Value="#959DAB" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="10,0,8,0" />
+    </Style>
+    <Style Selector="Button.inspTab">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="#959DAB" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Padding" Value="0,10" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="BorderThickness" Value="0,0,0,2" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="CornerRadius" Value="0" />
+    </Style>
+    <Style Selector="Button.inspTab.active">
+      <Setter Property="Foreground" Value="#ECEEF2" />
+    </Style>
+    <Style Selector="Button.inspTabElement.active">
+      <Setter Property="BorderBrush" Value="#22D3EE" />
+    </Style>
+    <Style Selector="Button.inspTabTheme.active">
+      <Setter Property="BorderBrush" Value="#7C6CF6" />
+    </Style>
+    <Style Selector="Button.inspSubTab">
+      <Setter Property="Background" Value="#1B202A" />
+      <Setter Property="Foreground" Value="#6E7682" />
+      <Setter Property="FontSize" Value="10.5" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Padding" Value="0,7" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="BorderThickness" Value="0,0,0,2" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="CornerRadius" Value="0" />
+    </Style>
+    <Style Selector="Button.inspSubTab.active">
+      <Setter Property="Foreground" Value="#ECEEF2" />
+      <Setter Property="Background" Value="#232932" />
+    </Style>
+    <Style Selector="Button.inspSubTabLayout.active">
+      <Setter Property="BorderBrush" Value="#22D3EE" />
+    </Style>
+    <Style Selector="Button.inspSubTabText.active">
+      <Setter Property="BorderBrush" Value="#A78BFA" />
+    </Style>
+    <Style Selector="Button.inspSubTabBinding.active">
+      <Setter Property="BorderBrush" Value="#F472B6" />
+    </Style>
+    <Style Selector="Button.inspSubTabBox.active">
+      <Setter Property="BorderBrush" Value="#FBBF24" />
+    </Style>
+    <Style Selector="Button.inspSubTabFill.active">
+      <Setter Property="BorderBrush" Value="#A78BFA" />
+    </Style>
+    <Style Selector="Button.inspSubTabImage.active">
+      <Setter Property="BorderBrush" Value="#22D3EE" />
+    </Style>
+    <Style Selector="Button.inspSubTabArrange.active">
+      <Setter Property="BorderBrush" Value="#F472B6" />
+    </Style>
+    <Style Selector="Button.inspSubTabBackground.active">
+      <Setter Property="BorderBrush" Value="#7C6CF6" />
+    </Style>
+    <Style Selector="Button.inspSubTabLegibility.active">
+      <Setter Property="BorderBrush" Value="#34D399" />
+    </Style>
+    <Style Selector="NumericUpDown.propNum">
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="TextBox.propField">
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Padding" Value="8,5" />
+    </Style>
+    <Style Selector="ComboBox.propField">
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="ColorPicker.propColor">
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="Height" Value="32" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="IsComponentTextInputVisible" Value="False" />
+      <Setter Property="IsHexInputVisible" Value="False" />
+      <Setter Property="IsColorModelVisible" Value="False" />
+    </Style>
+  </UserControl.Styles>
+
+  <UserControl.Resources>
+    <conv:HexColorConverter x:Key="HexColor" />
+  </UserControl.Resources>
+
+  <Border Background="#14181F" BorderBrush="#2A303C" BorderThickness="1,0,0,0" ClipToBounds="True">
+    <Grid RowDefinitions="Auto,Auto,Auto,*">
+
+      <!-- Selection header -->
+      <Border Grid.Row="0" Background="#0E1014" Padding="12,10" BorderBrush="#2A303C" BorderThickness="0,0,0,1">
+        <Grid ColumnDefinitions="Auto,*">
+          <Ellipse Grid.Column="0" Width="8" Height="8" Fill="#22D3EE" VerticalAlignment="Center" Margin="0,0,10,0" />
+          <StackPanel Grid.Column="1" Spacing="2">
+            <TextBlock Text="{Binding SelObjectName}" Foreground="#ECEEF2" FontSize="13" FontWeight="SemiBold" />
+            <TextBlock Text="Properties" Foreground="#6E7682" FontSize="10" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!-- Element | Theme -->
+      <Grid Grid.Row="1" ColumnDefinitions="*,*" Background="#0E1014">
+        <Button Grid.Column="0" Classes="inspTab inspTabElement" Classes.active="{Binding IsElementTab}"
+                Command="{Binding ShowElementInspectorCommand}" Content="Element" />
+        <Button Grid.Column="1" Classes="inspTab inspTabTheme" Classes.active="{Binding IsThemeTab}"
+                Command="{Binding ShowThemeInspectorTabCommand}" Content="Theme" />
+      </Grid>
+
+      <!-- Region sub-tabs: Layout | Text | Binding | Box -->
+      <Grid Grid.Row="2" ColumnDefinitions="*,*,*,*" Background="#14181F"
+            IsVisible="{Binding ShowRegionSubTabs}">
+        <Button Grid.Column="0" Classes="inspSubTab inspSubTabLayout" Classes.active="{Binding IsRegionLayoutTab}"
+                Command="{Binding SelectRegionTabCommand}" CommandParameter="{x:Static vm:RegionInspectorTab.Layout}"
+                Content="Layout" />
+        <Button Grid.Column="1" Classes="inspSubTab inspSubTabText" Classes.active="{Binding IsRegionTextTab}"
+                Command="{Binding SelectRegionTabCommand}" CommandParameter="{x:Static vm:RegionInspectorTab.Text}"
+                Content="Text" />
+        <Button Grid.Column="2" Classes="inspSubTab inspSubTabBinding" Classes.active="{Binding IsRegionBindingTab}"
+                Command="{Binding SelectRegionTabCommand}" CommandParameter="{x:Static vm:RegionInspectorTab.Binding}"
+                Content="Binding" />
+        <Button Grid.Column="3" Classes="inspSubTab inspSubTabBox" Classes.active="{Binding IsRegionBoxTab}"
+                Command="{Binding SelectRegionTabCommand}" CommandParameter="{x:Static vm:RegionInspectorTab.Box}"
+                Content="Box" />
+      </Grid>
+
+      <!-- Shape sub-tabs: Layout | Fill | Image | Arrange -->
+      <Grid Grid.Row="2" ColumnDefinitions="*,*,*,*" Background="#14181F"
+            IsVisible="{Binding ShowShapeSubTabs}">
+        <Button Grid.Column="0" Classes="inspSubTab inspSubTabLayout" Classes.active="{Binding IsShapeLayoutTab}"
+                Command="{Binding SelectShapeTabCommand}" CommandParameter="{x:Static vm:ShapeInspectorTab.Layout}"
+                Content="Layout" />
+        <Button Grid.Column="1" Classes="inspSubTab inspSubTabFill" Classes.active="{Binding IsShapeFillTab}"
+                Command="{Binding SelectShapeTabCommand}" CommandParameter="{x:Static vm:ShapeInspectorTab.Fill}"
+                Content="Fill" />
+        <Button Grid.Column="2" Classes="inspSubTab inspSubTabImage" Classes.active="{Binding IsShapeImageTab}"
+                Command="{Binding SelectShapeTabCommand}" CommandParameter="{x:Static vm:ShapeInspectorTab.Image}"
+                Content="Image" />
+        <Button Grid.Column="3" Classes="inspSubTab inspSubTabArrange" Classes.active="{Binding IsShapeArrangeTab}"
+                Command="{Binding SelectShapeTabCommand}" CommandParameter="{x:Static vm:ShapeInspectorTab.Arrange}"
+                Content="Arrange" />
+      </Grid>
+
+      <!-- Theme sub-tabs: Background | Legibility -->
+      <Grid Grid.Row="2" ColumnDefinitions="*,*" Background="#14181F"
+            IsVisible="{Binding ShowThemeSubTabs}">
+        <Button Grid.Column="0" Classes="inspSubTab inspSubTabBackground" Classes.active="{Binding IsThemeBackgroundTab}"
+                Command="{Binding SelectThemeTabCommand}" CommandParameter="{x:Static vm:ThemeInspectorTab.Background}"
+                Content="Background" />
+        <Button Grid.Column="1" Classes="inspSubTab inspSubTabLegibility" Classes.active="{Binding IsThemeLegibilityTab}"
+                Command="{Binding SelectThemeTabCommand}" CommandParameter="{x:Static vm:ThemeInspectorTab.Legibility}"
+                Content="Legibility" />
+      </Grid>
+
+      <ScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="0,0,0,12">
+
+          <TextBlock IsVisible="{Binding ShowElementEmptyHint}"
+                     Text="Select a layer or click an object on the canvas."
+                     Foreground="#6E7682" FontSize="12" TextWrapping="Wrap"
+                     Margin="14,16,14,0" />
+
+          <!-- ── REGION: Layout ── -->
+          <StackPanel IsVisible="{Binding ShowRegionLayoutPanel}">
+            <Border Classes="propSection">
+              <TextBlock Classes="propSectionTitle accentTransform" Text="POSITION &amp; SIZE" />
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="X" />
+                <NumericUpDown Grid.Column="1" Classes="propNum" Minimum="0" Maximum="1920" Increment="1"
+                               Value="{Binding SelX}" FormatString="0" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Y" />
+                <NumericUpDown Grid.Column="1" Classes="propNum" Minimum="0" Maximum="1080" Increment="1"
+                               Value="{Binding SelY}" FormatString="0" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Width" />
+                <NumericUpDown Grid.Column="1" Classes="propNum" Minimum="20" Maximum="1920" Increment="1"
+                               Value="{Binding SelWidth}" FormatString="0" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Height" />
+                <NumericUpDown Grid.Column="1" Classes="propNum" Minimum="20" Maximum="1080" Increment="1"
+                               Value="{Binding SelHeight}" FormatString="0" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propSection">
+              <TextBlock Classes="propSectionTitle" Text="ALIGNMENT &amp; FIT" />
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Horizontal" />
+                <ComboBox Grid.Column="1" Classes="propField" ItemsSource="{Binding Alignments}"
+                          SelectedItem="{Binding SelHAlign}" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Vertical" />
+                <ComboBox Grid.Column="1" Classes="propField" ItemsSource="{Binding VerticalAligns}"
+                          SelectedItem="{Binding SelVAlign}" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Auto-fit" />
+                <CheckBox Grid.Column="1" IsChecked="{Binding SelAutoFit}" VerticalAlignment="Center" Margin="10,0,0,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Min size" />
+                <NumericUpDown Grid.Column="1" Classes="propNum" Minimum="8" Maximum="120" Increment="1"
+                               Value="{Binding SelMinFontSize}" FormatString="0" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Max size" />
+                <NumericUpDown Grid.Column="1" Classes="propNum" Minimum="20" Maximum="220" Increment="1"
+                               Value="{Binding SelMaxFontSize}" FormatString="0" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+          </StackPanel>
+
+          <!-- ── REGION: Text ── -->
+          <StackPanel IsVisible="{Binding ShowRegionTextPanel}">
+            <Border Classes="propSection">
+              <TextBlock Classes="propSectionTitle accentTransform" Text="TYPOGRAPHY" />
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Font" />
+                <ComboBox Grid.Column="1" Classes="propField" ItemsSource="{Binding FontFamilies}"
+                          SelectedItem="{Binding SelFontFamily}" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Size" />
+                <NumericUpDown Grid.Column="1" Classes="propNum" Minimum="10" Maximum="200" Increment="1"
+                               Value="{Binding SelFontSize}" FormatString="0" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Bold" />
+                <CheckBox Grid.Column="1" IsChecked="{Binding Bold}" VerticalAlignment="Center" Margin="10,0,0,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Color" />
+                <ColorPicker Grid.Column="1" Classes="propColor" Margin="0,0,10,0"
+                             Color="{Binding SelTextColor, Converter={StaticResource HexColor}, Mode=TwoWay}" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Line height" />
+                <NumericUpDown Grid.Column="1" Classes="propNum" Minimum="0.8" Maximum="2.5" Increment="0.05"
+                               Value="{Binding LineHeightMultiplier}" FormatString="0.00" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+          </StackPanel>
+
+          <!-- ── REGION: Binding ── -->
+          <StackPanel IsVisible="{Binding ShowRegionBindingPanel}">
+            <Border Classes="propSection">
+              <TextBlock Classes="propSectionTitle accentBindings" Text="WHAT THIS LAYER SHOWS" />
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Scripture" />
+                <ComboBox Grid.Column="1" Classes="propField" ItemsSource="{Binding ContentFields}"
+                          SelectedItem="{Binding SelScriptureField}" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Songs" />
+                <ComboBox Grid.Column="1" Classes="propField" ItemsSource="{Binding ContentFields}"
+                          SelectedItem="{Binding SelSongField}" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Notes" />
+                <ComboBox Grid.Column="1" Classes="propField" ItemsSource="{Binding ContentFields}"
+                          SelectedItem="{Binding SelNoteField}" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Announcements" />
+                <ComboBox Grid.Column="1" Classes="propField" ItemsSource="{Binding ContentFields}"
+                          SelectedItem="{Binding SelAnnouncementField}" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+          </StackPanel>
+
+          <!-- ── REGION: Box ── -->
+          <StackPanel IsVisible="{Binding ShowRegionBoxPanel}">
+            <Border Classes="propSection">
+              <TextBlock Classes="propSectionTitle accentCaption" Text="CAPTION BOX" />
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Pad H" />
+                <NumericUpDown Grid.Column="1" Classes="propNum" Minimum="0" Maximum="400" Increment="1"
+                               Value="{Binding SelTextPaddingX}" FormatString="0" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Pad V" />
+                <NumericUpDown Grid.Column="1" Classes="propNum" Minimum="0" Maximum="400" Increment="1"
+                               Value="{Binding SelTextPaddingY}" FormatString="0" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Fill" />
+                <ColorPicker Grid.Column="1" Classes="propColor" Margin="0,0,10,0"
+                             Color="{Binding SelRegionBgColor, Converter={StaticResource HexColor}, Mode=TwoWay}" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Radius" />
+                <NumericUpDown Grid.Column="1" Classes="propNum" Minimum="0" Maximum="200" Increment="1"
+                               Value="{Binding SelRegionCorner}" FormatString="0" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Image" />
+                <Grid Grid.Column="1" ColumnDefinitions="*,Auto,Auto" Margin="0,0,10,0">
+                  <TextBox Grid.Column="0" Classes="propField" Text="{Binding SelRegionBgImagePath}" Watermark="None" />
+                  <Button Grid.Column="1" Content="…" FontSize="12" Padding="10,4" Margin="4,0,0,0"
+                          Click="OnBrowseRegionImageClicked" ToolTip.Tip="Browse" />
+                  <Button Grid.Column="2" Content="✕" FontSize="11" Padding="8,4" Margin="4,0,0,0"
+                          Click="OnClearRegionImageClicked" ToolTip.Tip="Clear" />
+                </Grid>
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Image fit" />
+                <ComboBox Grid.Column="1" Classes="propField" ItemsSource="{Binding ImageFits}"
+                          SelectedItem="{Binding SelRegionBgImageFit}" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Live BG" />
+                <CheckBox Grid.Column="1" IsChecked="{Binding SelRegionUseLiveBackground}"
+                          VerticalAlignment="Center" Margin="10,0,0,0" />
+              </Grid>
+            </Border>
+          </StackPanel>
+
+          <!-- ── SHAPE: Layout ── -->
+          <StackPanel IsVisible="{Binding ShowShapeLayoutPanel}">
+            <Border Classes="propSection">
+              <TextBlock Classes="propSectionTitle accentTransform" Text="POSITION &amp; SIZE" />
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="X" />
+                <NumericUpDown Grid.Column="1" Classes="propNum" Minimum="0" Maximum="1920" Increment="1"
+                               Value="{Binding SelX}" FormatString="0" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Y" />
+                <NumericUpDown Grid.Column="1" Classes="propNum" Minimum="0" Maximum="1080" Increment="1"
+                               Value="{Binding SelY}" FormatString="0" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Width" />
+                <NumericUpDown Grid.Column="1" Classes="propNum" Minimum="20" Maximum="1920" Increment="1"
+                               Value="{Binding SelWidth}" FormatString="0" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Height" />
+                <NumericUpDown Grid.Column="1" Classes="propNum" Minimum="20" Maximum="1080" Increment="1"
+                               Value="{Binding SelHeight}" FormatString="0" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+          </StackPanel>
+
+          <!-- ── SHAPE: Fill ── -->
+          <StackPanel IsVisible="{Binding ShowShapeFillPanel}">
+            <Border Classes="propSection">
+              <TextBlock Classes="propSectionTitle" Text="FILL" />
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Color" />
+                <ColorPicker Grid.Column="1" Classes="propColor" Margin="0,0,10,0"
+                             Color="{Binding SelShapeColor, Converter={StaticResource HexColor}, Mode=TwoWay}" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Radius" />
+                <NumericUpDown Grid.Column="1" Classes="propNum" Minimum="0" Maximum="200" Increment="1"
+                               Value="{Binding SelShapeCorner}" FormatString="0" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Opacity" />
+                <NumericUpDown Grid.Column="1" Classes="propNum" Minimum="0" Maximum="1" Increment="0.05"
+                               Value="{Binding SelShapeOpacity}" FormatString="0.00" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+          </StackPanel>
+
+          <!-- ── SHAPE: Image ── -->
+          <StackPanel IsVisible="{Binding ShowShapeImagePanel}">
+            <Border Classes="propSection">
+              <TextBlock Classes="propSectionTitle" Text="IMAGE" />
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="File" />
+                <Grid Grid.Column="1" ColumnDefinitions="*,Auto,Auto" Margin="0,0,10,0">
+                  <TextBox Grid.Column="0" Classes="propField" Text="{Binding SelShapeImagePath}" Watermark="None" />
+                  <Button Grid.Column="1" Content="…" FontSize="12" Padding="10,4" Margin="4,0,0,0"
+                          Click="OnBrowseShapeImageClicked" />
+                  <Button Grid.Column="2" Content="✕" FontSize="11" Padding="8,4" Margin="4,0,0,0"
+                          Click="OnClearShapeImageClicked" />
+                </Grid>
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Fit" />
+                <ComboBox Grid.Column="1" Classes="propField" ItemsSource="{Binding ImageFits}"
+                          SelectedItem="{Binding SelShapeImageFit}" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Live BG" />
+                <CheckBox Grid.Column="1" IsChecked="{Binding SelShapeUseLiveBackground}"
+                          VerticalAlignment="Center" Margin="10,0,0,0" />
+              </Grid>
+            </Border>
+          </StackPanel>
+
+          <!-- ── SHAPE: Arrange ── -->
+          <StackPanel IsVisible="{Binding ShowShapeArrangePanel}">
+            <Border Classes="propSection">
+              <TextBlock Classes="propSectionTitle" Text="STACK ORDER" />
+            </Border>
+            <Border Classes="propRow" Padding="10,8">
+              <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="6" RowSpacing="6">
+                <Button Grid.Row="0" Grid.Column="0" Content="Front" Command="{Binding BringToFrontCommand}" FontSize="11" />
+                <Button Grid.Row="0" Grid.Column="1" Content="Back" Command="{Binding SendToBackCommand}" FontSize="11" />
+                <Button Grid.Row="1" Grid.Column="0" Content="Forward" Command="{Binding BringForwardCommand}" FontSize="11" />
+                <Button Grid.Row="1" Grid.Column="1" Content="Backward" Command="{Binding SendBackwardCommand}" FontSize="11" />
+              </Grid>
+            </Border>
+            <Button Content="Delete shape" Command="{Binding RemoveShapeCommand}" Margin="10,8,10,0"
+                    Background="#3A1D24" Foreground="#F87171" FontWeight="SemiBold" Padding="12,7" HorizontalAlignment="Stretch" />
+          </StackPanel>
+
+          <!-- ── THEME: Background ── -->
+          <StackPanel IsVisible="{Binding ShowThemeBackgroundPanel}">
+            <Border Classes="propSection">
+              <TextBlock Classes="propSectionTitle accentTheme" Text="SCREEN BACKGROUND" />
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Type" />
+                <ComboBox Grid.Column="1" Classes="propField" ItemsSource="{Binding BackgroundKinds}"
+                          SelectedItem="{Binding BackgroundKind, Mode=TwoWay}" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow" IsVisible="{Binding ShowBackgroundColor}">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Color" />
+                <ColorPicker Grid.Column="1" Classes="propColor" Margin="0,0,10,0"
+                             Color="{Binding BackgroundColor, Converter={StaticResource HexColor}, Mode=TwoWay}" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow" IsVisible="{Binding ShowBackgroundImage}">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Image" />
+                <Grid Grid.Column="1" ColumnDefinitions="*,Auto" Margin="0,0,10,0">
+                  <TextBox Grid.Column="0" Classes="propField" Text="{Binding BackgroundImagePath}" Watermark="None" />
+                  <Button Grid.Column="1" Content="…" FontSize="12" Padding="10,4" Margin="4,0,0,0"
+                          Click="OnBrowseImageClicked" />
+                </Grid>
+              </Grid>
+            </Border>
+            <Border Classes="propRow" IsVisible="{Binding ShowBackgroundImage}">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Image fit" />
+                <ComboBox Grid.Column="1" Classes="propField" ItemsSource="{Binding ImageFits}"
+                          SelectedItem="{Binding ImageFit}" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Layout" />
+                <ComboBox Grid.Column="1" Classes="propField" ItemsSource="{Binding Layouts}"
+                          SelectedItem="{Binding Layout}" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+          </StackPanel>
+
+          <!-- ── THEME: Legibility ── -->
+          <StackPanel IsVisible="{Binding ShowThemeLegibilityPanel}">
+            <Border Classes="propSection">
+              <TextBlock Classes="propSectionTitle accentTheme" Text="TEXT LEGIBILITY" />
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Outline" />
+                <CheckBox Grid.Column="1" IsChecked="{Binding OutlineEnabled}" VerticalAlignment="Center" Margin="10,0,0,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Out color" />
+                <ColorPicker Grid.Column="1" Classes="propColor" Margin="0,0,10,0"
+                             Color="{Binding OutlineColor, Converter={StaticResource HexColor}, Mode=TwoWay}" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Out width" />
+                <NumericUpDown Grid.Column="1" Classes="propNum" Minimum="0" Maximum="10" Increment="0.5"
+                               Value="{Binding OutlineWidth}" FormatString="0.0" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Shadow" />
+                <CheckBox Grid.Column="1" IsChecked="{Binding ShadowEnabled}" VerticalAlignment="Center" Margin="10,0,0,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Shd blur" />
+                <NumericUpDown Grid.Column="1" Classes="propNum" Minimum="0" Maximum="30" Increment="1"
+                               Value="{Binding ShadowBlur}" FormatString="0" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+            <Border Classes="propRow">
+              <Grid ColumnDefinitions="118,*">
+                <TextBlock Grid.Column="0" Classes="propLabel" Text="Shd opacity" />
+                <NumericUpDown Grid.Column="1" Classes="propNum" Minimum="0" Maximum="1" Increment="0.05"
+                               Value="{Binding ShadowOpacity}" FormatString="0.00" Margin="0,0,10,0" />
+              </Grid>
+            </Border>
+          </StackPanel>
+
+        </StackPanel>
+      </ScrollViewer>
+    </Grid>
+  </Border>
+</UserControl>

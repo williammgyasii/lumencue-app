@@ -43,10 +43,9 @@ public interface IAiMatcherService
     Task<List<AiSuggestion>> NavigateAsync(NavCommand command, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Feeds one final utterance into a stateful builder that assembles a scripture reference uttered
-    /// in fragments across pauses (e.g. "Matthew" … "chapter two" … "verse three"). Returns scripture
-    /// suggestions when the pending reference gains new, showable information (book+chapter, then a
-    /// refined verse); otherwise an empty list. Fed from the per-utterance segment stream.
+    /// Feeds one utterance (final or growing interim) into a stateful builder that assembles a
+    /// scripture reference uttered in fragments (e.g. "Matthew" … "chapter two" … "verse three").
+    /// Returns scripture suggestions when the pending reference gains new, showable information.
     /// </summary>
     Task<List<AiSuggestion>> AccumulateSpokenAsync(string finalSegmentText, CancellationToken cancellationToken = default);
 

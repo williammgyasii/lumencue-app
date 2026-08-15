@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "LumenCue": {
+      "commandName": "Project",
+      "hotReloadEnabled": true
+    }
+  }
+}

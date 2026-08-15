@@ -8,6 +8,10 @@ namespace ChurchProjection.Infrastructure.Audio;
 
 public static class MicrophoneCaptureFactory
 {
+    // NAudio's WasapiCapture default is 100ms. Live captions need a tighter buffer so audio
+    // leaves the machine sooner; PortAudio already uses ~10ms (512 frames @ 48kHz).
+    public const int WasapiBufferMilliseconds = 40;
+
     private static readonly object InitLock = new();
     private static bool _portAudioInitialized;
 
@@ -77,7 +81,7 @@ public static class MicrophoneCaptureFactory
                     d.FriendlyName.Contains(deviceName, StringComparison.OrdinalIgnoreCase));
             }
             selected ??= enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
-            return new WasapiMicrophoneCapture(selected);
+            return new WasapiMicrophoneCapture(selected, WasapiBufferMilliseconds);
         }
         catch (Exception ex)
         {
@@ -168,7 +172,8 @@ public static class MicrophoneCaptureFactory
     {
         private readonly WasapiCapture _capture;
 
-        public WasapiMicrophoneCapture(MMDevice device) => _capture = new WasapiCapture(device);
+        public WasapiMicrophoneCapture(MMDevice device, int bufferMilliseconds)
+            => _capture = new WasapiCapture(device, useEventSync: false, bufferMilliseconds);
 
         public WaveFormat WaveFormat => _capture.WaveFormat;
 

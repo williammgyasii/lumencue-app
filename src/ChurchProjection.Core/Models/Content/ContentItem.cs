@@ -10,6 +10,7 @@ public class ContentItem : INotifyPropertyChanged
 {
     private bool _isLive;
     private bool _isOrigin;
+    private bool _isRangeSelected;
 
     public ContentItemType Type { get; set; }
     public string Title { get; set; } = "";
@@ -46,6 +47,21 @@ public class ContentItem : INotifyPropertyChanged
         {
             if (_isOrigin == value) return;
             _isOrigin = value;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>
+    /// True when this card sits inside a shift-click range (click one slide, Shift+click another).
+    /// Highlighted separately from LIVE and origin so the operator can bookmark the span.
+    /// </summary>
+    public bool IsRangeSelected
+    {
+        get => _isRangeSelected;
+        set
+        {
+            if (_isRangeSelected == value) return;
+            _isRangeSelected = value;
             OnPropertyChanged();
         }
     }

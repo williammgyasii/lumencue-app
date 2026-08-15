@@ -12,6 +12,17 @@
     <!-- LAYER 1 — Background: the theme colour + its image / live motion loop, gated together. -->
     <Panel IsVisible="{Binding BackgroundLayerEnabled}" Opacity="{Binding BackgroundLayerOpacity}">
       <Border Background="{Binding BackgroundBrush}" />
+      <Grid IsVisible="{Binding ShowPlaceholderStandIn}">
+        <Grid.Background>
+          <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+            <GradientStop Color="#243044" Offset="0" />
+            <GradientStop Color="#121820" Offset="1" />
+          </LinearGradientBrush>
+        </Grid.Background>
+        <TextBlock Text="Placeholder — select a background"
+                   Foreground="#66E6E9EE" FontSize="42" FontWeight="SemiBold"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+      </Grid>
       <Image Source="{Binding BackgroundImage}"
              IsVisible="{Binding HasBackgroundImage}"
              Stretch="{Binding BackgroundImageStretch}" />
@@ -61,9 +72,9 @@
                    Stretch="{Binding TitleRegion.BackgroundImageStretch}"
                    RenderTransform="{Binding TitleRegion.BackgroundImageTransform}" RenderTransformOrigin="0.5,0.5" />
           </Border>
-          <controls:OutlinedTextBlock Text="{Binding SlideTitle}"
+          <controls:OutlinedTextBlock Text="{Binding TitleRegion.DisplayText}"
                      Margin="{Binding TitleRegion.TextPadding}"
-                     FontFamily="{Binding FontFamily}"
+                     FontFamily="{Binding TitleFontFamily}"
                      FontSize="{Binding TitleFontSize}"
                      FontWeight="{Binding FontWeight}"
                      Foreground="{Binding TitleBrush}"
@@ -88,7 +99,7 @@
                    Stretch="{Binding BodyRegion.BackgroundImageStretch}"
                    RenderTransform="{Binding BodyRegion.BackgroundImageTransform}" RenderTransformOrigin="0.5,0.5" />
           </Border>
-          <controls:OutlinedTextBlock Text="{Binding SlideBody}"
+          <controls:OutlinedTextBlock Text="{Binding BodyRegion.DisplayText}"
                      Margin="{Binding BodyRegion.TextPadding}"
                      FontFamily="{Binding FontFamily}"
                      FontSize="{Binding BodyFontSize}"
@@ -116,9 +127,9 @@
                    Stretch="{Binding FooterRegion.BackgroundImageStretch}"
                    RenderTransform="{Binding FooterRegion.BackgroundImageTransform}" RenderTransformOrigin="0.5,0.5" />
           </Border>
-          <controls:OutlinedTextBlock Text="{Binding SlideFooter}"
+          <controls:OutlinedTextBlock Text="{Binding FooterRegion.DisplayText}"
                      Margin="{Binding FooterRegion.TextPadding}"
-                     FontFamily="{Binding FontFamily}"
+                     FontFamily="{Binding FooterFontFamily}"
                      FontSize="{Binding FooterFontSize}"
                      FontWeight="Normal"
                      Foreground="{Binding FooterBrush}"

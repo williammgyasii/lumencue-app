@@ -19,6 +19,11 @@
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.8" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.8" />
     <PackageReference Include="Avalonia.ReactiveUI" Version="11.3.8" />
+    <!-- Debug-only: F12 inspector overlay. Not referenced in Release. -->
+    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.8" Condition="'$(Configuration)' == 'Debug'" />
+    <!-- Debug-only XAML hot reload (HotAvalonia no-ops in Release and is not published). -->
+    <PackageReference Include="Avalonia.Markup.Xaml.Loader" Version="11.3.8" PrivateAssets="All" />
+    <PackageReference Include="HotAvalonia" Version="3.1.3" PrivateAssets="All" />
     <!-- Pin patched transitive dependency (Avalonia pulls 0.21.2; 0.21.3 backports the GHSA-xrw6-gwf8-vvr9 fix). -->
     <PackageReference Include="Tmds.DBus.Protocol" Version="0.21.3" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.6" />
@@ -35,6 +40,13 @@
     <ProjectReference Include="..\ChurchProjection.Core\ChurchProjection.Core.csproj" />
     <ProjectReference Include="..\ChurchProjection.Infrastructure\ChurchProjection.Infrastructure.csproj" />
     <ProjectReference Include="..\ChurchProjection.UI\ChurchProjection.UI.csproj" />
+  </ItemGroup>
+
+  <Import Project="..\..\native\lumenvideo\lumenvideo.targets" />
+
+  <!-- HotAvalonia watches .axaml itself. Keep `dotnet watch` from restarting the process on layout edits. -->
+  <ItemGroup>
+    <Watch Remove="**\*.axaml" />
   </ItemGroup>
 
   <ItemGroup>

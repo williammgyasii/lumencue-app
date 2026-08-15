@@ -25,6 +25,7 @@ public class ProjectorViewModel : ViewModelBase, IActivatableViewModel, IDisposa
     private string _slideBody = string.Empty;
     private string _slideFooter = string.Empty;
     private bool _isBlank = true;
+    private Theme? _appliedTheme;
     private SlideType _currentSlideType = SlideType.Blank;
 
     // Self-ticking live elements (countdown / clock) update their body text once a second
@@ -35,6 +36,8 @@ public class ProjectorViewModel : ViewModelBase, IActivatableViewModel, IDisposa
     private string? _clockFormat;
 
     private FontFamily _fontFamily = FontFamily.Default;
+    private FontFamily _titleFontFamily = FontFamily.Default;
+    private FontFamily _footerFontFamily = FontFamily.Default;
     private double _bodyFontSize = 64;
     private double _titleFontSize = 34;
     private double _footerFontSize = 24;
@@ -45,6 +48,7 @@ public class ProjectorViewModel : ViewModelBase, IActivatableViewModel, IDisposa
     private IBrush _backgroundBrush = Brushes.Black;
     private Bitmap? _backgroundImage;
     private bool _hasBackgroundImage;
+    private bool _showPlaceholderStandIn;
     private Stretch _backgroundImageStretch = Stretch.UniformToFill;
     private IBrush _lowerThirdBarBrush = Brushes.Transparent;
 
@@ -64,6 +68,7 @@ public class ProjectorViewModel : ViewModelBase, IActivatableViewModel, IDisposa
 
     // Background layering: the theme's own background image vs. the operator's swappable live layer.
     private Bitmap? _themeBackgroundImage;
+    private string? _themeBackgroundPath;
     private bool _themeIsPlaceholder;
     private Bitmap? _liveFrame;
 
@@ -206,14 +211,26 @@ public class ProjectorViewModel : ViewModelBase, IActivatableViewModel, IDisposa
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(slide =>
             {
+                var leavingBlank = _isBlank && slide.Type != SlideType.Blank;
                 IsBlank = slide.Type == SlideType.Blank;
                 SlideTitle = slide.Title;
                 SlideBody = slide.Body;
                 SlideFooter = slide.Footer;
                 _currentSlideType = slide.Type;
-                ApplyTheme(ResolveTheme(slide.Type));
+
                 if (IsBlank)
+                {
                     ApplyBlankScreen();
+                }
+                else
+                {
+                    var theme = ResolveTheme(slide.Type);
+                    if (ThemeApplyPolicy.NeedsFullApply(_appliedTheme, theme, leavingBlank))
+                        ApplyTheme(theme);
+                    else
+                        RouteSlideText();
+                }
+
                 ConfigureLiveClock(slide);
             })
             .DisposeWith(_subscriptions);
@@ -259,6 +276,14 @@ public class ProjectorViewModel : ViewModelBase, IActivatableViewModel, IDisposa
         SlideBody = body;
         SlideFooter = footer;
         IsBlank = false;
+        RouteSlideText();
+    }
+
+    /// <summary>Sets the content type used when routing layer bindings in Theme Studio preview.</summary>
+    public void SetPreviewSlideType(SlideType type)
+    {
+        _currentSlideType = type;
+        RouteSlideText();
     }
 
     /// <summary>
@@ -296,6 +321,7 @@ public class ProjectorViewModel : ViewModelBase, IActivatableViewModel, IDisposa
         if (_currentSlideType == SlideType.Clock)
         {
             SlideBody = DateTime.Now.ToString(string.IsNullOrWhiteSpace(_clockFormat) ? "h:mm tt" : _clockFormat);
+            RouteSlideText();
             return;
         }
 
@@ -306,13 +332,48 @@ public class ProjectorViewModel : ViewModelBase, IActivatableViewModel, IDisposa
             {
                 _liveTimer?.Stop();
                 SlideBody = string.IsNullOrWhiteSpace(_countdownDoneMessage) ? "0:00" : _countdownDoneMessage;
+                RouteSlideText();
                 return;
             }
 
             SlideBody = remaining.TotalHours >= 1
                 ? $"{(int)remaining.TotalHours}:{remaining.Minutes:00}:{remaining.Seconds:00}"
                 : $"{remaining.Minutes}:{remaining.Seconds:00}";
+            RouteSlideText();
         }
+    }
+
+    private void RouteSlideText()
+    {
+        if (_appliedTheme is null || _isBlank)
+        {
+            TitleRegion.DisplayText = "";
+            BodyRegion.DisplayText = "";
+            FooterRegion.DisplayText = "";
+            return;
+        }
+
+        var (titleReg, bodyReg, footerReg) = _appliedTheme.ResolveActiveRegions();
+        ApplyRegionSlot(TitleRegion, titleReg, ThemeContentField.Title);
+        ApplyRegionSlot(BodyRegion, bodyReg, ThemeContentField.Body);
+        ApplyRegionSlot(FooterRegion, footerReg, ThemeContentField.Footer);
+    }
+
+    private void ApplyRegionSlot(RegionVm vm, ThemeRegion? region, ThemeContentField legacyFallback)
+    {
+        if (region is null)
+        {
+            vm.Visible = false;
+            vm.DisplayText = "";
+            return;
+        }
+
+        vm.Visible = region.Visible;
+        var field = region.GetContentField(_currentSlideType);
+        if (field == ThemeContentField.None)
+            field = legacyFallback;
+        vm.DisplayText = ThemeRegion.ResolveSlideText(
+            SlideTitle, SlideBody, SlideFooter, field);
     }
 
     public void Dispose()
@@ -345,6 +406,8 @@ public class ProjectorViewModel : ViewModelBase, IActivatableViewModel, IDisposa
     }
 
     public FontFamily FontFamily { get => _fontFamily; set => this.RaiseAndSetIfChanged(ref _fontFamily, value); }
+    public FontFamily TitleFontFamily { get => _titleFontFamily; set => this.RaiseAndSetIfChanged(ref _titleFontFamily, value); }
+    public FontFamily FooterFontFamily { get => _footerFontFamily; set => this.RaiseAndSetIfChanged(ref _footerFontFamily, value); }
     public double BodyFontSize { get => _bodyFontSize; set => this.RaiseAndSetIfChanged(ref _bodyFontSize, value); }
     public double TitleFontSize { get => _titleFontSize; set => this.RaiseAndSetIfChanged(ref _titleFontSize, value); }
     public double FooterFontSize { get => _footerFontSize; set => this.RaiseAndSetIfChanged(ref _footerFontSize, value); }
@@ -355,6 +418,7 @@ public class ProjectorViewModel : ViewModelBase, IActivatableViewModel, IDisposa
     public IBrush BackgroundBrush { get => _backgroundBrush; set => this.RaiseAndSetIfChanged(ref _backgroundBrush, value); }
     public Bitmap? BackgroundImage { get => _backgroundImage; set => this.RaiseAndSetIfChanged(ref _backgroundImage, value); }
     public bool HasBackgroundImage { get => _hasBackgroundImage; set => this.RaiseAndSetIfChanged(ref _hasBackgroundImage, value); }
+    public bool ShowPlaceholderStandIn { get => _showPlaceholderStandIn; set => this.RaiseAndSetIfChanged(ref _showPlaceholderStandIn, value); }
     public Stretch BackgroundImageStretch { get => _backgroundImageStretch; set => this.RaiseAndSetIfChanged(ref _backgroundImageStretch, value); }
     public IBrush LowerThirdBarBrush { get => _lowerThirdBarBrush; set => this.RaiseAndSetIfChanged(ref _lowerThirdBarBrush, value); }
 
@@ -392,7 +456,9 @@ public class ProjectorViewModel : ViewModelBase, IActivatableViewModel, IDisposa
 
     private void ApplyTheme(Theme t)
     {
-        FontFamily = ResolveFontFamily(t.FontFamily);
+        FontFamily = ResolveFontFamily(t.ResolveBodyFont());
+        TitleFontFamily = ResolveFontFamily(t.ResolveTitleFont());
+        FooterFontFamily = ResolveFontFamily(t.ResolveFooterFont());
         BodyFontSize = t.BodyFontSize;
         TitleFontSize = t.TitleFontSize;
         FooterFontSize = t.FooterFontSize;
@@ -455,46 +521,71 @@ public class ProjectorViewModel : ViewModelBase, IActivatableViewModel, IDisposa
         ContentPadding = new Thickness(t.PaddingHorizontal, t.PaddingVertical);
         IsLowerThird = t.Layout == ThemeLayout.LowerThird;
 
-        var (title, body, footer) = t.ResolveRegions();
-        TitleRegion.Apply(title, 1.1);
-        BodyRegion.Apply(body, t.LineHeightMultiplier);
-        FooterRegion.Apply(footer, 1.1);
+        _appliedTheme = t;
+        var (title, body, footer) = t.ResolveActiveRegions();
+        ApplyRegionGeometry(TitleRegion, title, 1.1);
+        ApplyRegionGeometry(BodyRegion, body, t.LineHeightMultiplier);
+        ApplyRegionGeometry(FooterRegion, footer, 1.1);
         TitleRegion.SetLiveFrame(_liveFrame);
         BodyRegion.SetLiveFrame(_liveFrame);
         FooterRegion.SetLiveFrame(_liveFrame);
 
         // Lower-third bar covers the body + footer band, full width.
-        LowerThirdBarVisible = t.Layout == ThemeLayout.LowerThird;
-        var bandTop = Math.Min(body.Y, footer.Y) - 16;
-        BarX = 0;
-        BarY = Math.Max(0, bandTop);
-        BarWidth = Theme.CanvasWidth;
-        BarHeight = Math.Max(0, Theme.CanvasHeight - BarY);
+        LowerThirdBarVisible = t.Layout == ThemeLayout.LowerThird && body is not null && footer is not null;
+        if (body is not null && footer is not null)
+        {
+            var bandTop = Math.Min(body.Y, footer.Y) - 16;
+            BarX = 0;
+            BarY = Math.Max(0, bandTop);
+            BarWidth = Theme.CanvasWidth;
+            BarHeight = Math.Max(0, Theme.CanvasHeight - BarY);
+        }
+
+        RouteSlideText();
+    }
+
+    private static void ApplyRegionGeometry(RegionVm vm, ThemeRegion? region, double lineSpacing)
+    {
+        if (region is null)
+        {
+            vm.Visible = false;
+            return;
+        }
+
+        vm.Apply(region, lineSpacing);
     }
 
     private void LoadBackgroundImage(Theme t)
     {
-        if (t.BackgroundKind == ThemeBackgroundKind.Image && !string.IsNullOrWhiteSpace(t.BackgroundImagePath) && File.Exists(t.BackgroundImagePath))
+        var path = t.BackgroundKind == ThemeBackgroundKind.Image ? t.BackgroundImagePath : null;
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
         {
-            try
-            {
-                _themeBackgroundImage = new Bitmap(t.BackgroundImagePath);
-                return;
-            }
-            catch (Exception ex)
-            {
-                Log.Warning(ex, "Failed to load background image {Path}", t.BackgroundImagePath);
-            }
+            _themeBackgroundImage = null;
+            _themeBackgroundPath = null;
+            return;
         }
 
-        _themeBackgroundImage = null;
+        if (_themeBackgroundPath == path && _themeBackgroundImage is not null)
+            return;
+
+        try
+        {
+            _themeBackgroundImage = new Bitmap(path);
+            _themeBackgroundPath = path;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to load background image {Path}", path);
+            _themeBackgroundImage = null;
+            _themeBackgroundPath = null;
+        }
     }
 
     /// <summary>
     /// Chooses the painted background. The operator's live media layer only shows on a
-    /// <see cref="ThemeBackgroundKind.Placeholder"/> (transparent) theme that has opted in to it;
-    /// every other kind (solid, image, ATEM key colours) keeps its own background and ignores the
-    /// live layer, so a black theme stays black and a green key stays clean.
+    /// <see cref="ThemeBackgroundKind.Placeholder"/> theme; if nothing is selected, Program
+    /// still paints a stand-in so the hole is visible. Solid / image / ATEM key colours
+    /// ignore the live layer.
     /// </summary>
     private void RefreshBackground()
     {
@@ -504,15 +595,26 @@ public class ProjectorViewModel : ViewModelBase, IActivatableViewModel, IDisposa
             return;
         }
 
-        if (_liveFrame is not null && _themeIsPlaceholder)
+        var kind = _themeIsPlaceholder ? ThemeBackgroundKind.Placeholder
+            : _themeBackgroundImage is not null ? ThemeBackgroundKind.Image
+            : ThemeBackgroundKind.Solid;
+        var paint = ThemeBackgroundResolve.Choose(kind, _liveFrame is not null, _themeBackgroundImage is not null);
+
+        ShowPlaceholderStandIn = paint == ThemeBackgroundPaint.PlaceholderStandIn;
+        switch (paint)
         {
-            BackgroundImage = _liveFrame;
-            HasBackgroundImage = true;
-        }
-        else
-        {
-            BackgroundImage = _themeBackgroundImage;
-            HasBackgroundImage = _themeBackgroundImage is not null;
+            case ThemeBackgroundPaint.LiveMedia:
+                BackgroundImage = _liveFrame;
+                HasBackgroundImage = true;
+                break;
+            case ThemeBackgroundPaint.ThemeImage:
+                BackgroundImage = _themeBackgroundImage;
+                HasBackgroundImage = true;
+                break;
+            default:
+                BackgroundImage = null;
+                HasBackgroundImage = false;
+                break;
         }
     }
 
@@ -527,6 +629,7 @@ public class ProjectorViewModel : ViewModelBase, IActivatableViewModel, IDisposa
         _themeBackgroundImage = null;
         BackgroundImage = null;
         HasBackgroundImage = false;
+        ShowPlaceholderStandIn = false;
     }
 
     /// <summary>Applies a per-channel layer snapshot: enable/opacity for every layer plus the overlay logo
@@ -615,6 +718,8 @@ public sealed class RegionVm : ReactiveObject
     public double Width { get => _width; set => this.RaiseAndSetIfChanged(ref _width, value); }
     public double Height { get => _height; set => this.RaiseAndSetIfChanged(ref _height, value); }
     public bool Visible { get => _visible; set => this.RaiseAndSetIfChanged(ref _visible, value); }
+    public string DisplayText { get => _displayText; set => this.RaiseAndSetIfChanged(ref _displayText, value); }
+    private string _displayText = "";
     public VerticalAlignment VAlign { get => _vAlign; set => this.RaiseAndSetIfChanged(ref _vAlign, value); }
     public TextAlignment TextAlign { get => _textAlign; set => this.RaiseAndSetIfChanged(ref _textAlign, value); }
     public bool AutoFit { get => _autoFit; set => this.RaiseAndSetIfChanged(ref _autoFit, value); }

@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Threading;
+using ChurchProjection.UI.Services.Video;
 using LibVLCSharp.Shared;
 using Serilog;
 
@@ -16,7 +17,7 @@ namespace ChurchProjection.UI.Services;
 /// device — used for announcement clips that must play sound. Uses its own LibVLC instance so the
 /// global muted background instance is left untouched.
 /// </summary>
-internal sealed class VlcMediaPlayer : IDisposable
+internal sealed class VlcMediaPlayer : IVideoFramePlayer
 {
     private const int Width = 1280;
     private const int Height = 720;

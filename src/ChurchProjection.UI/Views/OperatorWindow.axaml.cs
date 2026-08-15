@@ -1,4 +1,5 @@
 using System;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -23,6 +24,16 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
         // them for its own selection movement. This is why arrows previously did nothing once a
         // Now Singing card or scripture verse was clicked (the list had focus and ate the key).
         AddHandler(KeyDownEvent, OnNavPreviewKeyDown, RoutingStrategies.Tunnel);
+    }
+
+    // Lock the preview pane to 16:9 of its width so Uniform scaling fills it with no stretch
+    // and no side letterbox.
+    private void OnProgramPreviewHostSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        if (sender is not Grid host || e.NewSize.Width <= 0) return;
+        var target = e.NewSize.Width * 9.0 / 16.0;
+        if (Math.Abs(host.Height - target) > 0.5)
+            host.Height = target;
     }
 
     // Centralised live-paging arrows, run before list controls see the key.
@@ -96,46 +107,46 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
                 vm.BlankCommand.Execute().Subscribe();
                 e.Handled = true;
                 break;
-
-            case Key.Q:
-                if (vm.ContentSearch.SelectedItem is not null)
-                {
-                    vm.ServiceQueue.AddItem(vm.ContentSearch.SelectedItem);
-                    vm.StatusText = $"Queued: {vm.ContentSearch.SelectedItem.Title}";
-                }
-                e.Handled = true;
-                break;
-
-            case Key.A:
-                if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && vm.ContentSearch.Results.Count > 0)
-                {
-                    vm.ServiceQueue.AddAllItems(vm.ContentSearch.Results);
-                    vm.StatusText = $"Queued {vm.ContentSearch.Results.Count} items";
-                    e.Handled = true;
-                }
-                break;
         }
 
         if (!e.Handled)
             base.OnKeyDown(e);
     }
 
-    // Single click sends straight to the Program (live) output, ProPresenter-style.
+    // Single click selects/previews. Shift+click paints a range. Double-click (or Settings →
+    // single-click-goes-live) sends Program. Shift never goes live — it is for bookmarking a span.
     public void OnContentListTapped(object? sender, TappedEventArgs e)
     {
-        if (DataContext is OperatorViewModel vm && sender is ListBox { SelectedItem: ContentItem item })
+        if (DataContext is not OperatorViewModel vm) return;
+        if (sender is not ListBox list) return;
+
+        var item = (e.Source as Control)?.DataContext as ContentItem
+            ?? list.SelectedItem as ContentItem;
+        if (item is null) return;
+
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+        {
+            vm.ContentSearch.ExtendRangeTo(item);
+            e.Handled = true;
+            return;
+        }
+
+        vm.ContentSearch.SetRangeAnchor(item);
+        if (LiveClickPolicy.GoesLive(isDoubleClick: false, vm.SingleClickGoesLive))
             vm.SendItemToLive(item);
     }
 
     public void OnSuggestionsTapped(object? sender, TappedEventArgs e)
     {
-        if (DataContext is OperatorViewModel vm && sender is ListBox { SelectedItem: SuggestionItem item })
+        if (DataContext is OperatorViewModel vm && sender is ListBox { SelectedItem: SuggestionItem item }
+            && LiveClickPolicy.GoesLive(isDoubleClick: false, vm.SingleClickGoesLive))
             vm.SendSuggestionToLive(item);
     }
 
     public void OnTopicalListTapped(object? sender, TappedEventArgs e)
     {
-        if (DataContext is OperatorViewModel vm && sender is ListBox { SelectedItem: ContentItem item })
+        if (DataContext is OperatorViewModel vm && sender is ListBox { SelectedItem: ContentItem item }
+            && LiveClickPolicy.GoesLive(isDoubleClick: false, vm.SingleClickGoesLive))
             vm.SendItemToLive(item);
     }
 
@@ -147,6 +158,12 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
     public void OnPageForward(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (DataContext is OperatorViewModel vm) vm.AdvanceForward();
+    }
+
+    public void OnLiveCompareDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (DataContext is OperatorViewModel vm && sender is Control { DataContext: LiveCompareCard card })
+            vm.SendCompareLive(card);
     }
 
     public void OnContentListDoubleTapped(object? sender, TappedEventArgs e)
@@ -380,14 +397,6 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
             await OpenSongEditorAsync(slide.Song);
     }
 
-    public void OnSongAddToQueueMenu(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        if (DataContext is OperatorViewModel vm && sender is MenuItem { DataContext: SongHitViewModel hit })
-            vm.LoadSongToQueue(hit.Song);
-    }
-
-    // ----- Backgrounds palette -----
-
     // Clicking a background tile swaps the live media layer (the theme/text is untouched).
     public void OnBackgroundTileTapped(object? sender, TappedEventArgs e)
     {
@@ -398,6 +407,11 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
             {
                 vm.RequestUpgradeCommand.Execute(
                     ChurchProjection.Core.Models.Tenancy.FeatureKeys.VideoBackgrounds).Subscribe();
+                return;
+            }
+            if (!vm.Backgrounds.ThemeAcceptsLiveSelection)
+            {
+                vm.StatusText = "This theme uses its own background — switch it to Placeholder to pick a live one.";
                 return;
             }
             vm.Backgrounds.SelectCommand.Execute(tile).Subscribe();
@@ -537,12 +551,6 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
             vm.StartSongLive(song);
     }
 
-    public void OnSongAddToQueueLibraryMenu(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        if (DataContext is OperatorViewModel vm && sender is MenuItem { DataContext: Song song })
-            vm.LoadSongToQueue(song);
-    }
-
     public async void OnEditSongMenu(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (sender is MenuItem { DataContext: Song song })
@@ -627,8 +635,19 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
         try
         {
             if (DataContext is not OperatorViewModel vm) return;
+
+            // Prevent the Themes nav tooltip from flickering behind the modal dialog (stale pointer-over state).
+            if (sender is Control ctrl)
+            {
+                ToolTip.SetIsOpen(ctrl, false);
+                ToolTip.SetTip(ctrl, null);
+            }
+
             var dialog = new ThemeStudioWindow { DataContext = vm.CreateThemeStudio() };
             await dialog.ShowDialog(this);
+
+            if (sender is Control restore)
+                ToolTip.SetTip(restore, "Design themes — one look for scripture, songs, notes, and announcements");
         }
         catch (Exception ex)
         {

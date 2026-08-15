@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using Avalonia.Threading;
 using ChurchProjection.Core.Models.Theme;
 using ChurchProjection.UI.ViewModels;
@@ -34,6 +35,7 @@ public sealed class NdiOutputService : INdiOutputService
     private VideoFrame? _videoFrame;
     private RenderTargetBitmap? _captureBitmap;
     private byte[]? _captureBuffer;
+    private bool _captureIsRgba;
     private double _captureScale = 1;
     private Control? _captureRoot;
     private Window? _captureWindow;
@@ -115,6 +117,10 @@ public sealed class NdiOutputService : INdiOutputService
 
             _captureBitmap = new RenderTargetBitmap(new PixelSize(Width, Height), new Vector(96, 96));
             _captureBuffer = new byte[Width * 4 * Height];
+            _captureIsRgba = _captureBitmap.Format == PixelFormat.Rgba8888
+                || (_captureBitmap.Format is null && OperatingSystem.IsMacOS());
+            Log.Information("NDI capture pixel format {Format} (treat as RGBA: {Rgba})",
+                _captureBitmap.Format, _captureIsRgba);
 
             _timer = new DispatcherTimer(TimeSpan.FromMilliseconds(1000.0 / FpsNumerator), DispatcherPriority.Render, CaptureTick);
             _timer.Start();
@@ -172,8 +178,7 @@ public sealed class NdiOutputService : INdiOutputService
                     _captureBuffer.Length,
                     stride);
 
-                // Avalonia RTB pixels are premultiplied; NDI expects straight opaque BGRA.
-                ConvertToStraightOpaqueBgra(_captureBuffer, Width, Height, stride);
+                NdiPixelConvert.ToStraightOpaqueBgra(_captureBuffer, Width, Height, stride, _captureIsRgba);
 
                 CopyRows(_captureBuffer, stride, _videoFrame.BufferPtr, _videoFrame.Stride, Height);
             }
@@ -195,38 +200,6 @@ public sealed class NdiOutputService : INdiOutputService
         var rowBytes = Math.Min(srcStride, destStride);
         for (var y = 0; y < rows; y++)
             Marshal.Copy(src, y * srcStride, dest + y * destStride, rowBytes);
-    }
-
-    /// <summary>Premultiplied BGRA → straight opaque BGRA for NDI video.</summary>
-    private static void ConvertToStraightOpaqueBgra(byte[] pixels, int width, int height, int stride)
-    {
-        for (var y = 0; y < height; y++)
-        {
-            var row = y * stride;
-            for (var x = 0; x < width; x++)
-            {
-                var i = row + x * 4;
-                var b = pixels[i];
-                var g = pixels[i + 1];
-                var r = pixels[i + 2];
-                var a = pixels[i + 3];
-
-                if (a == 0)
-                {
-                    pixels[i] = 0;
-                    pixels[i + 1] = 0;
-                    pixels[i + 2] = 0;
-                }
-                else if (a < 255)
-                {
-                    pixels[i] = (byte)Math.Min(255, b * 255 / a);
-                    pixels[i + 1] = (byte)Math.Min(255, g * 255 / a);
-                    pixels[i + 2] = (byte)Math.Min(255, r * 255 / a);
-                }
-
-                pixels[i + 3] = 255;
-            }
-        }
     }
 
     private void ProbeAvailability()

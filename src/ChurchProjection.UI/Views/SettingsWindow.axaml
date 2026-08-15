@@ -230,6 +230,7 @@
                       <Grid ColumnDefinitions="Auto,*,160" ColumnSpacing="14" VerticalAlignment="Center">
                         <ToggleSwitch Grid.Column="0" IsChecked="{Binding IsActive}" HorizontalAlignment="Left" VerticalAlignment="Center" />
                         <TextBox Grid.Column="1" Text="{Binding Name}" FontSize="13" VerticalAlignment="Center"
+                                 IsEnabled="{Binding CanRename}"
                                  ToolTip.Tip="The screen's name (e.g. LED Wall, Lobby)" />
                         <ComboBox Grid.Column="2" ItemsSource="{Binding ThemeOptions}" SelectedItem="{Binding SelectedThemeOption}"
                                   HorizontalAlignment="Stretch" FontSize="12" VerticalAlignment="Center" />

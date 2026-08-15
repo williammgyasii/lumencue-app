@@ -211,41 +211,7 @@ public class DeepgramTranscriptionService : ITranscriptionService
         // rate — sending native-rate audio (no resampling) gives Deepgram the cleanest signal.
         PrepareCapture(deviceName);
 
-        var liveSchema = new LiveSchema()
-        {
-            Model = "nova-3",
-            Encoding = "linear16",
-            SampleRate = _captureSampleRate,
-            Channels = 1,
-            Language = "en",
-            Punctuate = true,
-            SmartFormat = true,
-            Numerals = true,
-            InterimResults = true,
-            UtteranceEnd = "1500",
-            VadEvents = true,
-            EndPointing = "400",
-            FillerWords = false,
-            NoDelay = true,
-            Keyterm = [
-                "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
-                "Joshua", "Judges", "Ruth", "Samuel", "Kings", "Chronicles",
-                "Ezra", "Nehemiah", "Esther", "Job", "Psalms", "Psalm",
-                "Proverbs", "Ecclesiastes", "Song of Solomon", "Isaiah",
-                "Jeremiah", "Lamentations", "Ezekiel", "Daniel", "Hosea",
-                "Joel", "Amos", "Obadiah", "Jonah", "Micah", "Nahum",
-                "Habakkuk", "Zephaniah", "Haggai", "Zechariah", "Malachi",
-                "Matthew", "Mark", "Luke", "John", "Acts", "Romans",
-                "Corinthians", "Galatians", "Ephesians", "Philippians",
-                "Colossians", "Thessalonians", "Timothy", "Titus", "Philemon",
-                "Hebrews", "James", "Peter", "Jude", "Revelation",
-                "First", "Second", "Third", "chapter", "verse", "verses",
-                "scripture", "passage", "gospel", "epistle", "parable",
-                "amen", "hallelujah", "Jesus", "Christ", "God", "Holy Spirit",
-                "Lord", "covenant", "righteousness", "salvation", "grace",
-                "disciples", "apostle", "prophet", "Messiah", "Yahweh",
-            ],
-        };
+        var liveSchema = DeepgramListenOptions.Create(_captureSampleRate);
 
         bool connected = await _wsClient.Connect(liveSchema);
         if (!connected)
@@ -476,12 +442,15 @@ public class DeepgramTranscriptionService : ITranscriptionService
 
     private void OnDataAvailable(object? sender, WaveInEventArgs e)
     {
-        if (_captureFormat is null || e.BytesRecorded == 0 || _wsClient is null) return;
+        if (_captureFormat is null || e.BytesRecorded == 0) return;
 
         var pcmBytes = ConvertToMono16Pcm(e.Buffer, e.BytesRecorded, _captureFormat);
         if (pcmBytes.Length == 0) return;
 
+        // Keep the footer meter live even while Deepgram is connecting or briefly reconnecting.
         UpdateAudioLevel(pcmBytes);
+
+        if (_wsClient is null) return;
 
         if (!_vadGate || _vadRmsThreshold <= 0)
         {
