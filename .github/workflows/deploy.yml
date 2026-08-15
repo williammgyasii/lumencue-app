@@ -1,11 +1,11 @@
 name: deploy-api
 
 # Triggers a Render deploy for the LumenCue Cloud API (Docker web service).
-# Render builds from the repo Dockerfile; this workflow waits for the deploy to go live.
+# Uses the Render REST API — the official CLI v1.1.0 panics in CI on
+# `deploys create --wait --confirm` (nil deref in nonInteractiveDeployCreate).
 #
 # Required GitHub secrets:
 #   RENDER_API_KEY      — from https://dashboard.render.com/u/settings#api-keys
-#   RENDER_SERVICE_ID   — srv-… for the lumencue-api web service
 
 on:
   push:
@@ -32,20 +32,43 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Render CLI
-        run: |
-          curl -L https://github.com/render-oss/cli/releases/download/v1.1.0/cli_1.1.0_linux_amd64.zip -o render.zip
-          unzip render.zip
-          sudo mv cli_v1.1.0 /usr/local/bin/render
-
       - name: Deploy to Render
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          CI: true
         run: |
-          render deploys create "$RENDER_SERVICE_ID" \
-            --commit "${{ github.sha }}" \
-            --wait --confirm -o json
+          set -euo pipefail
+          CREATE=$(curl -sS -X POST \
+            -H "Authorization: Bearer ${RENDER_API_KEY}" \
+            -H "Accept: application/json" \
+            -H "Content-Type: application/json" \
+            "https://api.render.com/v1/services/${RENDER_SERVICE_ID}/deploys" \
+            -d "{\"commitId\":\"${{ github.sha }}\"}")
+          echo "$CREATE"
+          DEPLOY_ID=$(echo "$CREATE" | jq -r '.id // empty')
+          if [ -z "$DEPLOY_ID" ] || [ "$DEPLOY_ID" = "null" ]; then
+            echo "Render did not start a deploy. Check RENDER_API_KEY and service id."
+            exit 1
+          fi
+          echo "Deploy ${DEPLOY_ID} started"
+
+          for _ in $(seq 1 40); do
+            STATUS=$(curl -sS \
+              -H "Authorization: Bearer ${RENDER_API_KEY}" \
+              -H "Accept: application/json" \
+              "https://api.render.com/v1/services/${RENDER_SERVICE_ID}/deploys/${DEPLOY_ID}" \
+              | jq -r '.status // .deploy.status // empty')
+            echo "status=${STATUS}"
+            case "${STATUS}" in
+              live) exit 0 ;;
+              build_failed|update_failed|canceled|deactivated|pre_deploy_failed)
+                echo "Deploy failed: ${STATUS}"
+                exit 1
+                ;;
+            esac
+            sleep 15
+          done
+          echo "Timed out waiting for Render deploy ${DEPLOY_ID}"
+          exit 1
 
       - name: Smoke test
         run: |
