@@ -37,14 +37,28 @@ jobs:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
         run: |
           set -euo pipefail
-          CREATE=$(curl -sS -X POST \
+          HTTP=$(curl -sS -o /tmp/create.json -w "%{http_code}" -X POST \
             -H "Authorization: Bearer ${RENDER_API_KEY}" \
             -H "Accept: application/json" \
             -H "Content-Type: application/json" \
             "https://api.render.com/v1/services/${RENDER_SERVICE_ID}/deploys" \
-            -d "{\"commitId\":\"${{ github.sha }}\"}")
-          echo "$CREATE"
-          DEPLOY_ID=$(echo "$CREATE" | jq -r '.id // empty')
+            -d '{}')
+          echo "create_http=${HTTP}"
+          echo "create_body=$(cat /tmp/create.json)"
+          if [ "$HTTP" != "201" ] && [ "$HTTP" != "202" ]; then
+            echo "Create deploy failed with HTTP ${HTTP}"
+            exit 1
+          fi
+
+          DEPLOY_ID=$(jq -r '.id // .deploy.id // empty' /tmp/create.json)
+          if [ -z "$DEPLOY_ID" ] && [ "$HTTP" = "202" ]; then
+            sleep 3
+            DEPLOY_ID=$(curl -sS \
+              -H "Authorization: Bearer ${RENDER_API_KEY}" \
+              -H "Accept: application/json" \
+              "https://api.render.com/v1/services/${RENDER_SERVICE_ID}/deploys?limit=1" \
+              | jq -r '.[0].deploy.id // .[0].id // empty')
+          fi
           if [ -z "$DEPLOY_ID" ] || [ "$DEPLOY_ID" = "null" ]; then
             echo "Render did not start a deploy. Check RENDER_API_KEY and service id."
             exit 1
