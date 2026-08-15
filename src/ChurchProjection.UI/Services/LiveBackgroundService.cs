@@ -9,13 +9,14 @@ using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using ChurchProjection.Core.Models.Projection;
 using ChurchProjection.Infrastructure.Data;
+using ChurchProjection.UI.Services.Video;
 using Serilog;
 
 namespace ChurchProjection.UI.Services;
 
 /// <summary>
 /// Default <see cref="ILiveBackgroundService"/>. Persists the library to settings, loads still images
-/// directly, and drives motion clips through a <see cref="VlcBackgroundPlayer"/>. Only one clip plays
+/// directly, and drives motion clips through <see cref="VideoFramePlayerFactory"/>. Only one clip plays
 /// at a time; switching disposes the previous player.
 /// </summary>
 public sealed class LiveBackgroundService : ILiveBackgroundService, IDisposable
@@ -31,7 +32,7 @@ public sealed class LiveBackgroundService : ILiveBackgroundService, IDisposable
     private readonly BehaviorSubject<LiveBackground?> _selectedChanged = new(null);
     private readonly BehaviorSubject<Bitmap?> _frame = new(null);
 
-    private VlcBackgroundPlayer? _player;
+    private IVideoFramePlayer? _player;
     private Bitmap? _imageBitmap;
 
     public LiveBackgroundService(SettingsRepository settings)
@@ -125,7 +126,9 @@ public sealed class LiveBackgroundService : ILiveBackgroundService, IDisposable
 
         if (item.Kind == LiveBackgroundKind.Video)
         {
-            _player = new VlcBackgroundPlayer(item.Path, bmp => _frame.OnNext(bmp));
+            _player = VideoFramePlayerFactory.Start(
+                new VideoPlayRequest(item.Path, Loop: true, Audio: false),
+                bmp => _frame.OnNext(bmp));
             if (!_player.IsRunning)
             {
                 _player.Dispose();

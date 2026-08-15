@@ -145,7 +145,7 @@ public class WindowManager
         foreach (var row in _operatorVm.Outputs)
         {
             var state = saved.FirstOrDefault(s => s.Key == row.Key);
-            if (!string.IsNullOrWhiteSpace(state?.Name))
+            if (row.CanRename && !string.IsNullOrWhiteSpace(state?.Name))
                 row.Name = state.Name;
             row.SelectedThemeOption = string.IsNullOrEmpty(state?.ThemeOverride)
                 ? OutputRow.FollowContent
@@ -291,23 +291,21 @@ public class WindowManager
 
     private void PositionWindow(ProjectorWindow window, DisplayOption opt)
     {
-        if (opt.IsWindowedPreview)
-        {
-            window.WindowState = WindowState.Normal;
-            window.SystemDecorations = SystemDecorations.Full;
-            window.ShowInTaskbar = true;
-            window.Title = "LumenCue — Projector Preview";
-            window.Width = opt.Width;
-            window.Height = opt.Height;
-            window.Position = new PixelPoint(opt.X, opt.Y);
-            return;
-        }
+        var place = ProjectorOutputLayout.For(opt);
 
         window.WindowState = WindowState.Normal;
-        window.SystemDecorations = SystemDecorations.None;
-        window.ShowInTaskbar = false;
-        window.Position = new PixelPoint(opt.X, opt.Y);
-        window.WindowState = WindowState.FullScreen;
+        window.SystemDecorations = place.Decorated ? SystemDecorations.Full : SystemDecorations.None;
+        window.ShowInTaskbar = place.Decorated;
+        window.Topmost = !place.Decorated;
+        if (place.Decorated)
+            window.Title = "LumenCue — Projector Preview";
+
+        window.Width = place.Width;
+        window.Height = place.Height;
+        window.Position = new PixelPoint(place.PixelX, place.PixelY);
+
+        if (place.UsePlatformFullScreen)
+            window.WindowState = WindowState.FullScreen;
     }
 
     private List<DisplayOption> BuildDisplayOptions(Screens screens)
@@ -324,7 +322,7 @@ public class WindowManager
             var b = s.Bounds;
             var isPrimary = primary is not null && s.Equals(primary);
             var name = $"Display {i + 1} — {b.Width}×{b.Height}{(isPrimary ? " (primary)" : "")}";
-            options.Add(new DisplayOption(name, b.X, b.Y, b.Width, b.Height));
+            options.Add(new DisplayOption(name, b.X, b.Y, b.Width, b.Height, Scaling: s.Scaling));
         }
 
         options.Add(new DisplayOption("Windowed preview", 80, 80, 960, 540, IsWindowedPreview: true));

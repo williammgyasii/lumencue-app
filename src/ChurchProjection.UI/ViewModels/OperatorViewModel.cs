@@ -9,6 +9,7 @@ using ChurchProjection.Core.Models.Content;
 using ChurchProjection.Core.Models.Projection;
 using ChurchProjection.Core.Models.Slides;
 using ChurchProjection.Core.Models.Tenancy;
+using ChurchProjection.Core.Models.Theme;
 using ChurchProjection.Core.Parsing;
 using ChurchProjection.Core.Services;
 using ChurchProjection.Infrastructure.Bible;
@@ -127,7 +128,6 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     }
 
     public ContentSearchViewModel ContentSearch { get; }
-    public ServiceQueueViewModel ServiceQueue { get; }
     public TranscriptionViewModel Transcription { get; }
     public TopicalSearchViewModel TopicalSearch { get; }
     public SongSearchViewModel SongSearch { get; }
@@ -651,6 +651,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
             this.RaisePropertyChanged(nameof(IsNotesTab));
             this.RaisePropertyChanged(nameof(ShowScriptureList));
             this.RaisePropertyChanged(nameof(ShowNowSinging));
+            NotifyWorkspaceTabVisibility();
         }
     }
 
@@ -659,13 +660,14 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     public bool IsTopicalTab => SelectedContentTab == TopicalTabIndex;
     public bool IsParaphrasesTab => SelectedContentTab == ParaphrasesTabIndex;
     public bool IsSongsTab => SelectedContentTab == SongsTabIndex;
-    public bool IsNotesTab => SelectedContentTab == NotesTabIndex;
+    public bool IsNotesTab => IsNotesMode;
 
     // ───────────────────────── Top-level workspace mode (Bible vs Songs) ─────────────────────────
     // A service is either displaying scripture or singing. Each mode reconfigures the left sidebar
-    // and the center tools. Themes is a dialog launcher, not a mode.
+    // and the center tools. Notes is its own workspace. Themes is a dialog launcher, not a mode.
     private bool _isSongsMode;
     private bool _isMediaMode;
+    private bool _isNotesMode;
 
     public bool IsSongsMode
     {
@@ -674,16 +676,18 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         {
             this.RaiseAndSetIfChanged(ref _isSongsMode, value);
             this.RaisePropertyChanged(nameof(IsBibleMode));
+            this.RaisePropertyChanged(nameof(IsNotesMode));
             this.RaisePropertyChanged(nameof(LibraryTabLabel));
             this.RaisePropertyChanged(nameof(SearchWatermark));
             this.RaisePropertyChanged(nameof(ShowScriptureList));
             this.RaisePropertyChanged(nameof(ShowNowSinging));
+            NotifyWorkspaceTabVisibility();
         }
     }
 
     // Bible vs Songs is a sub-choice of the "content" workspace; Media is a third top-level workspace
     // that swaps the whole center area for the media bin + transport.
-    public bool IsBibleMode => !IsSongsMode && !IsMediaMode;
+    public bool IsBibleMode => !IsSongsMode && !IsMediaMode && !IsNotesMode;
 
     /// <summary>True when the center area shows the Media Playback view instead of the content tabs.</summary>
     public bool IsMediaMode
@@ -693,9 +697,11 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         {
             this.RaiseAndSetIfChanged(ref _isMediaMode, value);
             this.RaisePropertyChanged(nameof(IsBibleMode));
+            this.RaisePropertyChanged(nameof(IsNotesMode));
             this.RaisePropertyChanged(nameof(IsContentMode));
             this.RaisePropertyChanged(nameof(ShowScriptureList));
             this.RaisePropertyChanged(nameof(ShowNowSinging));
+            NotifyWorkspaceTabVisibility();
         }
     }
 
@@ -716,8 +722,37 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     /// <summary>Tab 0 shows the loaded song's slide cards only in Songs mode.</summary>
     public bool ShowNowSinging => IsLibraryTab && IsSongsMode;
 
+    /// <summary>Center tab bodies gated by workspace mode so stacked panels never bleed through.</summary>
+    public bool ShowSuggestionsTabContent => IsBibleMode && IsSuggestionsTab;
+    public bool ShowTopicalTabContent => IsBibleMode && IsTopicalTab;
+    public bool ShowParaphrasesTabContent => IsBibleMode && IsParaphrasesTab;
+    public bool ShowSongsTabContent => IsSongsMode && IsSongsTab;
+    public bool ShowNotesTabContent => IsNotesMode;
+
+    public bool IsNotesMode
+    {
+        get => _isNotesMode;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _isNotesMode, value);
+            this.RaisePropertyChanged(nameof(IsBibleMode));
+            this.RaisePropertyChanged(nameof(IsNotesTab));
+            NotifyWorkspaceTabVisibility();
+        }
+    }
+
+    private void NotifyWorkspaceTabVisibility()
+    {
+        this.RaisePropertyChanged(nameof(ShowSuggestionsTabContent));
+        this.RaisePropertyChanged(nameof(ShowTopicalTabContent));
+        this.RaisePropertyChanged(nameof(ShowParaphrasesTabContent));
+        this.RaisePropertyChanged(nameof(ShowSongsTabContent));
+        this.RaisePropertyChanged(nameof(ShowNotesTabContent));
+    }
+
     public void EnterBibleMode()
     {
+        IsNotesMode = false;
         IsMediaMode = false;
         IsSongsMode = false;
         // Scripture-driven service: keep the AI suggestions panel to scriptures only (no songs).
@@ -728,6 +763,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
 
     public void EnterSongsMode()
     {
+        IsNotesMode = false;
         IsMediaMode = false;
         IsSongsMode = true;
         _aiMatcher.IncludeContentMatches = true;
@@ -736,7 +772,23 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     }
 
     /// <summary>Switches the center area to the Media Playback view (graphics/videos + transport).</summary>
-    public void EnterMediaMode() => IsMediaMode = true;
+    public void EnterMediaMode()
+    {
+        IsNotesMode = false;
+        IsSongsMode = false;
+        IsMediaMode = true;
+    }
+
+    public void EnterNotesMode()
+    {
+        IsSongsMode = false;
+        IsMediaMode = false;
+        IsNotesMode = true;
+        _ = Notes.LoadAsync();
+        StatusText = Notes.HasNotes
+            ? "Click a note to open its slides."
+            : "Add a note, then click it to open its slides.";
+    }
 
     public bool HasNewTopical
     {
@@ -928,8 +980,6 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     public ReactiveCommand<Unit, Unit> ToggleFollowCommand { get; }
     public ReactiveCommand<Unit, Unit> ToggleScreenOutputCommand { get; }
     public ReactiveCommand<Unit, Unit> TransitionCommand { get; }
-    public ReactiveCommand<Unit, Unit> AddToQueueCommand { get; }
-    public ReactiveCommand<Unit, Unit> AddAllToQueueCommand { get; }
     public ReactiveCommand<Unit, Unit> ShowLibraryTabCommand { get; }
     public ReactiveCommand<Unit, Unit> ShowSuggestionsTabCommand { get; }
     public ReactiveCommand<Unit, Unit> ClearSuggestionsCommand { get; }
@@ -1015,7 +1065,6 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
             .Subscribe(OnUpdateState);
 
         ContentSearch = new ContentSearchViewModel(contentLibrary);
-        ServiceQueue = new ServiceQueueViewModel(projectionService, themes);
         Transcription = new TranscriptionViewModel(transcriptionService, suggestionEngine, projectionService, settings);
         TopicalSearch = new TopicalSearchViewModel(scriptureSearch);
         SongSearch = new SongSearchViewModel(songSearch);
@@ -1033,9 +1082,14 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
             });
 
         RefreshThemeOptions();
+        SyncBackgroundSelectionGate();
         _themes.Changed
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(_ => RefreshThemeOptions());
+            .Subscribe(_ =>
+            {
+                RefreshThemeOptions();
+                SyncBackgroundSelectionGate();
+            });
 
         BlankCommand = ReactiveCommand.Create(() => { _projection.GoBlank(); _liveScriptureRef = null; ClearContentLiveHighlights(); foreach (var s in NowSingingSlides) { s.IsLive = false; s.IsSuggested = false; } });
         ToggleFollowCommand = ReactiveCommand.Create(() =>
@@ -1057,7 +1111,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         ShowTopicalTabCommand = ReactiveCommand.Create(() => { SelectedContentTab = TopicalTabIndex; });
         ShowParaphrasesTabCommand = ReactiveCommand.Create(() => { SelectedContentTab = ParaphrasesTabIndex; });
         ShowSongsTabCommand = ReactiveCommand.Create(() => { SelectedContentTab = SongsTabIndex; });
-        ShowNotesTabCommand = ReactiveCommand.Create(() => { SelectedContentTab = NotesTabIndex; });
+        ShowNotesTabCommand = ReactiveCommand.Create(EnterNotesMode);
         ShowBibleModeCommand = ReactiveCommand.Create(EnterBibleMode);
         ShowSongsModeCommand = ReactiveCommand.Create(EnterSongsMode);
         ShowMediaModeCommand = ReactiveCommand.Create(EnterMediaMode);
@@ -1101,12 +1155,6 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         var canTransition = this.WhenAnyValue<OperatorViewModel, bool>(x => x.HasPreview);
         TransitionCommand = ReactiveCommand.Create(DoTransition, canTransition);
 
-        var canAdd = ContentSearch.WhenAnyValue<ContentSearchViewModel, ContentItem?>(x => x.SelectedItem)
-            .Select(i => i is not null);
-        AddToQueueCommand = ReactiveCommand.Create(DoAddToQueue, canAdd);
-
-        AddAllToQueueCommand = ReactiveCommand.Create(DoAddAllToQueue);
-
         SyncStatus = DescribeSync(syncScheduler.Status);
         syncScheduler.StatusChanged += info =>
             RxApp.MainThreadScheduler.Schedule(() => SyncStatus = DescribeSync(info));
@@ -1128,6 +1176,11 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
             AiSuggestionCount = Transcription.Suggestions.Count;
             if (e.Action == NotifyCollectionChangedAction.Add && SelectedContentTab != SuggestionsTabIndex)
                 HasNewSuggestions = true;
+            if (e.Action == NotifyCollectionChangedAction.Add && e.NewItems is not null)
+            {
+                foreach (SuggestionItem item in e.NewItems)
+                    StageHeardSuggestion(item);
+            }
         };
 
         ContentSearch.WhenAnyValue<ContentSearchViewModel, ContentItem?>(x => x.SelectedItem)
@@ -1438,6 +1491,34 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         PreloadChapter(_liveScriptureRef);
     }
 
+    /// <summary>
+    /// Preview-only: when a spoken scripture suggestion arrives, show that chapter on the Scripture
+    /// grid and highlight the verse. Never goes live — the operator still double-clicks to project.
+    /// </summary>
+    private void StageHeardSuggestion(SuggestionItem item)
+    {
+        if (!IsBibleMode || !item.IsScripture) return;
+
+        var reference = ScriptureReferenceParser.TryParse(item.Title)
+            ?? TryParseScriptureContentId(item.ContentId);
+        if (reference is null) return;
+
+        SelectedContentTab = 0;
+        _ = ContentSearch.StageReferenceAsync(reference.Book, reference.Chapter, reference.VerseStart);
+    }
+
+    private static ScriptureReference? TryParseScriptureContentId(string? contentId)
+    {
+        if (string.IsNullOrWhiteSpace(contentId) || !contentId.StartsWith("scripture:", StringComparison.Ordinal))
+            return null;
+        var parts = contentId.Split(':');
+        if (parts.Length < 4) return null;
+        if (!int.TryParse(parts[^2], out var chapter) || !int.TryParse(parts[^1], out var verse))
+            return null;
+        var book = string.Join(':', parts[1..^2]);
+        return string.IsNullOrWhiteSpace(book) ? null : new ScriptureReference(book, chapter, verse);
+    }
+
     /// <summary>Loads the chapter behind a just-projected verse into the Scripture tab, quietly (without
     /// stealing the operator's current tab). Skips work if that chapter is already loaded.</summary>
     private void PreloadChapter(ScriptureReference? reference)
@@ -1459,6 +1540,17 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         if (type != SlideType.Scripture)
             _liveScriptureRef = null;
         this.RaisePropertyChanged(nameof(LiveThemeName));
+        SyncBackgroundSelectionGate();
+    }
+
+    /// <summary>
+    /// Background tiles only highlight when the live theme is a Placeholder. Solid/image themes
+    /// already own their backdrop, so a click must not look selected.
+    /// </summary>
+    private void SyncBackgroundSelectionGate()
+    {
+        var kind = _themes.ResolveFor(_liveSlideType).BackgroundKind;
+        Backgrounds.ThemeAcceptsLiveSelection = ThemeBackgroundResolve.AcceptsLiveSelection(kind);
     }
 
     /// <summary>Clears the IsLive ring from the previously-live content item and suggestion.</summary>
@@ -1473,6 +1565,18 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     public void BookmarkScripture(ContentItem? item)
     {
         if (item is null || !item.IsScripture) return;
+
+        if (ContentSearch.HasRangeSelection)
+        {
+            var range = ContentSearch.SelectedRangeItems();
+            if (range.Count >= 2)
+            {
+                var bookmark = ScriptureRangeBookmark.FromItems(range);
+                Transcription.AddBookmark(bookmark);
+                StatusText = $"Bookmarked {bookmark.Title}";
+                return;
+            }
+        }
 
         var reference = ReferenceFor(item);
         var contentId = reference is not null
@@ -1497,6 +1601,38 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         if (item.Source is ScripturePassage p)
             return new ScriptureReference(p.Book, p.Chapter, p.VerseStart, p.VerseEnd);
         return ScriptureReferenceParser.TryParse(item.Title);
+    }
+
+    /// <summary>
+    /// Reloads the verse grid in the new translation, keeps the live highlight on the same verse,
+    /// and re-projects that verse so the output does not go blank.
+    /// </summary>
+    private async Task OnTranslationChangedAsync(string translation, int generation)
+    {
+        var origin = _liveScriptureRef?.VerseStart ?? 0;
+        await ContentSearch.HandleTranslationChangeAsync(origin, _liveScriptureRef);
+        RelinkLiveHighlight();
+        await RefreshLiveTranslationAsync(translation, generation);
+    }
+
+    /// <summary>
+    /// After a chapter reload the old live ContentItem is gone from Results. Point IsLive at the
+    /// matching new card so next/prev and the ring stay attached to the verse that is on output.
+    /// </summary>
+    private void RelinkLiveHighlight()
+    {
+        if (_liveScriptureRef is null) return;
+
+        var idx = IndexOfLiveVerse();
+        if (idx < 0) return;
+
+        var item = ContentSearch.Results[idx];
+        if (_liveContentItem is not null && !ReferenceEquals(_liveContentItem, item))
+            _liveContentItem.IsLive = false;
+
+        _liveContentItem = item;
+        item.IsLive = true;
+        ContentSearch.SelectedItem = item;
     }
 
     /// <summary>
@@ -1730,27 +1866,63 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     }
 
     /// <summary>
-    /// Arrow-right behaviour: page forward through the live deck; when on the last page,
-    /// roll over to the next queue item.
+    /// Arrow-right: page the live deck; on the last page of a verse, go to the next verse
+    /// in the loaded chapter. Does not wrap back to verse 1.
     /// </summary>
     public void AdvanceForward()
     {
         if (_projection.MoveNext())
             return;
-        if (ServiceQueue.CanGoNext)
-            ServiceQueue.NextCommand.Execute().Subscribe();
+        AdvanceLiveVerse(+1);
     }
 
     /// <summary>
-    /// Arrow-left behaviour: page back through the live deck; when on the first page,
-    /// roll over to the previous queue item.
+    /// Arrow-left: page back through the live deck; on the first page, go to the previous verse.
     /// </summary>
     public void AdvanceBackward()
     {
         if (_projection.MovePrev())
             return;
-        if (ServiceQueue.CanGoPrev)
-            ServiceQueue.PrevCommand.Execute().Subscribe();
+        AdvanceLiveVerse(-1);
+    }
+
+    private void AdvanceLiveVerse(int direction)
+    {
+        var results = ContentSearch.Results;
+        if (results.Count == 0) return;
+
+        var liveIdx = IndexOfLiveVerse();
+        var next = VerseAdvance.StepIndex(liveIdx, results.Count, direction);
+        if (next < 0 || next == liveIdx) return;
+
+        var item = results[next];
+        ContentSearch.SelectedItem = item;
+        SendItemToLive(item);
+    }
+
+    private int IndexOfLiveVerse()
+    {
+        var results = ContentSearch.Results;
+        if (_liveContentItem is not null)
+        {
+            var i = results.IndexOf(_liveContentItem);
+            if (i >= 0) return i;
+        }
+
+        if (_liveScriptureRef is not null)
+        {
+            for (var i = 0; i < results.Count; i++)
+            {
+                var r = ReferenceFor(results[i]);
+                if (r is not null
+                    && string.Equals(r.Book, _liveScriptureRef.Book, StringComparison.OrdinalIgnoreCase)
+                    && r.Chapter == _liveScriptureRef.Chapter
+                    && r.VerseStart == _liveScriptureRef.VerseStart)
+                    return i;
+            }
+        }
+
+        return -1;
     }
 
     private void DoTransition()
@@ -1758,38 +1930,39 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         SendItemToLive(ContentSearch.SelectedItem);
     }
 
-    private void DoAddToQueue()
-    {
-        if (ContentSearch.SelectedItem is not null)
-        {
-            ServiceQueue.AddItem(ContentSearch.SelectedItem);
-            StatusText = $"Queued: {ContentSearch.SelectedItem.Title}";
-        }
-    }
-
-    private void DoAddAllToQueue()
-    {
-        ServiceQueue.AddAllItems(ContentSearch.Results);
-        StatusText = $"Queued {ContentSearch.Results.Count} items";
-    }
-
     private const string PlaylistsKey = "playlists";
 
-    /// <summary>Saves the current service queue as a named, reusable playlist.</summary>
+    /// <summary>Saves the currently open song as a named playlist (Songs mode setlist).</summary>
     private void SaveCurrentAsPlaylist()
     {
-        var items = ServiceQueue.Snapshot();
+        if (SelectedLibrarySong is null || !HasNowSinging)
+        {
+            StatusText = "Open a song, then tap + to save it as a playlist.";
+            return;
+        }
+
+        var items = SongToItems(SelectedLibrarySong)
+            .Select(item => new QueueSlide
+            {
+                Title = item.Title,
+                Body = item.Body,
+                Footer = item.Footer,
+                Tag = item.Tag,
+                SlideType = item.Type.ToSlideType(),
+                LinesPerSlide = item.LinesPerSlide,
+            })
+            .ToList();
+
         if (items.Count == 0)
         {
-            StatusText = "Queue is empty — add items before saving a playlist.";
+            StatusText = "That song has no slides to save.";
             return;
         }
 
         var name = string.IsNullOrWhiteSpace(NewPlaylistName)
-            ? $"Set {Playlists.Count + 1}"
+            ? SelectedLibrarySong.Title
             : NewPlaylistName.Trim();
 
-        // Overwrite a same-named playlist rather than creating a duplicate.
         var existing = Playlists.FirstOrDefault(p => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
         if (existing is not null)
             Playlists.Remove(existing);
@@ -1798,7 +1971,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         NewPlaylistName = string.Empty;
         IsNamingPlaylist = false;
         this.RaisePropertyChanged(nameof(HasPlaylists));
-        StatusText = $"Saved playlist: {name} ({items.Count} items)";
+        StatusText = $"Saved playlist: {name}";
         _ = PersistPlaylistsAsync();
     }
 
@@ -2037,17 +2210,23 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         }
     }
 
-    /// <summary>Loads every section of a song into the Service Queue, ready to project.</summary>
-    public void LoadSongToQueue(Song? song)
+    /// <summary>Opens the playlist's song in Now Singing (Songs mode setlist).</summary>
+    public void LoadPlaylist(SavedPlaylist? playlist)
     {
-        if (song is null) return;
-        var items = SongToItems(song).ToList();
-        if (items.Count == 0) return;
-        ServiceQueue.AddAllItems(items);
-        StatusText = $"Loaded \"{song.Title}\" — {items.Count} slide{(items.Count == 1 ? "" : "s")} queued";
-    }
+        if (playlist is null || playlist.Items.Count == 0) return;
+        EnterSongsMode();
+        var title = playlist.Items[0].Title;
+        var song = LibrarySongs.FirstOrDefault(s =>
+            s.Title.Equals(title, StringComparison.OrdinalIgnoreCase));
+        if (song is null)
+        {
+            StatusText = $"Playlist \"{playlist.Name}\" — song not in the library";
+            return;
+        }
 
-    /// <summary>Projects a song's first slide to Live immediately (double-click action).</summary>
+        OpenSong(song);
+        StatusText = $"Loaded playlist: {playlist.Name}";
+    }
     public void StartSongLive(Song? song)
     {
         if (song is null) return;
@@ -2074,14 +2253,6 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         Source = song,
     };
 
-    /// <summary>Replaces the service queue with a saved playlist's items.</summary>
-    public void LoadPlaylist(SavedPlaylist? playlist)
-    {
-        if (playlist is null) return;
-        ServiceQueue.LoadSlides(playlist.Items.Select(CopySlide));
-        StatusText = $"Loaded playlist: {playlist.Name}";
-    }
-
     public void DeletePlaylist(SavedPlaylist? playlist)
     {
         if (playlist is null) return;
@@ -2089,16 +2260,6 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         this.RaisePropertyChanged(nameof(HasPlaylists));
         _ = PersistPlaylistsAsync();
     }
-
-    private static QueueSlide CopySlide(QueueSlide s) => new()
-    {
-        Title = s.Title,
-        Body = s.Body,
-        Footer = s.Footer,
-        Tag = s.Tag,
-        Icon = s.Icon,
-        SlideType = s.SlideType,
-    };
 
     private async Task PersistPlaylistsAsync()
     {
@@ -2178,6 +2339,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         TopicalSearch.Translation = ContentSearch.SelectedTranslation;
 
         ContentSearch.WhenAnyValue<ContentSearchViewModel, string>(x => x.SelectedTranslation)
+            .Skip(1)
             .Subscribe(t =>
             {
                 _aiMatcher.CurrentTranslation = t;
@@ -2185,7 +2347,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
                 _ = _settings.SetAsync("bible_translation", t);
                 _ = CacheTranslationAsync(t);
                 var generation = Interlocked.Increment(ref _translationRefreshGeneration);
-                _ = RefreshLiveTranslationAsync(t, generation);
+                _ = OnTranslationChangedAsync(t, generation);
             });
 
         _bibleCache.StatusMessage

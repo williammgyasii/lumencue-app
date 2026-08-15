@@ -12,7 +12,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\ChurchProjection.Core\ChurchProjection.Core.csproj" />
     <ProjectReference Include="..\..\src\ChurchProjection.Infrastructure\ChurchProjection.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\ChurchProjection.UI\ChurchProjection.UI.csproj" />
   </ItemGroup>
 
 </Project>

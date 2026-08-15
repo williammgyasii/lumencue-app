@@ -1,3 +1,5 @@
+using ChurchProjection.Core.Models.Slides;
+
 namespace ChurchProjection.Core.Models.Theme;
 
 public enum ThemeBackgroundKind
@@ -30,6 +32,12 @@ public enum ThemeLayout { FullScreen, LowerThird }
 
 /// <summary>How a background image is fitted to the screen.</summary>
 public enum ThemeImageFit { Fill, Uniform, UniformToFill }
+
+/// <summary>Which slide field a text layer displays for a given content type.</summary>
+public enum ThemeContentField { None, Title, Body, Footer }
+
+/// <summary>Fixed text slots in a theme layout (Title / Body / Footer).</summary>
+public enum ThemeTextSlot { Title, Body, Footer }
 
 /// <summary>
 /// A decorative shape painted behind the text (accent bars, lower-third panels, color blocks).
@@ -125,6 +133,53 @@ public sealed class ThemeRegion
     public double MinFontSize { get; set; } = 24;
     public double MaxFontSize { get; set; } = 140;
 
+    /// <summary>Per content-type bindings — which slide field this layer shows when projecting.</summary>
+    public ThemeContentField ScriptureField { get; set; }
+    public ThemeContentField SongField { get; set; }
+    public ThemeContentField NoteField { get; set; }
+    public ThemeContentField AnnouncementField { get; set; }
+
+    public ThemeContentField GetContentField(SlideType slideType) => slideType switch
+    {
+        SlideType.Scripture => ScriptureField,
+        SlideType.Lyric => SongField,
+        SlideType.Note => NoteField,
+        SlideType.Announcement => AnnouncementField,
+        _ => ThemeContentField.None,
+    };
+
+    public static string ResolveSlideText(string title, string body, string footer, ThemeContentField field)
+        => field switch
+        {
+            ThemeContentField.Title => title,
+            ThemeContentField.Body => body,
+            ThemeContentField.Footer => footer,
+            _ => "",
+        };
+
+    /// <summary>Seeds per-content bindings for a newly added Title/Body/Footer layer.</summary>
+    public void ApplyDefaultContentBindings(ThemeTextSlot slot)
+    {
+        switch (slot)
+        {
+            case ThemeTextSlot.Title:
+                ScriptureField = ThemeContentField.Title;
+                SongField = ThemeContentField.Title;
+                NoteField = ThemeContentField.Title;
+                AnnouncementField = ThemeContentField.Title;
+                break;
+            case ThemeTextSlot.Body:
+                ScriptureField = ThemeContentField.Body;
+                SongField = ThemeContentField.Body;
+                NoteField = ThemeContentField.Body;
+                AnnouncementField = ThemeContentField.Body;
+                break;
+            case ThemeTextSlot.Footer:
+                ScriptureField = ThemeContentField.Footer;
+                break;
+        }
+    }
+
     public ThemeRegion Clone() => (ThemeRegion)MemberwiseClone();
 }
 
@@ -148,9 +203,17 @@ public sealed class Theme
     public string Name { get; set; } = "New Theme";
 
     public string FontFamily { get; set; } = "Segoe UI";
+    /// <summary>Optional title face. Empty inherits <see cref="FontFamily"/> so older themes stay one font.</summary>
+    public string TitleFontFamily { get; set; } = "";
+    /// <summary>Optional footer face. Empty inherits <see cref="FontFamily"/> so older themes stay one font.</summary>
+    public string FooterFontFamily { get; set; } = "";
     public double BodyFontSize { get; set; } = 64;
     public double TitleFontSize { get; set; } = 34;
     public double FooterFontSize { get; set; } = 24;
+
+    public string ResolveBodyFont() => string.IsNullOrWhiteSpace(FontFamily) ? "Segoe UI" : FontFamily;
+    public string ResolveTitleFont() => string.IsNullOrWhiteSpace(TitleFontFamily) ? ResolveBodyFont() : TitleFontFamily;
+    public string ResolveFooterFont() => string.IsNullOrWhiteSpace(FooterFontFamily) ? ResolveBodyFont() : FooterFontFamily;
     public bool Bold { get; set; } = true;
     public double LineHeightMultiplier { get; set; } = 1.25;
     public ThemeTextAlign TextAlign { get; set; } = ThemeTextAlign.Center;
@@ -171,6 +234,28 @@ public sealed class Theme
     public ThemeRegion? TitleRegion { get; set; }
     public ThemeRegion? BodyRegion { get; set; }
     public ThemeRegion? FooterRegion { get; set; }
+
+    /// <summary>True once the layer editor has saved explicit regions (including deletions).</summary>
+    public bool UsesLayerEditor { get; set; }
+
+    /// <summary>
+    /// Gives the editor concrete boxes for legacy themes that never stored regions.
+    /// Layer-editor themes are left alone — an empty layout (every text layer deleted) is valid.
+    /// </summary>
+    public void EnsureEditorRegions()
+    {
+        if (UsesLayerEditor) return;
+        if (TitleRegion is not null || BodyRegion is not null || FooterRegion is not null)
+            return;
+
+        var (title, body, footer) = ResolveRegions();
+        TitleRegion = title.Clone();
+        BodyRegion = body.Clone();
+        FooterRegion = footer.Clone();
+        TitleRegion.ApplyDefaultContentBindings(ThemeTextSlot.Title);
+        BodyRegion.ApplyDefaultContentBindings(ThemeTextSlot.Body);
+        FooterRegion.ApplyDefaultContentBindings(ThemeTextSlot.Footer);
+    }
 
     public ThemeBackgroundKind BackgroundKind { get; set; } = ThemeBackgroundKind.Solid;
     public string BackgroundColor { get; set; } = "#FF000000";
@@ -201,7 +286,7 @@ public sealed class Theme
     {
         ThemeBackgroundKind.KeyColorGreen => KeyGreen,
         ThemeBackgroundKind.KeyColorBlack => KeyBlack,
-        ThemeBackgroundKind.Placeholder => "#00000000",
+        ThemeBackgroundKind.Placeholder or ThemeBackgroundKind.Image => "#00000000",
         _ => BackgroundColor,
     };
 
@@ -213,6 +298,36 @@ public sealed class Theme
         clone.FooterRegion = FooterRegion?.Clone();
         clone.Shapes = Shapes.Select(s => s.Clone()).ToList();
         return clone;
+    }
+
+    /// <summary>
+    /// Regions used at runtime. When <see cref="UsesLayerEditor"/> is set, null slots are omitted;
+    /// otherwise legacy themes derive all three from padding and layout.
+    /// </summary>
+    public (ThemeRegion? Title, ThemeRegion? Body, ThemeRegion? Footer) ResolveActiveRegions()
+    {
+        if (UsesLayerEditor || TitleRegion is not null || BodyRegion is not null || FooterRegion is not null)
+            return (TitleRegion, BodyRegion, FooterRegion);
+
+        var (title, body, footer) = ResolveRegions();
+        return (title, body, footer);
+    }
+
+    /// <summary>Body region used for pagination — the layer bound to <see cref="ThemeContentField.Body"/>.</summary>
+    public ThemeRegion ResolvePaginationRegion(SlideType slideType)
+    {
+        if (UsesLayerEditor || TitleRegion is not null || BodyRegion is not null || FooterRegion is not null)
+        {
+            foreach (var region in new[] { TitleRegion, BodyRegion, FooterRegion })
+            {
+                if (region?.GetContentField(slideType) == ThemeContentField.Body)
+                    return region;
+            }
+
+            return BodyRegion ?? TitleRegion ?? FooterRegion ?? ResolveRegions().Body;
+        }
+
+        return ResolveRegions().Body;
     }
 
     /// <summary>

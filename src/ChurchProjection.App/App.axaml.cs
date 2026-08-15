@@ -25,6 +25,10 @@ public class App : Application
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
+#if DEBUG
+        // F12 opens the Avalonia inspector (visual tree, properties, layout bounds).
+        this.AttachDevTools();
+#endif
     }
 
     public override async void OnFrameworkInitializationCompleted()
@@ -148,7 +152,16 @@ public class App : Application
         // Cost control: only stream to Deepgram during speech. Disable by setting Deepgram:VadGate=false.
         var vadGate = !bool.TryParse(config["Deepgram:VadGate"], out var vg) || vg;
         var vadThreshold = double.TryParse(config["Deepgram:VadThreshold"], out var vt) ? vt : 0.01;
-        if (!string.IsNullOrWhiteSpace(cloudApiBaseUrl))
+        var elevenLabsKey = config["ElevenLabs:ApiKey"];
+        if (!string.IsNullOrWhiteSpace(elevenLabsKey))
+        {
+            // Local trial only: API key lives in appsettings.local.json (gitignored). Deepgram stays
+            // the production path when this key is absent.
+            Log.Information("STT: ElevenLabs Scribe v2 (local key), confidence gate {Min:P0}", minConfidence);
+            services.AddSingleton<ITranscriptionService>(_ =>
+                new ElevenLabsTranscriptionService(elevenLabsKey, minConfidence, inputGain, vadGate, vadThreshold));
+        }
+        else if (!string.IsNullOrWhiteSpace(cloudApiBaseUrl))
         {
             Log.Information("STT: Deepgram (cloud, token-based), confidence gate {Min:P0}", minConfidence);
             var sttHttp = new HttpClient(new SeatAuthHandler(seatTokens, new HttpClientHandler()))

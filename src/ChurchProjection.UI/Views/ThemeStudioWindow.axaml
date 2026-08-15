@@ -1,8 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:ChurchProjection.UI.ViewModels"
-        xmlns:views="using:ChurchProjection.UI.Views"
-        xmlns:conv="using:ChurchProjection.UI.Converters"
+        xmlns:ts="using:ChurchProjection.UI.Views.ThemeStudio"
         x:Class="ChurchProjection.UI.Views.ThemeStudioWindow"
         x:DataType="vm:ThemeStudioViewModel"
         Title="Theme Studio"
@@ -11,10 +10,6 @@
         WindowState="Maximized"
         WindowStartupLocation="CenterOwner"
         Background="#0E1014">
-
-  <Window.Resources>
-    <conv:HexColorConverter x:Key="HexColor" />
-  </Window.Resources>
 
   <Window.Styles>
     <Style Selector="TextBlock.lbl">
@@ -29,54 +24,117 @@
       <Setter Property="FontWeight" Value="Bold" />
       <Setter Property="Margin" Value="0,4,0,4" />
     </Style>
+    <Style Selector="TextBlock.sectionThemes">
+      <Setter Property="Foreground" Value="#A78BFA" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Margin" Value="0,4,0,4" />
+    </Style>
+    <Style Selector="TextBlock.sectionPreview">
+      <Setter Property="Foreground" Value="#22D3EE" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Margin" Value="0,4,0,4" />
+    </Style>
+    <Style Selector="TextBlock.sectionLayers">
+      <Setter Property="Foreground" Value="#F472B6" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Margin" Value="0,4,0,4" />
+    </Style>
+    <Style Selector="Button.tsSave">
+      <Setter Property="Background" Value="#7C6CF6" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="18,8" />
+    </Style>
+    <Style Selector="Button.tsSave:pointerover">
+      <Setter Property="Background" Value="#6D5CE6" />
+    </Style>
+    <Style Selector="Button.tsClose">
+      <Setter Property="Background" Value="#2D2234" />
+      <Setter Property="Foreground" Value="#F9A8D4" />
+      <Setter Property="BorderBrush" Value="#F472B6" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="16,8" />
+    </Style>
+    <Style Selector="Button.tsClose:pointerover">
+      <Setter Property="Background" Value="#3F2D42" />
+    </Style>
+    <Style Selector="Button.tsAdd">
+      <Setter Property="Background" Value="#0E3A40" />
+      <Setter Property="Foreground" Value="#22D3EE" />
+      <Setter Property="BorderBrush" Value="#155E75" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="12,6" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+    <Style Selector="Button.tsAdd:pointerover">
+      <Setter Property="Background" Value="#134E59" />
+    </Style>
+    <Style Selector="Button.tsDanger">
+      <Setter Property="Background" Value="#3A2226" />
+      <Setter Property="Foreground" Value="#FCA5A5" />
+      <Setter Property="BorderBrush" Value="#991B1B" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="12,6" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+    <Style Selector="Button.tsDanger:pointerover">
+      <Setter Property="Background" Value="#4C2A30" />
+    </Style>
+    <Style Selector="Button.tsSidebar">
+      <Setter Property="Background" Value="#1F2430" />
+      <Setter Property="Foreground" Value="#D6DAE2" />
+      <Setter Property="BorderBrush" Value="#3A4150" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Padding" Value="9,4" />
+    </Style>
+    <Style Selector="Button.tsSidebar.accentNew">
+      <Setter Property="BorderBrush" Value="#7C6CF6" />
+      <Setter Property="Foreground" Value="#C4B5FD" />
+    </Style>
+    <Style Selector="Button.tsSidebar.accentImport">
+      <Setter Property="BorderBrush" Value="#22D3EE" />
+      <Setter Property="Foreground" Value="#67E8F9" />
+    </Style>
+    <Style Selector="Button.tsSidebar.accentLayer">
+      <Setter Property="BorderBrush" Value="#F472B6" />
+      <Setter Property="Foreground" Value="#FBCFE8" />
+    </Style>
+    <Style Selector="Button.tsSidebarDanger">
+      <Setter Property="Background" Value="#3A2226" />
+      <Setter Property="Foreground" Value="#FCA5A5" />
+      <Setter Property="BorderBrush" Value="#7F1D1D" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Padding" Value="9,4" />
+    </Style>
+    <Style Selector="ProgressBar">
+      <Setter Property="Foreground" Value="#7C6CF6" />
+      <Setter Property="Background" Value="#2A303C" />
+    </Style>
     <Style Selector="TextBox">
       <Setter Property="FontSize" Value="12" />
-      <!-- Allow path/value boxes to shrink inside the narrow inspector instead of forcing the
-           panel wider than its column (which the panel then clips on the right). -->
       <Setter Property="MinWidth" Value="0" />
     </Style>
     <Style Selector="ComboBox">
       <Setter Property="FontSize" Value="12" />
       <Setter Property="HorizontalAlignment" Value="Stretch" />
     </Style>
-
-    <!-- Inspector tabs -->
-    <Style Selector="TabControl.inspector">
-      <Setter Property="Padding" Value="0" />
-    </Style>
-    <Style Selector="TabControl.inspector > TabItem">
-      <Setter Property="FontSize" Value="12.5" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Foreground" Value="#7F8794" />
-      <Setter Property="Padding" Value="12,8" />
-      <Setter Property="MinHeight" Value="0" />
-    </Style>
-    <Style Selector="TabControl.inspector > TabItem:selected">
-      <Setter Property="Foreground" Value="#ECEEF2" />
-    </Style>
-    <Style Selector="TabControl.inspector > TabItem:pointerover /template/ ContentPresenter">
-      <Setter Property="Background" Value="#1F242E" />
-    </Style>
-
-    <!-- Top toolbar object tools -->
-    <Style Selector="Button.tool">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Foreground" Value="#C2C8D2" />
-      <Setter Property="FontSize" Value="12" />
-      <Setter Property="Padding" Value="9,5" />
-      <Setter Property="CornerRadius" Value="6" />
-    </Style>
-    <Style Selector="Button.tool:pointerover /template/ ContentPresenter">
-      <Setter Property="Background" Value="#262B36" />
-    </Style>
-
-    <!-- Layout editor: region outline boxes -->
     <Style Selector="Border.regionBox">
-      <Setter Property="BorderBrush" Value="#5B6472" />
-      <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="Background" Value="#11FFFFFF" />
+      <Setter Property="BorderBrush" Value="#22D3EE" />
+      <Setter Property="BorderThickness" Value="1.5" />
+      <Setter Property="Background" Value="#180E7490" />
     </Style>
-    <!-- Layout editor: resize handles (Photoshop-style small white squares with a hairline) -->
     <Style Selector="Thumb.handle">
       <Setter Property="Width" Value="10" />
       <Setter Property="Height" Value="10" />
@@ -87,7 +145,6 @@
         </ControlTemplate>
       </Setter>
     </Style>
-    <!-- Layout editor: move handle (fills the selected box, invisible but grabbable) -->
     <Style Selector="Thumb.move">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Cursor" Value="SizeAll" />
@@ -97,482 +154,69 @@
         </ControlTemplate>
       </Setter>
     </Style>
+    <Style Selector="Expander">
+      <Setter Property="Background" Value="#14181F" />
+      <Setter Property="BorderBrush" Value="#2A303C" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="10,8" />
+    </Style>
   </Window.Styles>
 
   <Grid RowDefinitions="Auto,*">
+    <!-- Toolbar -->
+    <DockPanel Grid.Row="0">
+      <Border DockPanel.Dock="Top" Height="2">
+        <Border.Background>
+          <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+            <GradientStop Color="#7C6CF6" Offset="0" />
+            <GradientStop Color="#22D3EE" Offset="0.5" />
+            <GradientStop Color="#F472B6" Offset="1" />
+          </LinearGradientBrush>
+        </Border.Background>
+      </Border>
+      <Border Background="#15181F" BorderBrush="#2A303C" BorderThickness="0,0,0,1" Padding="14,9" ClipToBounds="True">
+      <DockPanel LastChildFill="True">
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <Button Classes="tsDanger" Content="Delete" Command="{Binding DeleteSelectedCommand}"
+                  ToolTip.Tip="Delete selected shape or text layer (Del)" />
 
-    <!-- ============ TOP TOOLBAR ============ -->
-    <Border Grid.Row="0" Background="#15181F" BorderBrush="#2A303C" BorderThickness="0,0,0,1" Padding="14,9">
-      <Grid ColumnDefinitions="*,Auto,*">
-        <!-- left: editing theme name -->
-        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <TextBlock Text="Editing" Foreground="#6E7682" FontSize="12" VerticalAlignment="Center" />
-          <TextBox Text="{Binding Name}" Width="200" FontSize="13" FontWeight="SemiBold" />
+          <!-- Save feedback -->
+          <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
+                      IsVisible="{Binding ShowSaveProgress}">
+            <ProgressBar IsIndeterminate="True" Width="72" Height="3" VerticalAlignment="Center" />
+            <TextBlock Text="Saving…" Foreground="#A78BFA" FontSize="12" VerticalAlignment="Center" />
+          </StackPanel>
+          <TextBlock Text="Saved ✓" IsVisible="{Binding ShowSaveSuccess}" Foreground="#34D399" FontSize="12"
+                     FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,4,0" />
+
+          <Button Classes="tsSave" Content="Save Theme" Command="{Binding SaveThemeCommand}" />
+          <Button Classes="tsClose" Content="Close" Command="{Binding CloseCommand}"
+                  ToolTip.Tip="Close Theme Studio" />
         </StackPanel>
 
-        <!-- center: object insertion tools -->
-        <Border Grid.Column="1" Background="#0E1014" CornerRadius="8" Padding="6,4" BorderBrush="#2A303C" BorderThickness="1">
-          <StackPanel Orientation="Horizontal" Spacing="4">
-            <Button Classes="tool" Command="{Binding AddShapeCommand}" ToolTip.Tip="Add a rectangle / accent panel">
-              <StackPanel Orientation="Horizontal" Spacing="6">
-                <Border Width="14" Height="11" Background="#9AA3B2" CornerRadius="2" VerticalAlignment="Center" />
-                <TextBlock Text="Rectangle" VerticalAlignment="Center" />
-              </StackPanel>
-            </Button>
-            <Button Classes="tool" Command="{Binding AddBarCommand}" ToolTip.Tip="Add a thin accent bar">
-              <StackPanel Orientation="Horizontal" Spacing="6">
-                <Border Width="16" Height="4" Background="#9AA3B2" CornerRadius="2" VerticalAlignment="Center" />
-                <TextBlock Text="Bar" VerticalAlignment="Center" />
-              </StackPanel>
-            </Button>
-            <Border Width="1" Background="#2A303C" Margin="4,2" />
-            <Button Classes="tool" Click="OnBrowseImageClicked" ToolTip.Tip="Set a background image">
-              <TextBlock Text="Background…" VerticalAlignment="Center" />
-            </Button>
-            <Border Width="1" Background="#2A303C" Margin="4,2" />
-            <Button Classes="tool" Command="{Binding SendToBackCommand}" IsEnabled="{Binding IsShapeSelected}"
-                    ToolTip.Tip="Send the selected shape to the back">
-              <TextBlock Text="To back" VerticalAlignment="Center" />
-            </Button>
-            <Button Classes="tool" Command="{Binding BringToFrontCommand}" IsEnabled="{Binding IsShapeSelected}"
-                    ToolTip.Tip="Bring the selected shape to the front">
-              <TextBlock Text="To front" VerticalAlignment="Center" />
-            </Button>
-            <Border Width="1" Background="#2A303C" Margin="4,2" />
-            <Button Classes="tool" Command="{Binding DeleteSelectedCommand}"
-                    ToolTip.Tip="Delete the selected shape, or hide the selected text region (Del)">
-              <TextBlock Text="Delete" VerticalAlignment="Center" />
-            </Button>
-          </StackPanel>
-        </Border>
+        <StackPanel HorizontalAlignment="Center" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
+                    Margin="0,0,12,0" MinWidth="0">
+          <TextBlock Text="Editing" Foreground="#A78BFA" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+          <TextBox Text="{Binding Name}" MinWidth="160" MaxWidth="260" FontSize="13" FontWeight="SemiBold"
+                   HorizontalContentAlignment="Center" TextAlignment="Center"
+                   BorderBrush="#5B21B6" />
+        </StackPanel>
+      </DockPanel>
+      </Border>
+    </DockPanel>
 
-        <!-- right: save -->
-        <Button Grid.Column="2" Content="Save Theme" Command="{Binding SaveThemeCommand}"
-                Background="#7C6CF6" Foreground="White" FontWeight="SemiBold"
-                Padding="18,8" CornerRadius="6" HorizontalAlignment="Right" VerticalAlignment="Center" />
-      </Grid>
-    </Border>
-
-    <!-- ============ MAIN AREA ============ -->
-    <Grid Grid.Row="1">
+    <!-- Main columns -->
+    <Grid Grid.Row="1" ClipToBounds="True">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="232" />
-        <ColumnDefinition Width="*" MinWidth="360" />
-        <ColumnDefinition Width="360" MinWidth="340" />
+        <ColumnDefinition Width="240" MinWidth="180" />
+        <ColumnDefinition Width="*" MinWidth="280" />
+        <ColumnDefinition Width="400" MinWidth="280" />
       </Grid.ColumnDefinitions>
 
-      <!-- LEFT: themes + objects + assignments -->
-      <Border Grid.Column="0" Background="#181C24" BorderBrush="#2A303C" BorderThickness="0,0,1,0" Padding="12">
-        <DockPanel>
-          <TextBlock DockPanel.Dock="Top" Text="THEMES" Classes="section" />
-          <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6" Margin="0,4,0,6">
-            <Button Content="New" Command="{Binding NewThemeCommand}" FontSize="11" Padding="9,4" />
-            <Button Content="Duplicate" Command="{Binding DuplicateThemeCommand}" FontSize="11" Padding="9,4" />
-            <Button Content="Delete" Command="{Binding DeleteThemeCommand}" FontSize="11" Padding="9,4" />
-          </StackPanel>
-          <Button DockPanel.Dock="Top" Content="Import design…" Click="OnImportDesignClicked"
-                  IsEnabled="{Binding CanImportDesign}" HorizontalAlignment="Stretch" FontSize="11" Padding="9,4"
-                  Margin="0,0,0,6"
-                  ToolTip.Tip="Import a lower-third graphic (PNG/JPG). It's placed full-width at the bottom of a 1920×1080 green-key frame for your ATEM, with text regions you can position on top." />
-          <ListBox DockPanel.Dock="Top" ItemsSource="{Binding ThemeNames}" SelectedItem="{Binding SelectedThemeName}"
-                   MaxHeight="150" />
-
-          <!-- assignments pinned to bottom -->
-          <StackPanel DockPanel.Dock="Bottom" Spacing="4" Margin="0,10,0,0">
-            <TextBlock Text="ASSIGN TO CONTENT" Classes="section" />
-            <TextBlock Classes="lbl" Text="Scripture" />
-            <ComboBox ItemsSource="{Binding ThemeNames}" SelectedItem="{Binding ScriptureTheme}" />
-            <TextBlock Classes="lbl" Text="Songs" />
-            <ComboBox ItemsSource="{Binding ThemeNames}" SelectedItem="{Binding SongTheme}" />
-            <TextBlock Classes="lbl" Text="Announcements" />
-            <ComboBox ItemsSource="{Binding ThemeNames}" SelectedItem="{Binding AnnouncementTheme}" />
-          </StackPanel>
-
-          <!-- objects list fills the middle -->
-          <TextBlock DockPanel.Dock="Top" Text="OBJECTS" Classes="section" Margin="0,12,0,4" />
-          <ListBox ItemsSource="{Binding LayoutObjects}" SelectedItem="{Binding SelectedObject}"
-                   ToolTip.Tip="Double-click a shape's name to rename it">
-            <ListBox.ItemTemplate>
-              <DataTemplate x:DataType="vm:LayoutObjectItem">
-                <StackPanel Orientation="Horizontal" Spacing="8" Background="Transparent"
-                            DoubleTapped="OnObjectDoubleTapped">
-                  <Border Width="18" Height="18" CornerRadius="3" Background="#2A303C"
-                          BorderBrush="#3A4150" BorderThickness="1" VerticalAlignment="Center"
-                          IsVisible="{Binding !IsShape}" />
-                  <Border Width="18" Height="6" CornerRadius="2" Background="#6E7682" VerticalAlignment="Center"
-                          IsVisible="{Binding IsShape}" />
-                  <TextBlock Text="{Binding Display}" Foreground="#D6DAE2" FontSize="12.5" VerticalAlignment="Center"
-                             IsVisible="{Binding !IsEditing}" />
-                  <TextBox Text="{Binding EditName}" IsVisible="{Binding IsEditing}" FontSize="12.5"
-                           MinWidth="0" Padding="3,0" Margin="-2,0,0,0" VerticalAlignment="Center"
-                           KeyDown="OnRenameKeyDown" LostFocus="OnRenameCommit" />
-                </StackPanel>
-              </DataTemplate>
-            </ListBox.ItemTemplate>
-          </ListBox>
-        </DockPanel>
-      </Border>
-
-      <!-- CENTER: large editing canvas -->
-      <Border Grid.Column="1" Background="#0B0D12">
-        <Grid RowDefinitions="*,Auto">
-          <Panel Grid.Row="0" x:Name="EditorHost" SizeChanged="OnEditorHostSizeChanged">
-          <Border CornerRadius="8" ClipToBounds="True" BorderBrush="#374151" BorderThickness="1"
-                  HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20">
-            <Panel Width="{Binding EditorCanvasWidth}" Height="{Binding EditorCanvasHeight}">
-              <Viewbox Stretch="Uniform">
-                <Border Width="1920" Height="1080">
-                  <views:ProjectorView DataContext="{Binding Preview}" />
-                </Border>
-              </Viewbox>
-
-              <!-- Editing overlay -->
-              <Canvas Width="{Binding EditorCanvasWidth}" Height="{Binding EditorCanvasHeight}" Background="Transparent">
-                <!-- Transparent shape hit-targets (bottom layer) so any image/shape is click-selectable. -->
-                <ItemsControl ItemsSource="{Binding ShapeHandles}"
-                              Width="{Binding EditorCanvasWidth}" Height="{Binding EditorCanvasHeight}">
-                  <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate><Canvas /></ItemsPanelTemplate>
-                  </ItemsControl.ItemsPanel>
-                  <ItemsControl.Styles>
-                    <Style Selector="ItemsControl > ContentPresenter" x:DataType="vm:ShapeHandleItem">
-                      <Setter Property="Canvas.Left" Value="{Binding EX}" />
-                      <Setter Property="Canvas.Top" Value="{Binding EY}" />
-                    </Style>
-                  </ItemsControl.Styles>
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:ShapeHandleItem">
-                      <Border Background="Transparent" Width="{Binding EW}" Height="{Binding EH}"
-                              Tag="{Binding Index}" PointerPressed="OnShapeBoxPressed" Cursor="SizeAll" />
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-
-                <Border Classes="regionBox" Tag="Title" PointerPressed="OnRegionBoxPressed"
-                        Canvas.Left="{Binding TitleBoxX}" Canvas.Top="{Binding TitleBoxY}"
-                        Width="{Binding TitleBoxW}" Height="{Binding TitleBoxH}"
-                        IsVisible="{Binding TitleBoxVisible}" Opacity="0.9">
-                  <TextBlock Text="Title" Foreground="#9AA3B2" FontSize="10" Margin="4,2"
-                             HorizontalAlignment="Left" VerticalAlignment="Top" />
-                </Border>
-                <Border Classes="regionBox" Tag="Body" PointerPressed="OnRegionBoxPressed"
-                        Canvas.Left="{Binding BodyBoxX}" Canvas.Top="{Binding BodyBoxY}"
-                        Width="{Binding BodyBoxW}" Height="{Binding BodyBoxH}"
-                        IsVisible="{Binding BodyBoxVisible}" Opacity="0.9">
-                  <TextBlock Text="Body" Foreground="#9AA3B2" FontSize="10" Margin="4,2"
-                             HorizontalAlignment="Left" VerticalAlignment="Top" />
-                </Border>
-                <Border Classes="regionBox" Tag="Footer" PointerPressed="OnRegionBoxPressed"
-                        Canvas.Left="{Binding FooterBoxX}" Canvas.Top="{Binding FooterBoxY}"
-                        Width="{Binding FooterBoxW}" Height="{Binding FooterBoxH}"
-                        IsVisible="{Binding FooterBoxVisible}" Opacity="0.9">
-                  <TextBlock Text="Footer" Foreground="#9AA3B2" FontSize="10" Margin="4,2"
-                             HorizontalAlignment="Left" VerticalAlignment="Top" />
-                </Border>
-
-                <!-- selection box with move + resize handles -->
-                <Grid Canvas.Left="{Binding SelBoxX}" Canvas.Top="{Binding SelBoxY}"
-                      Width="{Binding SelBoxW}" Height="{Binding SelBoxH}">
-                  <Thumb Classes="move" DragDelta="OnMoveThumb" />
-                  <Border BorderBrush="#22D3EE" BorderThickness="1" IsHitTestVisible="False" />
-
-                  <!-- live width × height readout (design px) -->
-                  <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,-21,0,0"
-                          Background="#E60E7490" CornerRadius="3" Padding="6,1" IsHitTestVisible="False">
-                    <TextBlock Text="{Binding SelSizeLabel}" FontSize="10.5" FontWeight="SemiBold" Foreground="White" />
-                  </Border>
-
-                  <Thumb Classes="handle" Tag="tl" DragDelta="OnResizeThumb"
-                         HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-5,-5,0,0" />
-                  <Thumb Classes="handle" Tag="t" DragDelta="OnResizeThumb"
-                         HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,-5,0,0" />
-                  <Thumb Classes="handle" Tag="tr" DragDelta="OnResizeThumb"
-                         HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-5,-5,0" />
-                  <Thumb Classes="handle" Tag="l" DragDelta="OnResizeThumb"
-                         HorizontalAlignment="Left" VerticalAlignment="Center" Margin="-5,0,0,0" />
-                  <Thumb Classes="handle" Tag="r" DragDelta="OnResizeThumb"
-                         HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-5,0" />
-                  <Thumb Classes="handle" Tag="bl" DragDelta="OnResizeThumb"
-                         HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="-5,0,0,-5" />
-                  <Thumb Classes="handle" Tag="b" DragDelta="OnResizeThumb"
-                         HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,-5" />
-                  <Thumb Classes="handle" Tag="br" DragDelta="OnResizeThumb"
-                         HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-5,-5" />
-                </Grid>
-              </Canvas>
-            </Panel>
-          </Border>
-          </Panel>
-
-          <TextBlock Grid.Row="1" Margin="0,0,0,12"
-                     Text="Click any object on the canvas to select it, then drag to move or grab a handle to resize. Double-click a layer in the list to rename it."
-                     Foreground="#5C6470" FontSize="11" TextWrapping="Wrap"
-                     HorizontalAlignment="Center" TextAlignment="Center" MaxWidth="540" />
-        </Grid>
-      </Border>
-
-      <!-- RIGHT: inspector for the selected object -->
-      <Border Grid.Column="2" Background="#181C24" BorderBrush="#2A303C" BorderThickness="1,0,0,0" ClipToBounds="True">
-        <Grid RowDefinitions="Auto,*">
-
-          <!-- selected object header -->
-          <Border Grid.Row="0" Background="#0E1014" CornerRadius="6" Padding="10,7" Margin="14,14,14,6">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <Ellipse Width="9" Height="9" Fill="#22D3EE" VerticalAlignment="Center" />
-              <TextBlock Text="{Binding SelObjectName}" Foreground="#ECEEF2" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
-            </StackPanel>
-          </Border>
-
-          <TabControl Grid.Row="1" Classes="inspector" Margin="0,2,0,0">
-
-            <!-- ============ CONTENT TAB (appearance of the selected object) ============ -->
-            <TabItem Header="Content">
-              <ScrollViewer Padding="16,10" HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Spacing="2">
-
-                  <!-- text region appearance -->
-                  <StackPanel IsVisible="{Binding IsRegionSelected}">
-                    <TextBlock Text="TEXT" Classes="section" />
-                    <TextBlock Classes="lbl" Text="Font" />
-                    <ComboBox ItemsSource="{Binding FontFamilies}" SelectedItem="{Binding FontFamilyName}" />
-                    <CheckBox Content="Bold" IsChecked="{Binding Bold}" Margin="0,8,0,0" />
-                    <TextBlock Classes="lbl" Text="Font size" />
-                    <Slider Minimum="10" Maximum="200" Value="{Binding SelFontSize}" />
-                    <TextBlock Classes="lbl" Text="Text color" />
-                    <ColorPicker Color="{Binding SelTextColor, Converter={StaticResource HexColor}, Mode=TwoWay}"
-                                 HorizontalAlignment="Left" />
-                    <TextBox Text="{Binding SelTextColor}" Margin="0,6,0,0" Watermark="#FFFFFFFF" />
-                    <TextBlock Classes="lbl" Text="Line height (x)" />
-                    <Slider Minimum="0.8" Maximum="2.5" Value="{Binding LineHeightMultiplier}" />
-
-                    <TextBlock Text="TEXT PADDING (space inside the box)" Classes="section" Margin="0,16,0,4" />
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                      <StackPanel Grid.Column="0">
-                        <TextBlock Classes="lbl" Text="Horizontal" />
-                        <Slider Minimum="0" Maximum="400" Value="{Binding SelTextPaddingX}" />
-                      </StackPanel>
-                      <StackPanel Grid.Column="1">
-                        <TextBlock Classes="lbl" Text="Vertical" />
-                        <Slider Minimum="0" Maximum="400" Value="{Binding SelTextPaddingY}" />
-                      </StackPanel>
-                    </Grid>
-
-                    <TextBlock Text="CAPTION BOX (behind text)" Classes="section" Margin="0,16,0,4" />
-                    <TextBlock Classes="lbl" Text="Box color (set alpha to 0 for none)" />
-                    <ColorPicker Color="{Binding SelRegionBgColor, Converter={StaticResource HexColor}, Mode=TwoWay}"
-                                 HorizontalAlignment="Left" />
-                    <TextBox Text="{Binding SelRegionBgColor}" Margin="0,6,0,0" Watermark="#00000000" />
-                    <TextBlock Classes="lbl" Text="Box corner radius" />
-                    <Slider Minimum="0" Maximum="200" Value="{Binding SelRegionCorner}" />
-                    <TextBlock Classes="lbl" Text="Box image (custom artwork behind this text only)" />
-                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
-                      <TextBox Grid.Column="0" Text="{Binding SelRegionBgImagePath}" Watermark="No image" MinWidth="0" />
-                      <Button Grid.Column="1" Content="Browse" FontSize="12" Click="OnBrowseRegionImageClicked" />
-                      <Button Grid.Column="2" Content="Clear" FontSize="12" Click="OnClearRegionImageClicked" />
-                    </Grid>
-                    <TextBlock Classes="lbl" Text="Box image fit" />
-                    <ComboBox ItemsSource="{Binding ImageFits}" SelectedItem="{Binding SelRegionBgImageFit}" />
-
-                    <CheckBox Content="Fill box with live background (video)" IsChecked="{Binding SelRegionUseLiveBackground}"
-                              Margin="0,12,0,0"
-                              ToolTip.Tip="Plays the operator's selected live background (image or video loop) inside this box instead of a still image." />
-                    <TextBlock Classes="lbl" Text="Pick the actual clip from the Backgrounds panel on the main screen." TextWrapping="Wrap" Foreground="#6E7682" />
-
-                    <TextBlock Classes="lbl" Text="Image position / zoom (move the image inside the box)" TextWrapping="Wrap" />
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                      <StackPanel Grid.Column="0">
-                        <TextBlock Classes="lbl" Text="Offset X" />
-                        <Slider Minimum="-960" Maximum="960" Value="{Binding SelRegionImageOffsetX}" />
-                      </StackPanel>
-                      <StackPanel Grid.Column="1">
-                        <TextBlock Classes="lbl" Text="Offset Y" />
-                        <Slider Minimum="-540" Maximum="540" Value="{Binding SelRegionImageOffsetY}" />
-                      </StackPanel>
-                    </Grid>
-                    <TextBlock Classes="lbl" Text="Zoom" />
-                    <Slider Minimum="0.2" Maximum="4" Value="{Binding SelRegionImageZoom}" />
-                  </StackPanel>
-
-                  <!-- shape appearance -->
-                  <StackPanel IsVisible="{Binding IsShapeSelected}">
-                    <TextBlock Text="SHAPE" Classes="section" />
-                    <TextBlock Classes="lbl" Text="Fill color" />
-                    <ColorPicker Color="{Binding SelShapeColor, Converter={StaticResource HexColor}, Mode=TwoWay}"
-                                 HorizontalAlignment="Left" />
-                    <TextBox Text="{Binding SelShapeColor}" Margin="0,6,0,0" Watermark="#80FFFFFF" />
-                    <TextBlock Classes="lbl" Text="Corner radius" />
-                    <Slider Minimum="0" Maximum="200" Value="{Binding SelShapeCorner}" />
-                    <TextBlock Classes="lbl" Text="Opacity" />
-                    <Slider Minimum="0" Maximum="1" Value="{Binding SelShapeOpacity}" />
-
-                    <TextBlock Text="IMAGE FILL" Classes="section" Margin="0,16,0,4" />
-                    <TextBlock Classes="lbl" Text="Image (painted over the fill color)" />
-                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
-                      <TextBox Grid.Column="0" Text="{Binding SelShapeImagePath}" Watermark="No image" MinWidth="0" />
-                      <Button Grid.Column="1" Content="Browse" FontSize="12" Click="OnBrowseShapeImageClicked" />
-                      <Button Grid.Column="2" Content="Clear" FontSize="12" Click="OnClearShapeImageClicked" />
-                    </Grid>
-                    <TextBlock Classes="lbl" Text="Image fit" />
-                    <ComboBox ItemsSource="{Binding ImageFits}" SelectedItem="{Binding SelShapeImageFit}" />
-
-                    <CheckBox Content="Fill shape with live background (video)" IsChecked="{Binding SelShapeUseLiveBackground}"
-                              Margin="0,12,0,0"
-                              ToolTip.Tip="Plays the operator's selected live background (image or video loop) inside this shape — great for a lower-third panel that moves." />
-                    <TextBlock Classes="lbl" Text="Pick the actual clip from the Backgrounds panel on the main screen." TextWrapping="Wrap" Foreground="#6E7682" />
-
-                    <TextBlock Classes="lbl" Text="Image position / zoom (move the image inside the shape)" TextWrapping="Wrap" />
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                      <StackPanel Grid.Column="0">
-                        <TextBlock Classes="lbl" Text="Offset X" />
-                        <Slider Minimum="-960" Maximum="960" Value="{Binding SelShapeImageOffsetX}" />
-                      </StackPanel>
-                      <StackPanel Grid.Column="1">
-                        <TextBlock Classes="lbl" Text="Offset Y" />
-                        <Slider Minimum="-540" Maximum="540" Value="{Binding SelShapeImageOffsetY}" />
-                      </StackPanel>
-                    </Grid>
-                    <TextBlock Classes="lbl" Text="Zoom" />
-                    <Slider Minimum="0.2" Maximum="4" Value="{Binding SelShapeImageZoom}" />
-
-                    <TextBlock Text="ARRANGE (LAYER ORDER)" Classes="section" Margin="0,16,0,4" />
-                    <TextBlock Classes="lbl" Text="Shapes stack from back to front; text always sits on top." TextWrapping="Wrap" />
-                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="6" RowSpacing="6" Margin="0,4,0,0">
-                      <Button Grid.Row="0" Grid.Column="0" Content="Bring to front" Command="{Binding BringToFrontCommand}" FontSize="12" HorizontalAlignment="Stretch" />
-                      <Button Grid.Row="0" Grid.Column="1" Content="Send to back" Command="{Binding SendToBackCommand}" FontSize="12" HorizontalAlignment="Stretch" />
-                      <Button Grid.Row="1" Grid.Column="0" Content="Forward" Command="{Binding BringForwardCommand}" FontSize="12" HorizontalAlignment="Stretch" />
-                      <Button Grid.Row="1" Grid.Column="1" Content="Backward" Command="{Binding SendBackwardCommand}" FontSize="12" HorizontalAlignment="Stretch" />
-                    </Grid>
-
-                    <Button Content="Delete this shape" Command="{Binding RemoveShapeCommand}"
-                            Background="#3A1D24" Foreground="#F87171" FontWeight="SemiBold"
-                            Padding="14,7" CornerRadius="6" Margin="0,14,0,0" HorizontalAlignment="Left" />
-                  </StackPanel>
-
-                </StackPanel>
-              </ScrollViewer>
-            </TabItem>
-
-            <!-- ============ LAYOUT TAB (placement of the selected object) ============ -->
-            <TabItem Header="Layout">
-              <ScrollViewer Padding="16,10" HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Spacing="2">
-
-                  <StackPanel IsVisible="{Binding IsRegionSelected}">
-                    <CheckBox Content="Show this text region" IsChecked="{Binding SelVisible}"
-                              ToolTip.Tip="Uncheck to remove this element (e.g. hide the Title or Footer) from the theme." />
-                    <TextBlock Classes="lbl" Text="Uncheck to hide this element from the layout (e.g. no header/footer)." TextWrapping="Wrap" />
-                  </StackPanel>
-
-                  <TextBlock Text="POSITION &amp; SIZE" Classes="section" Margin="0,12,0,4" />
-                  <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                    <StackPanel Grid.Column="0">
-                      <TextBlock Classes="lbl" Text="X (left)" />
-                      <Slider Minimum="0" Maximum="1920" Value="{Binding SelX}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1">
-                      <TextBlock Classes="lbl" Text="Y (top)" />
-                      <Slider Minimum="0" Maximum="1080" Value="{Binding SelY}" />
-                    </StackPanel>
-                  </Grid>
-                  <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                    <StackPanel Grid.Column="0">
-                      <TextBlock Classes="lbl" Text="Width" />
-                      <Slider Minimum="20" Maximum="1920" Value="{Binding SelWidth}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1">
-                      <TextBlock Classes="lbl" Text="Height" />
-                      <Slider Minimum="20" Maximum="1080" Value="{Binding SelHeight}" />
-                    </StackPanel>
-                  </Grid>
-
-                  <StackPanel IsVisible="{Binding IsRegionSelected}">
-                    <TextBlock Text="ALIGNMENT" Classes="section" Margin="0,16,0,4" />
-                    <TextBlock Classes="lbl" Text="Horizontal" />
-                    <ComboBox ItemsSource="{Binding Alignments}" SelectedItem="{Binding SelHAlign}" />
-                    <TextBlock Classes="lbl" Text="Vertical" />
-                    <ComboBox ItemsSource="{Binding VerticalAligns}" SelectedItem="{Binding SelVAlign}" />
-
-                    <CheckBox Content="Auto-fit text to box" IsChecked="{Binding SelAutoFit}" Margin="0,14,0,0" />
-                    <TextBlock Classes="lbl" Text="Min font (auto-fit)" />
-                    <Slider Minimum="8" Maximum="120" Value="{Binding SelMinFontSize}" />
-                    <TextBlock Classes="lbl" Text="Max font (auto-fit)" />
-                    <Slider Minimum="20" Maximum="220" Value="{Binding SelMaxFontSize}" />
-                  </StackPanel>
-
-                </StackPanel>
-              </ScrollViewer>
-            </TabItem>
-
-            <!-- ============ THEME TAB (whole-theme look) ============ -->
-            <TabItem Header="Theme">
-              <ScrollViewer Padding="16,10" HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Spacing="2">
-
-                  <TextBlock Text="BACKGROUND" Classes="section" />
-                  <TextBlock Classes="lbl" Text="Kind" />
-                  <ComboBox ItemsSource="{Binding BackgroundKinds}" SelectedItem="{Binding BackgroundKind}" />
-                  <TextBlock Classes="lbl" TextWrapping="Wrap"
-                             Text="Placeholder = transparent: the live background (motion graphics) shows through. Solid/Image are opaque and ignore the live background." />
-                  <TextBlock Classes="lbl" Text="Solid color" />
-                  <ColorPicker Color="{Binding BackgroundColor, Converter={StaticResource HexColor}, Mode=TwoWay}"
-                               HorizontalAlignment="Left" />
-                  <TextBox Text="{Binding BackgroundColor}" Margin="0,6,0,0" Watermark="#FF101418" />
-                  <TextBlock Classes="lbl" Text="Image" />
-                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                    <TextBox Grid.Column="0" Text="{Binding BackgroundImagePath}" MinWidth="0" />
-                    <Button Grid.Column="1" Content="Browse" FontSize="12" Click="OnBrowseImageClicked" />
-                  </Grid>
-                  <TextBlock Classes="lbl" Text="Image fit" />
-                  <ComboBox ItemsSource="{Binding ImageFits}" SelectedItem="{Binding ImageFit}" />
-                  <TextBlock Classes="lbl" Text="Lower-third bar color (legacy band — leave transparent and use caption boxes)" TextWrapping="Wrap" />
-                  <ColorPicker Color="{Binding LowerThirdBarColor, Converter={StaticResource HexColor}, Mode=TwoWay}"
-                               HorizontalAlignment="Left" />
-                  <TextBox Text="{Binding LowerThirdBarColor}" Margin="0,6,0,0" Watermark="#00000000" />
-                  <TextBlock Text="Tip: 'KeyColorGreen' / 'KeyColorBlack' feed an ATEM keyer; 'Placeholder' lets a live motion background show behind the text."
-                             Foreground="#6E7682" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0" />
-
-                  <TextBlock Text="LEGIBILITY" Classes="section" Margin="0,18,0,4" />
-                  <CheckBox Content="Outline" IsChecked="{Binding OutlineEnabled}" />
-                  <TextBlock Classes="lbl" Text="Outline color" />
-                  <ColorPicker Color="{Binding OutlineColor, Converter={StaticResource HexColor}, Mode=TwoWay}"
-                               HorizontalAlignment="Left" />
-                  <TextBlock Classes="lbl" Text="Outline width" />
-                  <Slider Minimum="0" Maximum="10" Value="{Binding OutlineWidth}" />
-                  <CheckBox Content="Drop shadow" IsChecked="{Binding ShadowEnabled}" Margin="0,8,0,0" />
-                  <TextBlock Classes="lbl" Text="Shadow color" />
-                  <ColorPicker Color="{Binding ShadowColor, Converter={StaticResource HexColor}, Mode=TwoWay}"
-                               HorizontalAlignment="Left" />
-                  <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                    <StackPanel Grid.Column="0">
-                      <TextBlock Classes="lbl" Text="Blur" />
-                      <Slider Minimum="0" Maximum="30" Value="{Binding ShadowBlur}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1">
-                      <TextBlock Classes="lbl" Text="Opacity" />
-                      <Slider Minimum="0" Maximum="1" Value="{Binding ShadowOpacity}" />
-                    </StackPanel>
-                  </Grid>
-                  <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                    <StackPanel Grid.Column="0">
-                      <TextBlock Classes="lbl" Text="Offset X" />
-                      <Slider Minimum="-30" Maximum="30" Value="{Binding ShadowOffsetX}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1">
-                      <TextBlock Classes="lbl" Text="Offset Y" />
-                      <Slider Minimum="-30" Maximum="30" Value="{Binding ShadowOffsetY}" />
-                    </StackPanel>
-                  </Grid>
-
-                  <TextBlock Text="LAYOUT PRESET" Classes="section" Margin="0,18,0,4" />
-                  <ComboBox ItemsSource="{Binding Layouts}" SelectedItem="{Binding Layout}" />
-                </StackPanel>
-              </ScrollViewer>
-            </TabItem>
-
-          </TabControl>
-        </Grid>
-      </Border>
+      <ts:ThemeStudioSidebar Grid.Column="0" DataContext="{Binding}" />
+      <ts:ThemeStudioCanvas Grid.Column="1" DataContext="{Binding}" />
+      <ts:ThemeStudioInspector Grid.Column="2" DataContext="{Binding}" />
     </Grid>
   </Grid>
-
 </Window>

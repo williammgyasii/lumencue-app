@@ -40,6 +40,9 @@ public sealed class OutputRow : ReactiveObject
 
     public OutputKind Kind { get; }
 
+    /// <summary>Physical displays and the windowed preview can be renamed; ProPresenter and NDI cannot.</summary>
+    public bool CanRename => Kind is OutputKind.Display or OutputKind.Windowed;
+
     /// <summary>Geometry for Display/Windowed outputs; null for ProPresenter.</summary>
     public DisplayOption? Display { get; }
 

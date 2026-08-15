@@ -18,7 +18,7 @@ public class TranscriptionViewModel : ViewModelBase
     private static readonly TimeSpan SegmentThrottle = TimeSpan.FromMilliseconds(500);
     // Sample (not debounce) the live partial: emit the newest hypothesis on a fixed cadence so
     // references surface mid-sentence during continuous speech, instead of only when the speaker pauses.
-    private static readonly TimeSpan InterimSampleInterval = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan InterimSampleInterval = TimeSpan.FromMilliseconds(100);
     // Collapse rapid mic-dropdown changes into a single restart.
     private static readonly TimeSpan DeviceSwitchDebounce = TimeSpan.FromMilliseconds(350);
     // Persist the mic-sensitivity slider only after the operator stops dragging.
@@ -274,8 +274,10 @@ public class TranscriptionViewModel : ViewModelBase
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(s => StatusText = s);
 
+        // Sample (not Throttle): audio buffers arrive continuously while the mic is open, so
+        // Throttle would defer every update until speech stops — the meter would look dead.
         _transcription.AudioLevel
-            .Throttle(AudioLevelThrottle)
+            .Sample(AudioLevelThrottle)
             .ObserveOn(RxApp.MainThreadScheduler)
             .Subscribe(l => AudioLevel = l);
 

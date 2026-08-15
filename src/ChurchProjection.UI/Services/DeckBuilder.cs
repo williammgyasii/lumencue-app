@@ -60,7 +60,7 @@ public static class DeckBuilder
             theme.Bold ? FontWeight.Bold : FontWeight.Normal);
 
         // Paginate against the body region so a smaller/repositioned text box pages correctly.
-        var bodyRegion = theme.ResolveRegions().Body;
+        var bodyRegion = theme.ResolvePaginationRegion(type);
 
         // Pagination must agree with how the text is actually rendered. When the body auto-fits, the
         // renderer can shrink text down to MinFontSize, so we paginate at that smallest size — this

@@ -67,6 +67,19 @@ public class SpokenReferenceBuilderTests
     }
 
     [Fact]
+    public void Refines_a_growing_interim_of_the_same_utterance()
+    {
+        var builder = new SpokenReferenceBuilder();
+        var t = DateTimeOffset.UtcNow;
+
+        Assert.Equal(("John", 1, 1, (int?)null), Tup(builder.Accept("let's go to John", t)));
+        Assert.Equal(("John", 3, 1, ScriptureReference.WholeChapterSentinel),
+            Tup(builder.Accept("let's go to John chapter three", t.AddMilliseconds(200))));
+        Assert.Equal(("John", 3, 16, (int?)null),
+            Tup(builder.Accept("let's go to John chapter three verse sixteen", t.AddMilliseconds(400))));
+    }
+
+    [Fact]
     public void Handles_a_contiguous_reference_in_a_single_utterance()
     {
         var builder = new SpokenReferenceBuilder();

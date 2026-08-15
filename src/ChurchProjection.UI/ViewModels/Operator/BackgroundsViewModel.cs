@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using ChurchProjection.Core.Models.Projection;
 using ChurchProjection.UI.Services;
+using ChurchProjection.UI.Services.Video;
 using ReactiveUI;
 using Serilog;
 
@@ -24,6 +25,7 @@ public sealed class BackgroundsViewModel : ReactiveObject, IDisposable
     private readonly ILiveBackgroundService _service;
     private readonly CompositeDisposable _subs = new();
     private bool _hasSelection;
+    private bool _themeAcceptsLiveSelection;
 
     public ObservableCollection<BackgroundTileViewModel> Items { get; } = [];
 
@@ -35,7 +37,11 @@ public sealed class BackgroundsViewModel : ReactiveObject, IDisposable
     {
         _service = service;
 
-        SelectCommand = ReactiveCommand.Create<BackgroundTileViewModel>(t => _service.Select(t.Model));
+        SelectCommand = ReactiveCommand.Create<BackgroundTileViewModel>(t =>
+        {
+            if (!_themeAcceptsLiveSelection) return;
+            _service.Select(t.Model);
+        });
         RemoveCommand = ReactiveCommand.CreateFromTask<BackgroundTileViewModel>(t => _service.RemoveAsync(t.Model));
         ClearCommand = ReactiveCommand.Create(() => _service.Select(null));
 
@@ -46,13 +52,23 @@ public sealed class BackgroundsViewModel : ReactiveObject, IDisposable
 
         _service.SelectedChanged
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(sel =>
-            {
-                var id = sel?.Id;
-                foreach (var t in Items) t.IsSelected = t.Model.Id == id;
-                HasSelection = sel is not null;
-            })
+            .Subscribe(ApplySelectionHighlight)
             .DisposeWith(_subs);
+    }
+
+    /// <summary>
+    /// Placeholder themes take a live background; solid/image/key themes do not.
+    /// When false, clicks are ignored and no tile shows a selection ring.
+    /// </summary>
+    public bool ThemeAcceptsLiveSelection
+    {
+        get => _themeAcceptsLiveSelection;
+        set
+        {
+            if (!this.RaiseAndSetIfChanged(ref _themeAcceptsLiveSelection, value))
+                return;
+            ApplySelectionHighlight(_service.Selected);
+        }
     }
 
     /// <summary>True when a background is live (enables the "None" / clear control).</summary>
@@ -65,9 +81,16 @@ public sealed class BackgroundsViewModel : ReactiveObject, IDisposable
     /// <summary>Adds a media file picked by the view's file dialog.</summary>
     public Task AddAsync(string path) => _service.AddAsync(path);
 
+    private void ApplySelectionHighlight(LiveBackground? sel)
+    {
+        var id = _themeAcceptsLiveSelection ? sel?.Id : null;
+        foreach (var t in Items) t.IsSelected = t.Model.Id == id;
+        HasSelection = _themeAcceptsLiveSelection && sel is not null;
+    }
+
     private void Rebuild(IReadOnlyList<LiveBackground> items)
     {
-        var selId = _service.Selected?.Id;
+        var selId = _themeAcceptsLiveSelection ? _service.Selected?.Id : null;
         foreach (var t in Items) t.Dispose();
         Items.Clear();
         foreach (var i in items)
@@ -85,6 +108,9 @@ public sealed class BackgroundsViewModel : ReactiveObject, IDisposable
 public sealed class BackgroundTileViewModel : ReactiveObject, IDisposable
 {
     private bool _isSelected;
+    private Bitmap? _thumbnail;
+    private readonly Bitmap? _imageThumbnail;
+    private readonly IVideoFramePlayer? _preview;
 
     public BackgroundTileViewModel(LiveBackground model)
     {
@@ -95,19 +121,51 @@ public sealed class BackgroundTileViewModel : ReactiveObject, IDisposable
             try
             {
                 using var fs = File.OpenRead(model.Path);
-                Thumbnail = Bitmap.DecodeToWidth(fs, 240);
+                _imageThumbnail = Bitmap.DecodeToWidth(fs, BackgroundTilePreview.MaxWidth);
+                Thumbnail = _imageThumbnail;
             }
             catch (Exception ex)
             {
                 Log.Debug(ex, "Could not build thumbnail for {Path}", model.Path);
             }
+            return;
+        }
+
+        var request = BackgroundTilePreview.RequestFor(model);
+        if (request is null || !File.Exists(model.Path))
+            return;
+
+        try
+        {
+            _preview = VideoFramePlayerFactory.Start(request, OnPreviewFrame);
+            if (!_preview.IsRunning)
+            {
+                _preview.Dispose();
+                _preview = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "Could not start motion preview for {Path}", model.Path);
+            _preview?.Dispose();
+            _preview = null;
         }
     }
 
     public LiveBackground Model { get; }
     public string Name => Model.Name;
     public bool IsVideo => Model.Kind == LiveBackgroundKind.Video;
-    public Bitmap? Thumbnail { get; }
+
+    public Bitmap? Thumbnail
+    {
+        get => _thumbnail;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _thumbnail, value);
+            this.RaisePropertyChanged(nameof(HasThumbnail));
+        }
+    }
+
     public bool HasThumbnail => Thumbnail is not null;
 
     public bool IsSelected
@@ -116,5 +174,11 @@ public sealed class BackgroundTileViewModel : ReactiveObject, IDisposable
         set => this.RaiseAndSetIfChanged(ref _isSelected, value);
     }
 
-    public void Dispose() => Thumbnail?.Dispose();
+    private void OnPreviewFrame(Bitmap frame) => Thumbnail = frame;
+
+    public void Dispose()
+    {
+        _preview?.Dispose();
+        SafeBitmapDisposal.Retire(_imageThumbnail);
+    }
 }

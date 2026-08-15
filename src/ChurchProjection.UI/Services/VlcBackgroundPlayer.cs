@@ -4,6 +4,7 @@ using Avalonia;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Threading;
+using ChurchProjection.UI.Services.Video;
 using LibVLCSharp.Shared;
 using Serilog;
 
@@ -15,7 +16,7 @@ namespace ChurchProjection.UI.Services;
 /// rotate through three buffers and are pushed to <paramref name="onFrame"/> on the UI thread at ~30fps. Decoding
 /// to memory is CPU-bound by design; a 720p loop keeps the cost reasonable for a background layer.
 /// </summary>
-internal sealed class VlcBackgroundPlayer : IDisposable
+internal sealed class VlcBackgroundPlayer : IVideoFramePlayer
 {
     private const int Width = 1280;
     private const int Height = 720;
@@ -61,6 +62,14 @@ internal sealed class VlcBackgroundPlayer : IDisposable
 
     /// <summary>True if LibVLC native libraries loaded and playback started.</summary>
     public bool IsRunning => _player is not null;
+
+    public float Position { get => 0f; set { } }
+    public long TimeMs => 0;
+    public long LengthMs => 0;
+    public int Volume { get => 0; set { } }
+    public bool IsPaused => false;
+    public void SetPaused(bool paused) { }
+    public void SetAudioDevice(string? deviceId) { }
 
     private static WriteableBitmap NewBitmap() =>
         new(new PixelSize(Width, Height), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Opaque);

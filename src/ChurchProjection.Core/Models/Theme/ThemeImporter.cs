@@ -89,16 +89,23 @@ public static class ThemeImporter
             X = padX, Y = bandTop, Width = contentW, Height = headingH,
             Visible = true, HAlign = ThemeTextAlign.Center, VAlign = ThemeVerticalAlign.Center,
         };
+        theme.TitleRegion.ApplyDefaultContentBindings(ThemeTextSlot.Title);
+
         theme.BodyRegion = new ThemeRegion
         {
             X = padX, Y = bandTop + headingH, Width = contentW, Height = bodyH,
             Visible = true, HAlign = ThemeTextAlign.Center, VAlign = ThemeVerticalAlign.Center,
             AutoFit = true,
         };
+        theme.BodyRegion.ApplyDefaultContentBindings(ThemeTextSlot.Body);
+
         theme.FooterRegion = new ThemeRegion
         {
             X = padX, Y = bandTop + headingH + bodyH, Width = contentW, Height = footerH,
             Visible = true, HAlign = ThemeTextAlign.Center, VAlign = ThemeVerticalAlign.Center,
         };
+        theme.FooterRegion.ApplyDefaultContentBindings(ThemeTextSlot.Footer);
+
+        theme.UsesLayerEditor = true;
     }
 }

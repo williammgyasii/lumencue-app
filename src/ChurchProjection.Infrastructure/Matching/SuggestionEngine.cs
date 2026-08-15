@@ -60,6 +60,9 @@ public sealed class SuggestionEngine : ISuggestionEngine
     {
         if (string.IsNullOrWhiteSpace(transcriptWindow)) return;
         _interimChannel.Writer.TryWrite(transcriptWindow);
+        // Scribe interims are already readable mid-sentence. Feed the fragment builder so
+        // "John" → "John 3" → "John 3:16" stages as the caption grows, not after a pause.
+        _ = HandleSpokenAsync(transcriptWindow);
     }
 
     public void HandleSegment(string finalSegmentText)

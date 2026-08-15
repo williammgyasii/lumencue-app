@@ -10,13 +10,14 @@ using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using ChurchProjection.Core.Models.Projection;
 using ChurchProjection.Infrastructure.Data;
+using ChurchProjection.UI.Services.Video;
 using Serilog;
 
 namespace ChurchProjection.UI.Services;
 
 /// <summary>
 /// Default <see cref="IAnnouncementService"/>. Persists the library + chosen audio device to settings,
-/// loads still graphics directly and drives video clips through audio-enabled <see cref="VlcMediaPlayer"/>s.
+/// loads still graphics directly and drives video clips through <see cref="VideoFramePlayerFactory"/>.
 /// Announcements are tracked PER CHANNEL: each channel owns its own slot (current item, player or image,
 /// and frame stream), so several channels can run different announcements simultaneously. Live selections
 /// are intentionally NOT restored on startup, so launching the app never blasts audio unexpectedly.
@@ -44,7 +45,7 @@ public sealed class AnnouncementService : IAnnouncementService, IDisposable
         _settings = settings;
         _itemsChanged = new BehaviorSubject<IReadOnlyList<AnnouncementMedia>>(Snapshot());
         _collectionsChanged = new BehaviorSubject<IReadOnlyList<MediaCollection>>(CollectionsSnapshot());
-        AudioDevices = VlcMediaPlayer.EnumerateAudioDevices();
+        AudioDevices = VideoFramePlayerFactory.EnumerateAudioDevices();
     }
 
     public IReadOnlyList<AnnouncementMedia> Items => Snapshot();
@@ -202,7 +203,9 @@ public sealed class AnnouncementService : IAnnouncementService, IDisposable
 
         if (item.Kind == AnnouncementMediaKind.Video)
         {
-            slot.Player = new VlcMediaPlayer(item.Path, loop: true, _audioDeviceId, bmp => slot.Frame.OnNext(bmp));
+            slot.Player = VideoFramePlayerFactory.Start(
+                new VideoPlayRequest(item.Path, Loop: true, Audio: true, AudioDeviceId: _audioDeviceId),
+                bmp => slot.Frame.OnNext(bmp));
             if (slot.Player.IsRunning)
             {
                 slot.Player.Volume = slot.Volume;
@@ -322,7 +325,7 @@ public sealed class AnnouncementService : IAnnouncementService, IDisposable
     private sealed class ChannelSlot
     {
         public BehaviorSubject<Bitmap?> Frame { get; } = new(null);
-        public VlcMediaPlayer? Player { get; set; }
+        public IVideoFramePlayer? Player { get; set; }
         public Bitmap? Image { get; set; }
         public AnnouncementMedia? Current { get; set; }
         public int Volume { get; set; } = 100;

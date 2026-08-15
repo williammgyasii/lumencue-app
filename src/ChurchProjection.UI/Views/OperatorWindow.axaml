@@ -117,17 +117,6 @@
       <Setter Property="BorderBrush" Value="#22C55E" />
       <Setter Property="BorderThickness" Value="2" />
     </Style>
-    <!-- Layers status indicator: one dot per compositing layer (lit = on) -->
-    <Style Selector="Border.layerDot">
-      <Setter Property="Width" Value="9" />
-      <Setter Property="Height" Value="9" />
-      <Setter Property="CornerRadius" Value="5" />
-      <Setter Property="Background" Value="#2E3540" />
-      <Setter Property="VerticalAlignment" Value="Center" />
-    </Style>
-    <Style Selector="Border.layerDot.on">
-      <Setter Property="Background" Value="#34D399" />
-    </Style>
     <Style Selector="GridSplitter">
       <Setter Property="Background" Value="#11151B" />
       <Setter Property="MinWidth" Value="0" />
@@ -150,64 +139,27 @@
   <Grid RowDefinitions="Auto,*,Auto,Auto,Auto,Auto">
 
     <!-- TOP TOOLBAR (doubles as the window title bar; right inset clears the OS caption buttons) -->
-    <!-- Three zones layered in one cell so the center nav is truly window-centered regardless of
-         how wide the left (identity/status) and right (controls) clusters are. -->
-    <Border Grid.Row="0" Background="#14181F" Padding="16,9,148,9" BorderBrush="#2A303C" BorderThickness="0,0,0,1">
-      <!-- Three real columns (left identity/status | flexible center nav | right controls) so the
-           clusters reserve their own space and can never overlap, no matter how wide each gets. -->
-      <Grid ColumnDefinitions="Auto,*,Auto">
-        <!-- LEFT: identity + a single combined status pill (live state · account · sync) -->
+    <Border Grid.Row="0" Background="#14181F" Padding="16,9,148,9" BorderBrush="#2A303C" BorderThickness="0,0,0,1"
+            ClipToBounds="True">
+      <Grid ColumnDefinitions="Auto,*,Auto" ClipToBounds="True">
+        <!-- LEFT: logo + optional subscription banner -->
         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
           <Border Width="28" Height="28" CornerRadius="7" ClipToBounds="True">
             <Image Source="/Assets/logo.png" Width="28" Height="28" Stretch="UniformToFill" />
           </Border>
           <TextBlock Classes="h2" Text="LumenCue" Foreground="#ECEEF2" FontSize="16" VerticalAlignment="Center"
                      Margin="0,0,4,0" />
-          <!-- Combined status pill: replaces the former three separate chips (LIVE/BLANK, account, sync). -->
-          <Border Background="#232932" CornerRadius="10" Padding="10,4">
-            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" IsVisible="{Binding IsLive}">
-                <Ellipse Width="8" Height="8" Fill="#22C55E" VerticalAlignment="Center" />
-                <TextBlock Text="LIVE" Foreground="#FFFFFF" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" />
-              </StackPanel>
-              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" IsVisible="{Binding !IsLive}">
-                <Ellipse Width="8" Height="8" Fill="#4B5563" VerticalAlignment="Center" />
-                <TextBlock Text="BLANK" Foreground="#6E7682" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
-              </StackPanel>
-              <Border Width="1" Height="14" Background="#3A414D" VerticalAlignment="Center" />
-              <TextBlock Text="{Binding AccountLabel}" Foreground="#C2C8D2" FontSize="11"
-                         MaxWidth="200" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
-                         ToolTip.Tip="Signed-in organization and branch" />
-              <Border Width="1" Height="14" Background="#3A414D" VerticalAlignment="Center" />
-              <TextBlock Text="{Binding SyncStatus}" Foreground="#959DAB" FontSize="11" VerticalAlignment="Center" />
-            </StackPanel>
-          </Border>
           <Border Background="#3A2A12" CornerRadius="10" Padding="10,4" IsVisible="{Binding ShowEntitlementBanner}"
                   ToolTip.Tip="Subscription status">
             <TextBlock Text="{Binding EntitlementBannerText}" Foreground="#F59E0B" FontSize="11"
                        MaxWidth="300" TextTrimming="CharacterEllipsis" />
           </Border>
-          <!-- Always-on AI minutes remaining this month (turns amber as the allowance runs low). -->
-          <Panel IsVisible="{Binding ShowAiMinutes}">
-            <Border Background="#232932" CornerRadius="10" Padding="10,4" IsVisible="{Binding !AiNearLimit}"
-                    ToolTip.Tip="AI listening minutes remaining this month">
-              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                <Ellipse Width="7" Height="7" Fill="#22C55E" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding AiMinutesShort}" Foreground="#9BD3B0" FontSize="11" FontWeight="SemiBold" />
-              </StackPanel>
-            </Border>
-            <Border Background="#3A2A12" CornerRadius="10" Padding="10,4" IsVisible="{Binding AiNearLimit}"
-                    ToolTip.Tip="AI listening minutes remaining this month">
-              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                <Ellipse Width="7" Height="7" Fill="#F59E0B" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding AiMinutesShort}" Foreground="#F59E0B" FontSize="11" FontWeight="SemiBold" />
-              </StackPanel>
-            </Border>
-          </Panel>
         </StackPanel>
 
-        <!-- CENTER: workspace modes — a service is either showing scripture or singing -->
-        <StackPanel Grid.Column="1" HorizontalAlignment="Center" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+        <!-- CENTER: workspace modes — scrolls horizontally when the window is narrow. -->
+        <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                      MinWidth="0" Margin="8,0">
+        <StackPanel HorizontalAlignment="Center" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
           <!-- Bible mode -->
           <Panel>
             <Button Classes="topNav" Command="{Binding ShowBibleModeCommand}"
@@ -253,9 +205,23 @@
             <Border Height="3" CornerRadius="2" VerticalAlignment="Bottom" Margin="8,0,8,-1"
                     Background="#22D3EE" IsVisible="{Binding IsMediaMode}" />
           </Panel>
+          <!-- Notes (own workspace, not a Bible tab) -->
+          <Panel>
+            <Button Classes="topNav" Command="{Binding ShowNotesTabCommand}"
+                    ToolTip.Tip="Notes: prayer points and announcements">
+              <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+                <Border Width="26" Height="26" CornerRadius="7" Background="#3A2A12">
+                  <TextBlock Text="&#x1F4DD;" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <TextBlock Text="Notes" FontSize="14" FontWeight="Bold" Foreground="#ECEEF2" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+            <Border Height="3" CornerRadius="2" VerticalAlignment="Bottom" Margin="8,0,8,-1"
+                    Background="#FBBF24" IsVisible="{Binding IsNotesMode}" />
+          </Panel>
           <!-- Themes (opens the Theme Studio dialog) -->
           <Button Classes="topNav" Tapped="OnThemeStudioClicked"
-                  ToolTip.Tip="Design themes and assign them to scripture / songs / announcements">
+                  ToolTip.Tip="Design themes — one look for scripture, songs, notes, and announcements">
             <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
               <Border Width="26" Height="26" CornerRadius="7">
                 <Border.Background>
@@ -269,6 +235,7 @@
             </StackPanel>
           </Button>
         </StackPanel>
+        </ScrollViewer>
 
         <!-- RIGHT: live-critical controls stay visible; secondary actions move into the More menu. -->
         <StackPanel Grid.Column="2" HorizontalAlignment="Right" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
@@ -285,7 +252,16 @@
               </StackPanel>
             </Panel>
           </Button>
-          <Button Classes="danger" Content="Blank" Command="{Binding BlankCommand}" FontSize="12" Padding="12,6" />
+          <Button Content="Sign in" Command="{Binding SignInCommand}" IsVisible="{Binding !IsSignedIn}"
+                  Background="#0E4A6E" Foreground="#7DD3FC" FontWeight="SemiBold"
+                  FontSize="12" Padding="14,6" CornerRadius="6"
+                  ToolTip.Tip="Sign in to sync your library and unlock cloud features">
+            <Button.Styles>
+              <Style Selector="Button:pointerover">
+                <Setter Property="Background" Value="#155E8A" />
+              </Style>
+            </Button.Styles>
+          </Button>
           <!-- Overflow menu for lower-frequency actions (keeps the bar uncluttered). -->
           <Button Classes="ghost" Content="More" Padding="10,6" FontSize="12" ToolTip.Tip="More actions">
             <Button.Flyout>
@@ -294,7 +270,6 @@
                 <MenuItem Header="Pre-service" Click="OnPreServiceClicked" />
                 <MenuItem Header="Settings" Click="OnSettingsClicked" />
                 <Separator />
-                <MenuItem Header="Sign in" Command="{Binding SignInCommand}" IsVisible="{Binding !IsSignedIn}" />
                 <MenuItem Header="Sign out" Command="{Binding SignOutCommand}" IsVisible="{Binding IsSignedIn}" />
               </MenuFlyout>
             </Button.Flyout>
@@ -303,15 +278,14 @@
       </Grid>
     </Border>
 
-    <!-- MAIN: Playlists (left rail) | AI / Content (center, the hero) | Program + Queue (right rail)  (drag splitters to resize) -->
-    <!-- Columns carry MinWidth so the splitters can shrink a rail but never collapse it out of the grid. -->
-    <Grid Grid.Row="1" Margin="14,12,14,8">
+    <!-- MAIN: navigator (left) | content (center) | Program (right). Widths are fixed so the center grid stays flush. -->
+    <Grid x:Name="MainSplitGrid" Grid.Row="1" Margin="14,12,8,8" ClipToBounds="True">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="230" MinWidth="190" />
-        <ColumnDefinition Width="6" />
-        <ColumnDefinition Width="*" MinWidth="460" />
-        <ColumnDefinition Width="6" />
-        <ColumnDefinition Width="360" MinWidth="300" />
+        <ColumnDefinition Width="230" />
+        <ColumnDefinition Width="12" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="12" />
+        <ColumnDefinition Width="360" />
       </Grid.ColumnDefinitions>
 
         <!-- LEFT SIDEBAR: ProPresenter-style navigator — collapsible Library + Playlists sections -->
@@ -453,7 +427,6 @@
                         <Grid.ContextMenu>
                           <ContextMenu>
                             <MenuItem Header="Send to Live" Click="OnSongSendLiveMenu" />
-                            <MenuItem Header="Add to Service Queue" Click="OnSongAddToQueueLibraryMenu" />
                             <Separator />
                             <MenuItem Header="Edit Song" Click="OnEditSongMenu" />
                           </ContextMenu>
@@ -522,12 +495,13 @@
               </ListBox>
               </StackPanel>
 
-              <!-- ── PLAYLISTS ───────────────────────────────────────────── -->
+              <!-- ── PLAYLISTS (Songs mode) ──────────────────────────────── -->
+              <StackPanel IsVisible="{Binding IsSongsMode}">
               <Border Classes="sectionHeader" Margin="0,4,0,0">
                 <Grid ColumnDefinitions="*,Auto,Auto">
                   <TextBlock Grid.Column="0" Classes="sectionLabel" Text="PLAYLISTS" />
                   <Button Grid.Column="1" Classes="hdrIcon" Content="&#43;" Command="{Binding BeginNamePlaylistCommand}"
-                          ToolTip.Tip="Save the current Service Queue as a playlist" />
+                          ToolTip.Tip="Save the open song as a playlist" />
                   <Button Grid.Column="2" Classes="hdrIcon" Command="{Binding TogglePlaylistsSectionCommand}"
                           ToolTip.Tip="Collapse / expand">
                     <Panel>
@@ -543,12 +517,12 @@
                 <Border IsVisible="{Binding IsNamingPlaylist}" Padding="8,8" Background="#14181F">
                   <StackPanel Spacing="6">
                     <TextBox Text="{Binding NewPlaylistName}" Watermark="Name this set…" FontSize="12" Padding="8,6" />
-                    <Button Classes="primary" Content="Save current queue" Command="{Binding SavePlaylistCommand}"
+                    <Button Classes="primary" Content="Save current song" Command="{Binding SavePlaylistCommand}"
                             HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" FontSize="12" Padding="0,7" />
                   </StackPanel>
                 </Border>
 
-                <TextBlock IsVisible="{Binding !HasPlaylists}" Text="No playlists yet — build a queue, then tap + to save it"
+                <TextBlock IsVisible="{Binding !HasPlaylists}" Text="No playlists yet — open a song, then tap + to save it"
                            Foreground="#5B626E" FontSize="11" Margin="14,8" TextWrapping="Wrap" />
 
                 <ListBox x:Name="PlaylistsListBox" Classes="navList"
@@ -560,10 +534,10 @@
                   <ListBox.ItemTemplate>
                     <DataTemplate x:DataType="slides:SavedPlaylist">
                       <Grid ColumnDefinitions="Auto,*,Auto" Background="Transparent"
-                            ToolTip.Tip="Click to load this set into the Service Queue">
+                            ToolTip.Tip="Click to open this song in Now Singing">
                         <Grid.ContextMenu>
                           <ContextMenu>
-                            <MenuItem Header="Load into Queue" Click="OnLoadPlaylistMenu" />
+                            <MenuItem Header="Open Song" Click="OnLoadPlaylistMenu" />
                             <MenuItem Header="Delete Playlist" Click="OnDeletePlaylistMenu" />
                           </ContextMenu>
                         </Grid.ContextMenu>
@@ -585,20 +559,20 @@
                   </ListBox.ItemTemplate>
                 </ListBox>
               </StackPanel>
+              </StackPanel>
 
             </StackPanel>
           </ScrollViewer>
         </Border>
 
-        <!-- Splitter: sidebar <-> center -->
-        <GridSplitter Grid.Column="1" ResizeDirection="Columns" VerticalAlignment="Stretch" />
+        <!-- Gutter: sidebar <-> center -->
 
         <!-- CENTER: AI / CONTENT (search + tabs + lists) — the core of the app -->
         <Grid Grid.Column="2" RowDefinitions="Auto,*" IsVisible="{Binding IsContentMode}">
 
           <!-- Single search bar: scripture lookup in Bible mode, smart lyric search in Songs mode.
                Typing in Songs mode drives the Songs results tab (see OperatorViewModel). -->
-          <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,8">
+          <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,8" IsVisible="{Binding !IsNotesMode}">
             <Grid Grid.Column="0" ColumnDefinitions="*,Auto" IsVisible="{Binding IsBibleMode}">
               <TextBox Text="{Binding ContentSearch.SearchQuery}"
                        Watermark="{Binding SearchWatermark}" FontSize="13" />
@@ -623,7 +597,8 @@
           <!-- Tab bar: Library / AI Suggestions -->
           <Border Grid.Row="1" Background="#181C24" CornerRadius="10" BorderBrush="#2A303C" BorderThickness="1">
             <DockPanel>
-              <Border DockPanel.Dock="Top" Background="#1B202A" BorderBrush="#2A303C" BorderThickness="0,0,0,1">
+              <Border DockPanel.Dock="Top" Background="#1B202A" BorderBrush="#2A303C" BorderThickness="0,0,0,1"
+                      IsVisible="{Binding !IsNotesMode}">
                 <StackPanel Orientation="Horizontal" Spacing="0">
                   <!-- Shared content tab: "Scripture" (reference lookups) in Bible mode, "Library" in Songs mode -->
                   <Panel>
@@ -720,23 +695,6 @@
                     <Border Height="2" VerticalAlignment="Bottom" Background="#F472B6"
                             IsVisible="{Binding IsSongsTab}" />
                   </Panel>
-                  <!-- Notes tab (both modes): free-text prayer points / announcements to project -->
-                  <Panel>
-                    <Button Command="{Binding ShowNotesTabCommand}" Padding="16,10" CornerRadius="0"
-                            Background="Transparent" BorderThickness="0" Cursor="Hand">
-                      <StackPanel Orientation="Horizontal" Spacing="6">
-                        <TextBlock Text="&#x1F4DD;" FontSize="12" VerticalAlignment="Center" />
-                        <Panel>
-                          <TextBlock Text="Notes" FontSize="13" FontWeight="SemiBold" Foreground="#ECEEF2"
-                                     IsVisible="{Binding IsNotesTab}" />
-                          <TextBlock Text="Notes" FontSize="13" FontWeight="SemiBold" Foreground="#6E7682"
-                                     IsVisible="{Binding !IsNotesTab}" />
-                        </Panel>
-                      </StackPanel>
-                    </Button>
-                    <Border Height="2" VerticalAlignment="Bottom" Background="#FBBF24"
-                            IsVisible="{Binding IsNotesTab}" />
-                  </Panel>
                 </StackPanel>
               </Border>
 
@@ -752,7 +710,7 @@
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          ScrollViewer.VerticalScrollBarVisibility="Auto">
                   <ListBox.ItemsPanel>
-                    <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                    <ItemsPanelTemplate><UniformGrid Columns="3" /></ItemsPanelTemplate>
                   </ListBox.ItemsPanel>
                   <ListBox.Styles>
                     <Style Selector="ListBoxItem">
@@ -761,6 +719,8 @@
                       <Setter Property="CornerRadius" Value="8" />
                       <Setter Property="Background" Value="Transparent" />
                       <Setter Property="MinHeight" Value="0" />
+                      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                      <Setter Property="HorizontalAlignment" Value="Stretch" />
                     </Style>
                     <Style Selector="ListBoxItem:selected Border#scrCard">
                       <Setter Property="BorderBrush" Value="#7C6CF6" />
@@ -771,10 +731,10 @@
                   </ListBox.Styles>
                   <ListBox.ItemTemplate>
                     <DataTemplate x:DataType="content:ContentItem">
-                      <Panel Width="210">
+                      <Panel HorizontalAlignment="Stretch">
                         <Border x:Name="scrCard" Background="#0B0D12" CornerRadius="8"
                                 ClipToBounds="True" BorderBrush="#2A303C" BorderThickness="2" Cursor="Hand"
-                                ToolTip.Tip="Click to preview · double-click to send live">
+                                ToolTip.Tip="Click to preview · Shift+click another card for a range · double-click to send live">
                           <Border.ContextMenu>
                             <ContextMenu>
                               <MenuItem Header="Send to Live" Click="OnSendContentToLiveMenu" />
@@ -826,6 +786,16 @@
                             <TextBlock Text="★" Foreground="#1A1205" FontSize="9" FontWeight="Bold" VerticalAlignment="Center" />
                             <TextBlock Text="FROM HERE" Foreground="#1A1205" FontSize="9" FontWeight="Bold" />
                           </StackPanel>
+                        </Border>
+                        <!-- Range: same 22×22 rounded chip as the bookmark star, sky so it is not
+                             amber (bookmark), green (LIVE), or purple (selected). -->
+                        <Border IsVisible="{Binding IsRangeSelected}" IsHitTestVisible="False"
+                                BorderBrush="#38BDF8" BorderThickness="3" CornerRadius="8" />
+                        <Border IsVisible="{Binding IsRangeSelected}" IsHitTestVisible="False"
+                                Background="#0C2A3A" CornerRadius="5" Width="22" Height="22"
+                                HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="6">
+                          <TextBlock Text="↕" FontSize="11" Foreground="#38BDF8"
+                                     HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                       </Panel>
                     </DataTemplate>
@@ -974,7 +944,7 @@
                 </DockPanel>
 
                 <!-- AI Suggestions tab content -->
-                <DockPanel IsVisible="{Binding IsSuggestionsTab}">
+                <DockPanel IsVisible="{Binding ShowSuggestionsTabContent}">
                   <Border DockPanel.Dock="Top" Padding="12,8" IsVisible="{Binding Transcription.IsListening}">
                     <StackPanel Spacing="3">
                       <TextBlock Foreground="#959DAB" FontSize="12" FontStyle="Italic"
@@ -1090,7 +1060,7 @@
                 </DockPanel>
 
                 <!-- Find Scripture (topical) tab content -->
-                <DockPanel IsVisible="{Binding IsTopicalTab}">
+                <DockPanel IsVisible="{Binding ShowTopicalTabContent}">
                  <DockPanel DataContext="{Binding TopicalSearch}">
                   <Border DockPanel.Dock="Top" Padding="10,8" BorderBrush="#2A303C" BorderThickness="0,0,0,1">
                     <StackPanel Spacing="6">
@@ -1174,7 +1144,7 @@
 
                 <!-- AI Paraphrases tab content: verses auto-detected from live preaching. On its own
                      tab so it never crowds the manual Find Scripture results. -->
-                <DockPanel IsVisible="{Binding IsParaphrasesTab}">
+                <DockPanel IsVisible="{Binding ShowParaphrasesTabContent}">
                  <DockPanel DataContext="{Binding TopicalSearch}">
                   <Border DockPanel.Dock="Top" Padding="10,8" Background="#141A29" BorderBrush="#2A303C" BorderThickness="0,0,0,1">
                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -1243,7 +1213,7 @@
 
                 <!-- Songs (smart lyric search) tab content: a results list. "Show full song" opens it
                      in the Now Singing tab, where the slide view lives. -->
-                <DockPanel IsVisible="{Binding IsSongsTab}">
+                <DockPanel IsVisible="{Binding ShowSongsTabContent}">
                  <DockPanel DataContext="{Binding SongSearch}">
                   <Border DockPanel.Dock="Top" Padding="12,8" BorderBrush="#2A303C" BorderThickness="0,0,0,1">
                     <TextBlock Text="{Binding StatusText}" Foreground="#959DAB" FontSize="11" FontStyle="Italic" />
@@ -1275,7 +1245,6 @@
                           <Grid.ContextMenu>
                             <ContextMenu>
                               <MenuItem Header="Show Full Song" Click="OnSongShowLyricsMenu" />
-                              <MenuItem Header="Add Whole Song to Queue" Click="OnSongAddToQueueMenu" />
                             </ContextMenu>
                           </Grid.ContextMenu>
                           <Border Grid.Column="0" Background="#3A1F30" CornerRadius="6" Width="28" Height="28"
@@ -1309,7 +1278,7 @@
                 </DockPanel>
 
                 <!-- Notes tab content: saved notes as projectable slide cards (click to open slides) -->
-                <DockPanel IsVisible="{Binding IsNotesTab}">
+                <DockPanel IsVisible="{Binding ShowNotesTabContent}">
                   <!-- Toolbar: status + add -->
                   <Border DockPanel.Dock="Top" Padding="12,8" BorderBrush="#2A303C" BorderThickness="0,0,0,1">
                     <Grid ColumnDefinitions="Auto,*,Auto,Auto">
@@ -1606,40 +1575,35 @@
           </DockPanel>
         </Border>
 
-        <!-- Splitter: content <-> right rail -->
-        <GridSplitter Grid.Column="3" ResizeDirection="Columns" VerticalAlignment="Stretch" />
+        <!-- Gutter: content <-> right rail -->
 
-        <!-- RIGHT RAIL: compact Program monitor (top) + Service Queue (below) -->
-        <!-- Program row is sized so the 16:9 thumbnail fills the rail width (no side letterboxing);
-             MinHeight on both rows keeps the row splitter from collapsing either out of view. -->
-        <Grid Grid.Column="4">
+        <!-- RIGHT RAIL: compact Program monitor (top) + Now Live readout (below) -->
+        <Grid x:Name="ProgramRailGrid" Grid.Column="4">
           <Grid.RowDefinitions>
-            <RowDefinition Height="296" MinHeight="200" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="6" />
-            <RowDefinition Height="*" MinHeight="140" />
+            <RowDefinition Height="*" MinHeight="120" />
           </Grid.RowDefinitions>
 
-          <!-- PROGRAM (small confidence monitor — what you click goes live here) -->
-          <Border Grid.Row="0" CornerRadius="10" ClipToBounds="True" BorderBrush="#22C55E" BorderThickness="2">
+          <!-- PROGRAM: outer stroke stays continuous; inner clip keeps chrome from covering the corners. -->
+          <Border Grid.Row="0" CornerRadius="10" BorderBrush="#22C55E" BorderThickness="2" Background="#14181F">
+          <Border CornerRadius="8" ClipToBounds="True">
           <DockPanel>
-            <Border DockPanel.Dock="Top" Background="#1B202A" Padding="12,7" BorderBrush="#2A303C" BorderThickness="0,0,0,1">
+            <Border DockPanel.Dock="Top" Background="#1B202A" Padding="10,7" BorderBrush="#2A303C" BorderThickness="0,0,0,1"
+                    ClipToBounds="True">
               <Grid ColumnDefinitions="Auto,Auto,*,Auto">
                 <TextBlock Classes="section" Text="PROGRAM" Foreground="#22C55E" FontSize="11" VerticalAlignment="Center" />
-                <Border Grid.Column="1" Background="#22C55E" CornerRadius="4" Padding="8,2" Margin="10,0,0,0"
+                <Border Grid.Column="1" Background="#22C55E" CornerRadius="4" Padding="8,2" Margin="8,0,0,0"
                         VerticalAlignment="Center" IsVisible="{Binding IsLive}">
                   <TextBlock Text="ON AIR" Foreground="White" FontSize="9" FontWeight="Bold" />
                 </Border>
-                <!-- Quick theme switcher: retargets the live slide type's theme and updates the
-                     screen + this preview instantly. -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5" Margin="10,0"
-                            HorizontalAlignment="Right" VerticalAlignment="Center"
-                            IsVisible="{Binding IsLive}">
-                  <TextBlock Text="&#127912;" FontSize="11" VerticalAlignment="Center" />
-                  <ComboBox ItemsSource="{Binding LiveThemeOptions}" SelectedItem="{Binding LiveThemeName}"
-                            MinWidth="120" FontSize="11" Padding="6,2" VerticalAlignment="Center"
-                            ToolTip.Tip="Switch the theme for the current slide type (applies live)" />
-                </StackPanel>
-                <Border Grid.Column="3" Background="#7C6CF6" CornerRadius="4" Padding="8,2" Margin="6,0,0,0"
+                <!-- Theme switcher fills leftover width and shrinks instead of overflowing neighbors. -->
+                <ComboBox Grid.Column="2" ItemsSource="{Binding LiveThemeOptions}" SelectedItem="{Binding LiveThemeName}"
+                          MinWidth="0" MaxWidth="160" Margin="8,0" FontSize="11" Padding="6,2"
+                          HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                          IsVisible="{Binding IsLive}"
+                          ToolTip.Tip="Switch the theme for the current slide type (applies live)" />
+                <Border Grid.Column="3" Background="#7C6CF6" CornerRadius="4" Padding="8,2"
                         VerticalAlignment="Center" IsVisible="{Binding HasMultipleSlides}"
                         ToolTip.Tip="Arrow keys page through this passage">
                   <StackPanel Orientation="Horizontal" Spacing="4">
@@ -1662,129 +1626,72 @@
               </Grid>
             </Border>
 
-            <!-- Letterbox area is painted in the chrome color (not black) so the uniform-scaled
-                 thumbnail blends seamlessly at any window size — no black bars, ProPresenter-style. -->
-            <Panel Background="#14181F">
-              <!-- True-to-output thumbnail: the actual ProjectorView, scaled to fit, so the preview
-                   shows the live theme (background, fonts, colors) exactly as it appears on screen. -->
-              <Viewbox Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <Border Width="{Binding PreviewWidth}" Height="{Binding PreviewHeight}" ClipToBounds="True">
+            <!-- Pin the Viewbox to the host's real pixel size. Avalonia otherwise sizes the
+                 Viewbox to a 16:9 fit, which leaves a side gutter when the pane is wider
+                 than 16:9 (the max Program rail width). -->
+            <Grid x:Name="ProgramPreviewHost" Background="#14181F" ClipToBounds="True"
+                  SizeChanged="OnProgramPreviewHostSizeChanged">
+              <Viewbox Stretch="Uniform" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                <Border Width="1920" Height="1080" ClipToBounds="True">
                   <views:ProjectorView DataContext="{Binding ProgramPreview}" />
                 </Border>
               </Viewbox>
               <StackPanel IsVisible="{Binding !IsLive}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4"
                           IsHitTestVisible="False">
                 <TextBlock Text="Screen is blank" Foreground="#6E7682" FontSize="13" HorizontalAlignment="Center" />
-                <TextBlock Text="Click any item to go live" Foreground="#4B515C" FontSize="11" HorizontalAlignment="Center" />
+                <TextBlock Text="Double-click a verse to go live" Foreground="#4B515C" FontSize="11" HorizontalAlignment="Center" />
               </StackPanel>
-
-              <!-- Layer status: a read-out of what's currently composited on the output, top → bottom. -->
-              <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" Padding="8,6"
-                      Background="#B30B0D12" CornerRadius="7" IsHitTestVisible="False">
-                <StackPanel Spacing="5">
-                  <StackPanel Orientation="Horizontal" Spacing="7">
-                    <Border Classes="layerDot" Classes.on="{Binding ProgramPreview.ShowAnnouncement}" />
-                    <TextBlock Text="Media" FontSize="10" Foreground="#C7CDD8" VerticalAlignment="Center" />
-                  </StackPanel>
-                  <StackPanel Orientation="Horizontal" Spacing="7">
-                    <Border Classes="layerDot" Classes.on="{Binding ProgramPreview.ShowSlide}" />
-                    <TextBlock Text="Text" FontSize="10" Foreground="#C7CDD8" VerticalAlignment="Center" />
-                  </StackPanel>
-                  <StackPanel Orientation="Horizontal" Spacing="7">
-                    <Border Classes="layerDot" Classes.on="{Binding ProgramPreview.BackgroundLayerEnabled}" />
-                    <TextBlock Text="Background" FontSize="10" Foreground="#C7CDD8" VerticalAlignment="Center" />
-                  </StackPanel>
-                </StackPanel>
-              </Border>
-            </Panel>
+            </Grid>
           </DockPanel>
           </Border>
+          </Border>
 
-          <!-- Splitter: program <-> queue -->
-          <GridSplitter Grid.Row="1" ResizeDirection="Rows" HorizontalAlignment="Stretch" />
+          <!-- Gutter: Program preview <-> Now Live -->
 
-          <!-- Service Queue -->
-          <Grid Grid.Row="2">
-          <Border Background="#181C24" CornerRadius="10" BorderBrush="#2A303C" BorderThickness="1">
+          <!-- NOW LIVE: text readout of what's on screen (replaces the old service queue slot). -->
+          <Border Grid.Row="2" Background="#181C24" CornerRadius="10" BorderBrush="#2A303C" BorderThickness="1" ClipToBounds="True">
             <DockPanel>
-              <Border DockPanel.Dock="Top" Padding="14,10" BorderBrush="#2A303C" BorderThickness="0,0,0,1">
+              <Border DockPanel.Dock="Top" Background="#1B202A" Padding="12,8" BorderBrush="#2A303C" BorderThickness="0,0,0,1">
                 <Grid ColumnDefinitions="*,Auto">
-                  <StackPanel Spacing="3">
-                    <TextBlock Classes="section" Text="SERVICE QUEUE" Foreground="#F59E0B" FontSize="11" />
-                    <TextBlock Text="{Binding ServiceQueue.PositionText}" Foreground="#959DAB" FontSize="12" />
+                  <StackPanel Spacing="2">
+                    <TextBlock Classes="section" Text="NOW LIVE" Foreground="#22C55E" FontSize="11" />
+                    <TextBlock Text="{Binding DeckPositionText}" Foreground="#959DAB" FontSize="11"
+                               IsVisible="{Binding HasMultipleSlides}" />
                   </StackPanel>
-                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                    <Button Classes="ghost" Content="+ Add" Command="{Binding AddToQueueCommand}"
-                            ToolTip.Tip="Add selected to queue (Q)" FontSize="12" Padding="8,5" />
-                    <Button Classes="ghost" Content="+ All" Command="{Binding AddAllToQueueCommand}"
-                            ToolTip.Tip="Add all results to queue" FontSize="12" Padding="8,5" />
-                    <Button Classes="ghost" Content="Clear" Command="{Binding ServiceQueue.ClearCommand}"
-                            ToolTip.Tip="Clear queue" FontSize="12" Padding="8,5" Foreground="#F87171" />
-                  </StackPanel>
+                  <Border Grid.Column="1" Background="#22C55E" CornerRadius="4" Padding="8,2"
+                          VerticalAlignment="Center" IsVisible="{Binding IsLive}">
+                    <TextBlock Text="ON AIR" Foreground="White" FontSize="9" FontWeight="Bold" />
+                  </Border>
                 </Grid>
               </Border>
 
-              <Border DockPanel.Dock="Bottom" Padding="12,10" BorderBrush="#2A303C" BorderThickness="0,1,0,0">
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                  <Button Grid.Column="0" Classes="queueBtn" Content="Prev" Command="{Binding ServiceQueue.PrevCommand}"
-                          FontSize="12" Padding="12,7" />
-                  <Button Grid.Column="1" Classes="transition" Content="Go Live" Command="{Binding ServiceQueue.GoLiveCommand}"
-                          HorizontalAlignment="Stretch" Margin="8,0" FontSize="13" Padding="0,9"
-                          HorizontalContentAlignment="Center" />
-                  <Button Grid.Column="2" Classes="queueBtn" Content="Next" Command="{Binding ServiceQueue.NextCommand}"
-                          FontSize="12" Padding="12,7" />
-                </Grid>
-              </Border>
-
-              <ListBox ItemsSource="{Binding ServiceQueue.Items}"
-                       SelectedItem="{Binding ServiceQueue.SelectedItem}"
-                       Background="Transparent" BorderThickness="0">
-                <ListBox.Styles>
-                  <Style Selector="ListBoxItem">
-                    <Setter Property="Padding" Value="10,8" />
-                    <Setter Property="CornerRadius" Value="6" />
-                    <Setter Property="Margin" Value="4,1" />
-                    <Setter Property="MinHeight" Value="0" />
-                  </Style>
-                  <Style Selector="ListBoxItem:selected">
-                    <Setter Property="Background" Value="#2A2510" />
-                  </Style>
-                  <Style Selector="ListBoxItem:pointerover">
-                    <Setter Property="Background" Value="#232932" />
-                  </Style>
-                </ListBox.Styles>
-                <ListBox.ItemTemplate>
-                  <DataTemplate x:DataType="slides:QueueSlide">
-                    <Grid ColumnDefinitions="Auto,*,Auto">
-                      <Border Grid.Column="0" Background="#2A2510" CornerRadius="6" Width="24" Height="24"
-                              VerticalAlignment="Center" Margin="0,0,8,0">
-                        <TextBlock Text="{Binding Icon}" FontSize="11" FontWeight="Bold" Foreground="#F59E0B"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-                      </Border>
-                      <StackPanel Grid.Column="1" Spacing="1">
-                        <TextBlock Text="{Binding Title}" Foreground="#ECEEF2" FontSize="13" FontWeight="Medium"
-                                   TextTrimming="CharacterEllipsis" MaxLines="1" />
-                        <TextBlock Text="{Binding Body}" Foreground="#959DAB" FontSize="11"
-                                   MaxLines="1" TextTrimming="CharacterEllipsis" />
-                      </StackPanel>
-                      <Border Grid.Column="2" Background="#232932" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding Tag}" Foreground="#A7AFBC" FontSize="10" FontWeight="Medium" />
-                      </Border>
-                    </Grid>
-                  </DataTemplate>
-                </ListBox.ItemTemplate>
-              </ListBox>
+              <ScrollViewer Padding="12,10">
+                <Panel>
+                  <StackPanel Spacing="6" IsVisible="{Binding IsLive}">
+                    <TextBlock Text="{Binding LiveTitle}" Foreground="#ECEEF2" FontSize="14" FontWeight="SemiBold"
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding LiveBody}" Foreground="#C2C8D2" FontSize="12" LineHeight="18"
+                               TextWrapping="Wrap" MaxLines="6" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding LiveFooter}" Foreground="#8A93A2" FontSize="11" FontStyle="Italic"
+                               TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"
+                               IsVisible="{Binding LiveFooter, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                  </StackPanel>
+                  <StackPanel Spacing="4" VerticalAlignment="Center" IsVisible="{Binding !IsLive}">
+                    <TextBlock Text="Screen is blank" Foreground="#6E7682" FontSize="13" FontWeight="SemiBold" />
+                    <TextBlock Text="Double-click a verse, song, or note to go live. Use ← → to page through passages."
+                               Foreground="#4B515C" FontSize="11" TextWrapping="Wrap" LineHeight="16" />
+                  </StackPanel>
+                </Panel>
+              </ScrollViewer>
             </DockPanel>
           </Border>
-          </Grid>
 
         </Grid>
 
     </Grid>
 
-    <!-- BACKGROUNDS PALETTE: swappable media layer (still images + motion loops). Clicking a tile
-         swaps the live background under the text without altering the theme. Key-colour (ATEM) outputs
-         keep their chroma fill regardless. -->
+    <!-- BACKGROUNDS PALETTE: swappable media layer (still images + motion loops). Only Placeholder
+         themes take a live background; solid/image themes ignore clicks so no selection ring appears. -->
     <Border Grid.Row="2" Background="#12161D" Padding="14,8" BorderBrush="#2A303C" BorderThickness="0,1,0,0"
             DataContext="{Binding Backgrounds}">
       <DockPanel>
@@ -1841,8 +1748,8 @@
     <!-- AI LISTENING BAR (slim; mic, status, last-heard, level, device, start/stop) with an
          expandable live-transcript panel so the operator can see exactly what the AI is hearing -->
     <Border Grid.Row="3" Background="#14181F" Padding="14,7" BorderBrush="#2A303C" BorderThickness="0,1,0,0"
-            DataContext="{Binding Transcription}">
-      <DockPanel>
+            DataContext="{Binding Transcription}" ClipToBounds="True">
+      <DockPanel LastChildFill="True">
 
       <!-- Expandable live transcript (newest words anchored at the bottom for a real-time feel) -->
       <Border DockPanel.Dock="Top" IsVisible="{Binding ShowTranscript}" Height="118" ClipToBounds="True"
@@ -1855,85 +1762,89 @@
         </Grid>
       </Border>
 
-      <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto" VerticalAlignment="Center">
-        <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
-          <Button Classes="ghost" Command="{Binding ToggleTranscriptCommand}" Padding="6,3" FontSize="12"
-                  ToolTip.Tip="Show / hide the live transcript">
+      <!-- Right-side controls scroll when the window is narrow instead of overlapping neighbors. -->
+      <ScrollViewer DockPanel.Dock="Right" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                    Margin="12,0,0,0">
+        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" IsVisible="{Binding IsListening}">
+            <Ellipse Width="8" Height="8" VerticalAlignment="Center" IsVisible="{Binding HasSignal}">
+              <Ellipse.Fill><SolidColorBrush Color="#22C55E" /></Ellipse.Fill>
+            </Ellipse>
+            <Ellipse Width="8" Height="8" VerticalAlignment="Center" IsVisible="{Binding !HasSignal}">
+              <Ellipse.Fill><SolidColorBrush Color="#3C4350" /></Ellipse.Fill>
+            </Ellipse>
+            <ProgressBar Minimum="0" Maximum="100" Value="{Binding AudioLevelPercent}" Height="6" Width="110"
+                         VerticalAlignment="Center" CornerRadius="3">
+              <ProgressBar.Styles>
+                <Style Selector="ProgressBar /template/ Border#PART_Indicator">
+                  <Setter Property="Background" Value="#A78BFA" />
+                  <Setter Property="CornerRadius" Value="3" />
+                </Style>
+                <Style Selector="ProgressBar">
+                  <Setter Property="Background" Value="#232932" />
+                </Style>
+              </ProgressBar.Styles>
+            </ProgressBar>
+          </StackPanel>
+
+          <!-- Mic sensitivity: software input gain the operator can tune live while watching the meter. -->
+          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="6,0,0,0"
+                      ToolTip.Tip="Mic sensitivity — raise if the meter barely moves; lower if it pins to the top / clips.">
+            <TextBlock Text="&#127897;" FontSize="13" VerticalAlignment="Center" Foreground="#8B93A1" />
+            <Slider Minimum="1" Maximum="4" Value="{Binding MicSensitivity}" Width="96"
+                    VerticalAlignment="Center" />
+            <TextBlock Text="{Binding MicSensitivityLabel}" Foreground="#A7AFBC" FontSize="11"
+                       MinWidth="34" VerticalAlignment="Center" />
+          </StackPanel>
+
+          <ComboBox ItemsSource="{Binding AudioDevices}" SelectedItem="{Binding SelectedDevice}"
+                    Background="#181C24" Foreground="#ECEEF2" BorderBrush="#3C4350"
+                    CornerRadius="6" Padding="8,4" FontSize="11" MinWidth="120" MaxWidth="220"
+                    VerticalAlignment="Center" ToolTip.Tip="Microphone input device" />
+
+          <Button Command="{Binding ToggleListeningCommand}"
+                  Padding="14,6" CornerRadius="6" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center">
             <Panel>
-              <TextBlock Text="&#9650;" FontSize="10" IsVisible="{Binding !ShowTranscript}" />
-              <TextBlock Text="&#9660;" FontSize="10" IsVisible="{Binding ShowTranscript}" />
+              <TextBlock Text="Stop" IsVisible="{Binding IsListening}" />
+              <TextBlock Text="Start" IsVisible="{Binding !IsListening}" />
             </Panel>
-          </Button>
-          <TextBlock Text="&#127908;" FontSize="14" VerticalAlignment="Center" />
-          <TextBlock Text="AI LISTENING" Classes="section" Foreground="#A78BFA" FontSize="11" VerticalAlignment="Center" />
-          <Border CornerRadius="4" Padding="6,2" VerticalAlignment="Center" Background="#1E2530"
-                  BorderBrush="#2F3845" BorderThickness="1" IsVisible="{Binding ShowEngineName}"
-                  ToolTip.Tip="Active speech-to-text engine">
-            <TextBlock Text="{Binding EngineName}" Foreground="#8B93A1" FontSize="10" VerticalAlignment="Center" />
-          </Border>
-        </StackPanel>
-
-        <Border Grid.Column="1" CornerRadius="4" Padding="7,3" Margin="10,0,0,0" VerticalAlignment="Center" Background="#232932">
-          <TextBlock Text="{Binding StatusText}" Foreground="#A7AFBC" FontSize="11" />
-        </Border>
-
-        <TextBlock Grid.Column="2" Text="{Binding LastHeard}" Foreground="#7E8794" FontSize="12" FontStyle="Italic"
-                   VerticalAlignment="Center" Margin="14,0" TextTrimming="CharacterEllipsis" MaxLines="1" />
-
-        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="0,0,10,0"
-                    Width="150" IsVisible="{Binding IsListening}">
-          <Ellipse Width="8" Height="8" VerticalAlignment="Center" IsVisible="{Binding HasSignal}">
-            <Ellipse.Fill><SolidColorBrush Color="#22C55E" /></Ellipse.Fill>
-          </Ellipse>
-          <Ellipse Width="8" Height="8" VerticalAlignment="Center" IsVisible="{Binding !HasSignal}">
-            <Ellipse.Fill><SolidColorBrush Color="#3C4350" /></Ellipse.Fill>
-          </Ellipse>
-          <ProgressBar Minimum="0" Maximum="100" Value="{Binding AudioLevelPercent}" Height="6" Width="110"
-                       VerticalAlignment="Center" CornerRadius="3">
-            <ProgressBar.Styles>
-              <Style Selector="ProgressBar /template/ Border#PART_Indicator">
+            <Button.Styles>
+              <Style Selector="Button">
                 <Setter Property="Background" Value="#A78BFA" />
-                <Setter Property="CornerRadius" Value="3" />
+                <Setter Property="Foreground" Value="White" />
               </Style>
-              <Style Selector="ProgressBar">
-                <Setter Property="Background" Value="#232932" />
+              <Style Selector="Button:pointerover">
+                <Setter Property="Background" Value="#8B5CF6" />
               </Style>
-            </ProgressBar.Styles>
-          </ProgressBar>
+            </Button.Styles>
+          </Button>
         </StackPanel>
+      </ScrollViewer>
 
-        <!-- Mic sensitivity: software input gain the operator can tune live while watching the meter. -->
-        <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="0,0,10,0"
-                    ToolTip.Tip="Mic sensitivity — raise if the meter barely moves; lower if it pins to the top / clips.">
-          <TextBlock Text="&#127897;" FontSize="13" VerticalAlignment="Center" Foreground="#8B93A1" />
-          <Slider Minimum="1" Maximum="4" Value="{Binding MicSensitivity}" Width="96"
-                  VerticalAlignment="Center" />
-          <TextBlock Text="{Binding MicSensitivityLabel}" Foreground="#A7AFBC" FontSize="11"
-                     MinWidth="34" VerticalAlignment="Center" />
-        </StackPanel>
-
-        <ComboBox Grid.Column="5" ItemsSource="{Binding AudioDevices}" SelectedItem="{Binding SelectedDevice}"
-                  Background="#181C24" Foreground="#ECEEF2" BorderBrush="#3C4350"
-                  CornerRadius="6" Padding="8,4" FontSize="11" MinWidth="150" MaxWidth="220" Margin="0,0,8,0"
-                  VerticalAlignment="Center" ToolTip.Tip="Microphone input device" />
-
-        <Button Grid.Column="6" Command="{Binding ToggleListeningCommand}"
-                Padding="14,6" CornerRadius="6" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center">
+      <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+        <Button Classes="ghost" Command="{Binding ToggleTranscriptCommand}" Padding="6,3" FontSize="12"
+                ToolTip.Tip="Show / hide the live transcript">
           <Panel>
-            <TextBlock Text="Stop" IsVisible="{Binding IsListening}" />
-            <TextBlock Text="Start" IsVisible="{Binding !IsListening}" />
+            <TextBlock Text="&#9650;" FontSize="10" IsVisible="{Binding !ShowTranscript}" />
+            <TextBlock Text="&#9660;" FontSize="10" IsVisible="{Binding ShowTranscript}" />
           </Panel>
-          <Button.Styles>
-            <Style Selector="Button">
-              <Setter Property="Background" Value="#A78BFA" />
-              <Setter Property="Foreground" Value="White" />
-            </Style>
-            <Style Selector="Button:pointerover">
-              <Setter Property="Background" Value="#8B5CF6" />
-            </Style>
-          </Button.Styles>
         </Button>
-      </Grid>
+        <TextBlock Text="&#127908;" FontSize="14" VerticalAlignment="Center" />
+        <TextBlock Text="AI LISTENING" Classes="section" Foreground="#A78BFA" FontSize="11" VerticalAlignment="Center" />
+        <Border CornerRadius="4" Padding="6,2" VerticalAlignment="Center" Background="#1E2530"
+                BorderBrush="#2F3845" BorderThickness="1" IsVisible="{Binding ShowEngineName}"
+                ToolTip.Tip="Active speech-to-text engine">
+          <TextBlock Text="{Binding EngineName}" Foreground="#8B93A1" FontSize="10" VerticalAlignment="Center" />
+        </Border>
+        <Border CornerRadius="4" Padding="7,3" VerticalAlignment="Center" Background="#232932">
+          <TextBlock Text="{Binding StatusText}" Foreground="#A7AFBC" FontSize="11" MaxWidth="180"
+                     TextTrimming="CharacterEllipsis" />
+        </Border>
+      </StackPanel>
+
+      <TextBlock Text="{Binding LastHeard}" Foreground="#7E8794" FontSize="12" FontStyle="Italic"
+                 VerticalAlignment="Center" Margin="12,0,0,0" TextTrimming="CharacterEllipsis" MaxLines="1"
+                 MinWidth="0" />
       </DockPanel>
     </Border>
 
@@ -1941,11 +1852,51 @@
     <Border Grid.Row="4" Background="#181C24" Padding="16,7" BorderBrush="#2A303C" BorderThickness="0,1,0,0">
       <Grid ColumnDefinitions="*,Auto">
         <TextBlock Text="{Binding StatusText}" Foreground="#959DAB" FontSize="12" VerticalAlignment="Center" />
-        <Button Grid.Column="1" Command="{Binding CheckForUpdatesCommand}"
-                Background="Transparent" BorderThickness="0" Padding="6,2" Cursor="Hand"
-                ToolTip.Tip="Check for updates">
-          <TextBlock Text="{Binding AppVersion}" Foreground="#3C4350" FontSize="11" VerticalAlignment="Center" />
-        </Button>
+
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+          <!-- Live state · account · sync — grouped with AI minutes and version so the top bar stays clean. -->
+          <Border Background="#232932" CornerRadius="8" Padding="8,3">
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" IsVisible="{Binding IsLive}">
+                <Ellipse Width="7" Height="7" Fill="#22C55E" VerticalAlignment="Center" />
+                <TextBlock Text="LIVE" Foreground="#FFFFFF" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" IsVisible="{Binding !IsLive}">
+                <Ellipse Width="7" Height="7" Fill="#4B5563" VerticalAlignment="Center" />
+                <TextBlock Text="BLANK" Foreground="#6E7682" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+              </StackPanel>
+              <Border Width="1" Height="12" Background="#3A414D" VerticalAlignment="Center" />
+              <TextBlock Text="{Binding AccountLabel}" Foreground="#C2C8D2" FontSize="11"
+                         MaxWidth="180" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                         ToolTip.Tip="Signed-in organization and branch" />
+              <Border Width="1" Height="12" Background="#3A414D" VerticalAlignment="Center" />
+              <TextBlock Text="{Binding SyncStatus}" Foreground="#959DAB" FontSize="11" VerticalAlignment="Center" />
+            </StackPanel>
+          </Border>
+
+          <Panel IsVisible="{Binding ShowAiMinutes}">
+            <Border Background="#232932" CornerRadius="8" Padding="8,3" IsVisible="{Binding !AiNearLimit}"
+                    ToolTip.Tip="AI listening minutes remaining this month">
+              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                <Ellipse Width="7" Height="7" Fill="#22C55E" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding AiMinutesShort}" Foreground="#9BD3B0" FontSize="11" FontWeight="SemiBold" />
+              </StackPanel>
+            </Border>
+            <Border Background="#3A2A12" CornerRadius="8" Padding="8,3" IsVisible="{Binding AiNearLimit}"
+                    ToolTip.Tip="AI listening minutes remaining this month">
+              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                <Ellipse Width="7" Height="7" Fill="#F59E0B" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding AiMinutesShort}" Foreground="#F59E0B" FontSize="11" FontWeight="SemiBold" />
+              </StackPanel>
+            </Border>
+          </Panel>
+
+          <Button Command="{Binding CheckForUpdatesCommand}"
+                  Background="Transparent" BorderThickness="0" Padding="6,2" Cursor="Hand"
+                  ToolTip.Tip="Check for updates">
+            <TextBlock Text="{Binding AppVersion}" Foreground="#3C4350" FontSize="11" VerticalAlignment="Center" />
+          </Button>
+        </StackPanel>
       </Grid>
     </Border>
 

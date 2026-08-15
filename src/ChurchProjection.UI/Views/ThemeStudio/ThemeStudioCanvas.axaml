@@ -1,0 +1,106 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ChurchProjection.UI.ViewModels"
+             xmlns:views="using:ChurchProjection.UI.Views"
+             x:Class="ChurchProjection.UI.Views.ThemeStudio.ThemeStudioCanvas"
+             x:DataType="vm:ThemeStudioViewModel">
+
+  <Border Background="#1A1D24">
+    <Grid RowDefinitions="*,Auto">
+      <Panel Grid.Row="0" x:Name="EditorHost" SizeChanged="OnEditorHostSizeChanged">
+        <!-- Matte + gradient frame — checkerboard behind preview so black themes stay visible -->
+        <Border CornerRadius="8" ClipToBounds="True" BorderThickness="2"
+                Background="#252830" Padding="3"
+                HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20">
+          <Border.BorderBrush>
+            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+              <GradientStop Color="#7C6CF6" Offset="0" />
+              <GradientStop Color="#22D3EE" Offset="0.5" />
+              <GradientStop Color="#F472B6" Offset="1" />
+            </LinearGradientBrush>
+          </Border.BorderBrush>
+          <Panel Width="{Binding EditorCanvasWidth}" Height="{Binding EditorCanvasHeight}">
+            <Viewbox Stretch="Uniform">
+              <Border Width="1920" Height="1080" Background="#404550" BorderBrush="#C2C8D2" BorderThickness="2" ClipToBounds="True">
+                <views:ProjectorView DataContext="{Binding Preview}" />
+              </Border>
+            </Viewbox>
+
+            <Canvas Width="{Binding EditorCanvasWidth}" Height="{Binding EditorCanvasHeight}"
+                    Background="Transparent" PointerPressed="OnCanvasBackgroundPressed">
+              <ItemsControl ItemsSource="{Binding ShapeHandles}"
+                            Width="{Binding EditorCanvasWidth}" Height="{Binding EditorCanvasHeight}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><Canvas /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.Styles>
+                  <Style Selector="ItemsControl > ContentPresenter" x:DataType="vm:ShapeHandleItem">
+                    <Setter Property="Canvas.Left" Value="{Binding EX}" />
+                    <Setter Property="Canvas.Top" Value="{Binding EY}" />
+                  </Style>
+                </ItemsControl.Styles>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ShapeHandleItem">
+                    <Border Background="Transparent" Width="{Binding EW}" Height="{Binding EH}"
+                            Tag="{Binding Index}" PointerPressed="OnShapeBoxPressed" Cursor="SizeAll" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+              <Border Classes="regionBox" Tag="Title" PointerPressed="OnRegionBoxPressed"
+                      Canvas.Left="{Binding TitleBoxX}" Canvas.Top="{Binding TitleBoxY}"
+                      Width="{Binding TitleBoxW}" Height="{Binding TitleBoxH}"
+                      IsVisible="{Binding TitleBoxVisible}" Opacity="0.9">
+                <TextBlock Text="Title" Foreground="#9AA3B2" FontSize="10" Margin="4,2" />
+              </Border>
+              <Border Classes="regionBox" Tag="Body" PointerPressed="OnRegionBoxPressed"
+                      Canvas.Left="{Binding BodyBoxX}" Canvas.Top="{Binding BodyBoxY}"
+                      Width="{Binding BodyBoxW}" Height="{Binding BodyBoxH}"
+                      IsVisible="{Binding BodyBoxVisible}" Opacity="0.9">
+                <TextBlock Text="Body" Foreground="#9AA3B2" FontSize="10" Margin="4,2" />
+              </Border>
+              <Border Classes="regionBox" Tag="Footer" PointerPressed="OnRegionBoxPressed"
+                      Canvas.Left="{Binding FooterBoxX}" Canvas.Top="{Binding FooterBoxY}"
+                      Width="{Binding FooterBoxW}" Height="{Binding FooterBoxH}"
+                      IsVisible="{Binding FooterBoxVisible}" Opacity="0.9">
+                <TextBlock Text="Footer" Foreground="#9AA3B2" FontSize="10" Margin="4,2" />
+              </Border>
+
+              <Grid Canvas.Left="{Binding SelBoxX}" Canvas.Top="{Binding SelBoxY}"
+                    Width="{Binding SelBoxW}" Height="{Binding SelBoxH}"
+                    IsVisible="{Binding HasSelectionHandles}">
+                <Thumb Classes="move" DragDelta="OnMoveThumb" />
+                <Border BorderBrush="#22D3EE" BorderThickness="1" IsHitTestVisible="False" />
+                <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,-21,0,0"
+                        Background="#E60E7490" CornerRadius="3" Padding="6,1" IsHitTestVisible="False">
+                  <TextBlock Text="{Binding SelSizeLabel}" FontSize="10.5" FontWeight="SemiBold" Foreground="White" />
+                </Border>
+                <Thumb Classes="handle" Tag="tl" DragDelta="OnResizeThumb"
+                       HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-5,-5,0,0" />
+                <Thumb Classes="handle" Tag="t" DragDelta="OnResizeThumb"
+                       HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,-5,0,0" />
+                <Thumb Classes="handle" Tag="tr" DragDelta="OnResizeThumb"
+                       HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-5,-5,0" />
+                <Thumb Classes="handle" Tag="l" DragDelta="OnResizeThumb"
+                       HorizontalAlignment="Left" VerticalAlignment="Center" Margin="-5,0,0,0" />
+                <Thumb Classes="handle" Tag="r" DragDelta="OnResizeThumb"
+                       HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-5,0" />
+                <Thumb Classes="handle" Tag="bl" DragDelta="OnResizeThumb"
+                       HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="-5,0,0,-5" />
+                <Thumb Classes="handle" Tag="b" DragDelta="OnResizeThumb"
+                       HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,-5" />
+                <Thumb Classes="handle" Tag="br" DragDelta="OnResizeThumb"
+                       HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-5,-5" />
+              </Grid>
+            </Canvas>
+          </Panel>
+        </Border>
+      </Panel>
+
+      <TextBlock Grid.Row="1" Margin="0,0,0,12"
+                 Text="Click empty canvas for theme settings · click an object to edit it · drag handles to resize"
+                 Foreground="#5C6470" FontSize="11" TextWrapping="Wrap"
+                 HorizontalAlignment="Center" TextAlignment="Center" MaxWidth="540" />
+    </Grid>
+  </Border>
+</UserControl>

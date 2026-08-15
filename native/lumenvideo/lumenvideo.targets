@@ -1,0 +1,11 @@
+<Project>
+  <!-- Compiles the Mac AVFoundation frame pump next to the managed output. -->
+  <Target Name="BuildLumenVideoMac" BeforeTargets="BeforeBuild" Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+    <PropertyGroup>
+      <_LumenVideoSrc>$(MSBuildThisFileDirectory)lumenvideo.m</_LumenVideoSrc>
+      <_LumenVideoDylib>$(OutDir)liblumenvideo.dylib</_LumenVideoDylib>
+    </PropertyGroup>
+    <MakeDir Directories="$(OutDir)" />
+    <Exec Command="clang -dynamiclib -fobjc-arc -arch arm64 -mmacosx-version-min=11.0 -framework AVFoundation -framework CoreMedia -framework CoreVideo -framework Foundation -Wl,-install_name,@loader_path/liblumenvideo.dylib -o &quot;$(_LumenVideoDylib)&quot; &quot;$(_LumenVideoSrc)&quot;" />
+  </Target>
+</Project>

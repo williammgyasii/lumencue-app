@@ -22,7 +22,8 @@ public static class MediaLibrary
     private static string Normalize(string path)
     {
         if (string.IsNullOrWhiteSpace(path)) return string.Empty;
-        try { return Path.GetFullPath(path).TrimEnd('\\', '/').ToLowerInvariant(); }
-        catch { return path.Trim().ToLowerInvariant(); }
+        var unified = path.Replace('\\', '/').Trim().ToLowerInvariant();
+        try { return Path.GetFullPath(unified).TrimEnd('/'); }
+        catch { return unified; }
     }
 }
