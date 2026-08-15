@@ -5,9 +5,8 @@
         x:Class="ChurchProjection.UI.Views.SongEditorWindow"
         x:DataType="vm:SongEditorViewModel"
         Title="{Binding WindowTitle}"
-        Width="1180" Height="760"
-        MinWidth="980" MinHeight="600"
-        WindowState="Maximized"
+        Width="1280" Height="800"
+        MinWidth="980" MinHeight="620"
         WindowStartupLocation="CenterOwner"
         Background="#0E1014">
 
@@ -25,13 +24,14 @@
     </Style>
     <Style Selector="TextBlock.lbl">
       <Setter Property="Foreground" Value="#D8DCE3" />
-      <Setter Property="FontSize" Value="13" />
-      <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style Selector="TextBlock.section">
-      <Setter Property="Foreground" Value="#959DAB" />
-      <Setter Property="FontSize" Value="11" />
-      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="#C4B5FD" />
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="LetterSpacing" Value="1.0" />
     </Style>
     <Style Selector="ComboBox">
       <Setter Property="Background" Value="#181C24" />
@@ -43,91 +43,99 @@
   </Window.Styles>
 
   <DockPanel>
-    <!-- Header -->
-    <Border DockPanel.Dock="Top" Background="#181C24" Padding="24,16" BorderBrush="#2A303C" BorderThickness="0,0,0,1">
-      <StackPanel Spacing="3">
-        <TextBlock Classes="h1" Text="Song Editor" Foreground="#ECEEF2" FontSize="20" />
-        <TextBlock Text="Paste lyrics, auto-detect verses &amp; chorus, then refine and preview against your theme."
-                   Foreground="#959DAB" FontSize="13" />
+    <Border DockPanel.Dock="Top" Background="#181C24" Padding="20,14" BorderBrush="#2A303C" BorderThickness="0,0,0,1">
+      <StackPanel Spacing="2">
+        <TextBlock Text="Song Editor" Foreground="#ECEEF2" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock Text="Paste lyrics — sections appear on the right. Preview shows each line-break."
+                   Foreground="#959DAB" FontSize="12" />
       </StackPanel>
     </Border>
 
-    <!-- Footer -->
-    <Border DockPanel.Dock="Bottom" Background="#181C24" Padding="24,14" BorderBrush="#2A303C" BorderThickness="0,1,0,0">
+    <Border DockPanel.Dock="Bottom" Background="#181C24" Padding="20,12" BorderBrush="#2A303C" BorderThickness="0,1,0,0">
       <Grid ColumnDefinitions="*,Auto,Auto">
         <TextBlock Grid.Column="0" Text="{Binding SlideCountText}" Foreground="#959DAB"
                    FontSize="13" VerticalAlignment="Center" />
-        <Button Grid.Column="1" Content="Cancel" HorizontalAlignment="Right"
+        <Button Grid.Column="1" Content="Cancel"
                 Background="#2A303C" Foreground="#D8DCE3" FontWeight="SemiBold"
-                Padding="20,9" CornerRadius="6" FontSize="13" Margin="0,0,8,0"
+                Padding="18,8" CornerRadius="6" FontSize="13" Margin="0,0,8,0"
                 Click="OnCancelClicked" />
-        <Button Grid.Column="2" Content="Save to Library" HorizontalAlignment="Right"
+        <Button Grid.Column="2" Content="Save to Library"
                 Background="#7C6CF6" Foreground="White" FontWeight="SemiBold"
-                Padding="20,9" CornerRadius="6" FontSize="13"
+                Padding="18,8" CornerRadius="6" FontSize="13"
                 Command="{Binding SaveCommand}" />
       </Grid>
     </Border>
 
-    <!-- Body: lyrics | sections | preview.
-         Star widths give the middle (sections) the most room; MinWidth on each panel
-         makes the splitters snap/clamp so a panel can't be dragged shut or off-screen. -->
-    <Grid Margin="0">
+    <Grid>
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="1.1*" MinWidth="320" />
+        <ColumnDefinition Width="1.1*" MinWidth="300" />
         <ColumnDefinition Width="6" />
-        <ColumnDefinition Width="2.2*" MinWidth="440" />
+        <ColumnDefinition Width="1.6*" MinWidth="360" />
         <ColumnDefinition Width="6" />
-        <ColumnDefinition Width="1.5*" MinWidth="430" />
+        <ColumnDefinition Width="1.3*" MinWidth="340" />
       </Grid.ColumnDefinitions>
 
-      <!-- Left: lyrics input + meta -->
-      <DockPanel Grid.Column="0" Margin="20,18">
-        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,0,0,12">
-          <StackPanel Grid.Column="0" Spacing="6">
-            <TextBlock Classes="lbl" Text="Song Title" />
-            <TextBox Text="{Binding Title}" Watermark="e.g. Amazing Grace" />
+      <!-- Details -->
+      <DockPanel Grid.Column="0" Margin="16,16">
+        <Border DockPanel.Dock="Top" Background="#2A2110" Padding="12,8" CornerRadius="8,8,0,0"
+                BorderBrush="#F59E0B" BorderThickness="0,0,0,2" Margin="0,0,0,12">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Border Width="8" Height="8" CornerRadius="4" Background="#F59E0B" VerticalAlignment="Center" />
+            <TextBlock Text="SONG DETAILS" Classes="section" Foreground="#FBBF24" VerticalAlignment="Center" />
           </StackPanel>
-          <StackPanel Grid.Column="1" Spacing="6">
-            <TextBlock Classes="lbl" Text="Artist" />
-            <TextBox Text="{Binding Artist}" Watermark="Optional" />
-          </StackPanel>
-        </Grid>
+        </Border>
 
-        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,12">
-          <TextBlock Classes="lbl" Text="Lines per slide" />
-          <Grid ColumnDefinitions="120,*" ColumnSpacing="10">
-            <ComboBox Grid.Column="0" ItemsSource="{Binding LinesPerSlideOptions}"
-                      SelectedItem="{Binding LinesPerSlide}" HorizontalAlignment="Stretch" />
-            <TextBlock Grid.Column="1" Text="0 = auto-fit to theme" Foreground="#6E7682"
-                       FontSize="12" VerticalAlignment="Center" />
-          </Grid>
+        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,10">
+          <TextBlock Classes="lbl" Text="Title" />
+          <TextBox Text="{Binding Title}" Watermark="Amazing grace" LostFocus="OnTitleLostFocus" />
         </StackPanel>
 
-        <Button DockPanel.Dock="Bottom" Content="Break into sections" HorizontalAlignment="Stretch"
-                HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,10">
+          <TextBlock Classes="lbl" Text="Artist" />
+          <TextBox Text="{Binding Artist}" Watermark="Required — e.g. CEYC" />
+        </StackPanel>
+
+        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,10">
+          <TextBlock Classes="lbl" Text="Lines per slide" />
+          <ComboBox ItemsSource="{Binding LinesPerSlideChoices}"
+                    SelectedItem="{Binding LinesPerSlideChoice}"
+                    HorizontalAlignment="Stretch" />
+          <TextBlock Text="Auto follows the theme. A number splits each section the same way as Now Singing."
+                     Foreground="#6E7682" FontSize="11" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <Button DockPanel.Dock="Bottom" Content="Re-break sections" HorizontalAlignment="Stretch"
+                HorizontalContentAlignment="Center"
                 Background="#2A303C" Foreground="#ECEEF2" FontWeight="SemiBold"
-                Padding="0,11" CornerRadius="6" FontSize="13" Margin="0,12,0,0"
-                Command="{Binding ParseCommand}" />
+                Padding="0,10" CornerRadius="6" FontSize="13" Margin="0,12,0,0"
+                Command="{Binding ParseCommand}"
+                ToolTip.Tip="Run the offline breakdown again from the lyrics box" />
 
         <StackPanel Spacing="6">
           <TextBlock Classes="lbl" Text="Lyrics" />
           <TextBox Text="{Binding RawLyrics}"
-                   Watermark="Paste lyrics here. Blank lines separate stanzas; repeated stanzas become the chorus automatically."
+                   Watermark="Paste lyrics. Sections fill in automatically — no need to click Re-break."
                    AcceptsReturn="True" TextWrapping="Wrap"
-                   VerticalAlignment="Stretch" Height="380"
+                   VerticalAlignment="Stretch"
                    VerticalContentAlignment="Top" />
         </StackPanel>
       </DockPanel>
 
       <GridSplitter Grid.Column="1" Background="#1A1E26" Width="6" />
 
-      <!-- Middle: editable section breakdown -->
-      <DockPanel Grid.Column="2" Margin="16,18">
-        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
-          <TextBlock Grid.Column="0" Classes="section" Text="SECTIONS" VerticalAlignment="Center" />
-          <Button Grid.Column="1" Content="+ Add" Background="#2A303C" Foreground="#ECEEF2"
-                  FontSize="12" Padding="12,6" CornerRadius="6" Command="{Binding AddSectionCommand}" />
-        </Grid>
+      <!-- Sections -->
+      <DockPanel Grid.Column="2" Margin="12,16">
+        <Border DockPanel.Dock="Top" Background="#1E1A32" Padding="12,8" CornerRadius="8,8,0,0"
+                BorderBrush="#A78BFA" BorderThickness="0,0,0,2" Margin="0,0,0,10">
+          <Grid ColumnDefinitions="*,Auto">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Border Width="8" Height="8" CornerRadius="4" Background="#A78BFA" VerticalAlignment="Center" />
+              <TextBlock Text="SECTIONS" Classes="section" VerticalAlignment="Center" />
+            </StackPanel>
+            <Button Grid.Column="1" Content="+ Add" Background="#262446" Foreground="#C4B5FD"
+                    FontSize="12" Padding="12,5" CornerRadius="6" Command="{Binding AddSectionCommand}" />
+          </Grid>
+        </Border>
 
         <ListBox x:Name="SectionsList" ItemsSource="{Binding Sections}"
                  SelectedItem="{Binding SelectedSection}"
@@ -158,6 +166,26 @@
                             HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                             Background="#2A303C" Foreground="#EF6B6B" CornerRadius="5" Click="OnDeleteClicked" />
                   </Grid>
+                  <TextBlock Text="{Binding SlideCountLabel}" Foreground="#A78BFA" FontSize="11" FontWeight="SemiBold" />
+                  <ItemsControl ItemsSource="{Binding Pages}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" />
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:SongSlidePageVm">
+                        <Border Background="#0B0D12" BorderBrush="#3C4350" BorderThickness="1" CornerRadius="6"
+                                Padding="8,6" Margin="0,0,6,6" MaxWidth="220">
+                          <StackPanel Spacing="3">
+                            <TextBlock Text="{Binding Label}" Foreground="#C4B5FD" FontSize="10" FontWeight="Bold" />
+                            <TextBlock Text="{Binding Text}" Foreground="#E6E9EE" FontSize="11"
+                                       TextWrapping="Wrap" MaxLines="4" TextTrimming="CharacterEllipsis" />
+                          </StackPanel>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
                   <TextBox Text="{Binding Text}" AcceptsReturn="True" TextWrapping="Wrap"
                            MinHeight="64" VerticalContentAlignment="Top" FontSize="13" />
                 </StackPanel>
@@ -169,12 +197,24 @@
 
       <GridSplitter Grid.Column="3" Background="#1A1E26" Width="6" />
 
-      <!-- Right: live themed preview -->
-      <DockPanel Grid.Column="4" Margin="16,18,20,18">
-        <TextBlock DockPanel.Dock="Top" Classes="section" Text="PREVIEW" Margin="0,0,0,10" />
+      <!-- Preview -->
+      <DockPanel Grid.Column="4" Margin="12,16,16,16">
+        <Border DockPanel.Dock="Top" Background="#102018" Padding="12,8" CornerRadius="8,8,0,0"
+                BorderBrush="#22C55E" BorderThickness="0,0,0,2" Margin="0,0,0,10">
+          <Grid ColumnDefinitions="Auto,*">
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <Border Width="8" Height="8" CornerRadius="4" Background="#22C55E" VerticalAlignment="Center" />
+              <TextBlock Text="PREVIEW" Classes="section" Foreground="#4ADE80" VerticalAlignment="Center" />
+            </StackPanel>
+            <ComboBox Grid.Column="1" ItemsSource="{Binding ThemeNames}"
+                      SelectedItem="{Binding PreviewThemeName}"
+                      Margin="12,0,0,0" MinWidth="0" FontSize="12" Padding="8,4"
+                      ToolTip.Tip="Preview only — does not change the live lyric theme" />
+          </Grid>
+        </Border>
 
         <StackPanel DockPanel.Dock="Bottom" Spacing="10" Margin="0,12,0,0">
-          <Grid ColumnDefinitions="Auto,*,Auto" >
+          <Grid ColumnDefinitions="Auto,*,Auto">
             <Button Grid.Column="0" Content="‹ Prev" Background="#2A303C" Foreground="#ECEEF2"
                     FontSize="12" Padding="12,7" CornerRadius="6" Command="{Binding PreviewPrevCommand}" />
             <TextBlock Grid.Column="1" Text="{Binding PreviewPositionText}" Foreground="#959DAB"
@@ -182,14 +222,14 @@
             <Button Grid.Column="2" Content="Next ›" Background="#2A303C" Foreground="#ECEEF2"
                     FontSize="12" Padding="12,7" CornerRadius="6" Command="{Binding PreviewNextCommand}" />
           </Grid>
-          <TextBlock Text="Live render of the selected section using the Lyric theme."
+          <TextBlock Text="Each page is one line-break. Change Lines or Theme to see the next look."
                      Foreground="#6E7682" FontSize="11" TextWrapping="Wrap"
                      HorizontalAlignment="Center" TextAlignment="Center" />
         </StackPanel>
 
-        <Border CornerRadius="8" ClipToBounds="True" BorderBrush="#374151" BorderThickness="1"
-                VerticalAlignment="Top" HorizontalAlignment="Center">
-          <Viewbox Stretch="Uniform" Width="400" Height="225">
+        <Border CornerRadius="8" ClipToBounds="True" BorderBrush="#22C55E" BorderThickness="2"
+                VerticalAlignment="Top" HorizontalAlignment="Stretch" Background="#14181F">
+          <Viewbox Stretch="Uniform">
             <Border Width="1920" Height="1080">
               <views:ProjectorView DataContext="{Binding Preview}" />
             </Border>

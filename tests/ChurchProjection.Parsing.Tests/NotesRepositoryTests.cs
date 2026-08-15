@@ -73,6 +73,18 @@ public class NotesRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task Update_persists_lines_per_slide()
+    {
+        var note = await _repo.InsertAsync(new Note { Title = "Points", Body = "a\nb\nc\nd", LinesPerSlide = 2 });
+
+        note.LinesPerSlide = 4;
+        await _repo.UpdateAsync(note);
+
+        var loaded = Assert.Single(await _repo.GetAllAsync());
+        Assert.Equal(4, loaded.LinesPerSlide);
+    }
+
+    [Fact]
     public async Task Delete_of_a_missing_id_is_a_no_op()
     {
         await _repo.InsertAsync(new Note { Title = "Keep", Body = "x" });

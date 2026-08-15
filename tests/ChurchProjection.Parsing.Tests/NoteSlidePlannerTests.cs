@@ -54,6 +54,26 @@ public class NoteSlidePlannerTests
     }
 
     [Fact]
+    public void LinesPerSlide_packs_non_blank_lines_and_wins_over_paragraph_mode()
+    {
+        var body = "Line one\n\nLine two\n\nLine three\n\nLine four";
+
+        var slides = NoteSlidePlanner.PlanBodies(body, NoteSplitMode.OneParagraphPerSlide, linesPerSlide: 2);
+
+        Assert.Equal(2, slides.Count);
+        Assert.Equal("Line one\nLine two", slides[0]);
+        Assert.Equal("Line three\nLine four", slides[1]);
+    }
+
+    [Fact]
+    public void LinesPerSlide_zero_keeps_paragraph_split()
+    {
+        var slides = NoteSlidePlanner.PlanBodies("Point one\n\nPoint two", NoteSplitMode.OneParagraphPerSlide, 0);
+
+        Assert.Equal(["Point one", "Point two"], slides);
+    }
+
+    [Fact]
     public void SplitNoteSections_keeps_header_with_following_content()
     {
         var sections = SlideContentSplitter.SplitNoteSections(PastorChrisSample);

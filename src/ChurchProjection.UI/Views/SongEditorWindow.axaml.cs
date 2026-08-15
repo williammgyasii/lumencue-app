@@ -24,6 +24,12 @@ public partial class SongEditorWindow : Window
 
     private void OnCancelClicked(object? sender, RoutedEventArgs e) => Close();
 
+    private void OnTitleLostFocus(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is SongEditorViewModel vm)
+            vm.NormalizeTitle();
+    }
+
     private void OnMoveUpClicked(object? sender, RoutedEventArgs e)
     {
         if (DataContext is SongEditorViewModel vm && (sender as Control)?.DataContext is SongSectionVm s)

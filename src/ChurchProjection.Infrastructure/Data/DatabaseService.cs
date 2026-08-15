@@ -121,6 +121,7 @@ public sealed class DatabaseService : IDisposable
         await EnsureColumnAsync(conn, "songs", "dirty", "INTEGER NOT NULL DEFAULT 1").ConfigureAwait(false);
 
         await EnsureColumnAsync(conn, "notes", "split_mode", "INTEGER NOT NULL DEFAULT 0").ConfigureAwait(false);
+        await EnsureColumnAsync(conn, "notes", "lines_per_slide", "INTEGER NOT NULL DEFAULT 0").ConfigureAwait(false);
 
         await conn.ExecuteAsync(
             "UPDATE songs SET organization_id = 'local-default' WHERE organization_id IS NULL OR organization_id = ''")

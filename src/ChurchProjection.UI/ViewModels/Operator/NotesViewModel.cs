@@ -32,6 +32,27 @@ public class NotesViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _selectedCard, value);
     }
 
+    /// <summary>Writes the note without rebuilding the library cards (used for lines-per-slide).</summary>
+    public async Task PersistAsync(Note note)
+    {
+        try
+        {
+            await _repo.UpdateAsync(note);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to persist note");
+        }
+    }
+
+    /// <summary>Marks which library row is the open note (amber highlight).</summary>
+    public void MarkOpen(NoteSlideItem? card)
+    {
+        foreach (var item in Cards)
+            item.IsOpen = card is not null && ReferenceEquals(item, card);
+        SelectedCard = card;
+    }
+
     public string StatusText
     {
         get => _statusText;
@@ -112,6 +133,7 @@ public class NotesViewModel : ViewModelBase
 public class NoteSlideItem : ReactiveObject
 {
     private bool _isLive;
+    private bool _isOpen;
 
     public NoteSlideItem(Note note)
     {
@@ -132,6 +154,8 @@ public class NoteSlideItem : ReactiveObject
 
     private static int CountSlides(Note note)
     {
+        if (note.LinesPerSlide > 0)
+            return Math.Max(1, NoteSlidePlanner.PlanBodies(note.Body, note.SplitMode, note.LinesPerSlide).Count);
         if (note.SplitMode == NoteSplitMode.AutoFit)
             return Math.Max(1, note.Body.Split("\n\n", StringSplitOptions.RemoveEmptyEntries).Length);
         return Math.Max(1, NoteSlidePlanner.PlanBodies(note.Body, note.SplitMode).Count);
@@ -142,6 +166,13 @@ public class NoteSlideItem : ReactiveObject
     {
         get => _isLive;
         set => this.RaiseAndSetIfChanged(ref _isLive, value);
+    }
+
+    /// <summary>True when this note is open in the center slide breakdown.</summary>
+    public bool IsOpen
+    {
+        get => _isOpen;
+        set => this.RaiseAndSetIfChanged(ref _isOpen, value);
     }
 }
 

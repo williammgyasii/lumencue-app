@@ -8,7 +8,7 @@ namespace ChurchProjection.Infrastructure.Data;
 /// </summary>
 public class NotesRepository
 {
-    private const string SelectColumns = "id, title, body, split_mode, created_at, updated_at";
+    private const string SelectColumns = "id, title, body, split_mode, lines_per_slide, created_at, updated_at";
 
     private readonly DatabaseService _db;
 
@@ -32,8 +32,8 @@ public class NotesRepository
             await using var conn = _db.GetConnection();
             note.Id = await conn.QuerySingleAsync<long>(
                 """
-                INSERT INTO notes (title, body, split_mode, created_at, updated_at)
-                VALUES (@Title, @Body, @SplitMode, @CreatedAt, @UpdatedAt);
+                INSERT INTO notes (title, body, split_mode, lines_per_slide, created_at, updated_at)
+                VALUES (@Title, @Body, @SplitMode, @LinesPerSlide, @CreatedAt, @UpdatedAt);
                 SELECT last_insert_rowid();
                 """,
                 new
@@ -41,6 +41,7 @@ public class NotesRepository
                     note.Title,
                     note.Body,
                     SplitMode = (int)note.SplitMode,
+                    note.LinesPerSlide,
                     CreatedAt = note.CreatedAt.ToString("o"),
                     UpdatedAt = note.UpdatedAt.ToString("o"),
                 }).ConfigureAwait(false);
@@ -61,8 +62,8 @@ public class NotesRepository
         {
             await using var conn = _db.GetConnection();
             await conn.ExecuteAsync(
-                "UPDATE notes SET title = @Title, body = @Body, split_mode = @SplitMode, updated_at = @UpdatedAt WHERE id = @Id",
-                new { note.Title, note.Body, SplitMode = (int)note.SplitMode, UpdatedAt = note.UpdatedAt.ToString("o"), note.Id })
+                "UPDATE notes SET title = @Title, body = @Body, split_mode = @SplitMode, lines_per_slide = @LinesPerSlide, updated_at = @UpdatedAt WHERE id = @Id",
+                new { note.Title, note.Body, SplitMode = (int)note.SplitMode, note.LinesPerSlide, UpdatedAt = note.UpdatedAt.ToString("o"), note.Id })
                 .ConfigureAwait(false);
         }
         finally
@@ -92,6 +93,7 @@ public class NotesRepository
         Title = (string)row.title,
         Body = (string)row.body,
         SplitMode = row.split_mode is null ? NoteSplitMode.AutoFit : (NoteSplitMode)(int)row.split_mode,
+        LinesPerSlide = row.lines_per_slide is null ? 0 : (int)row.lines_per_slide,
         CreatedAt = ParseDate(row.created_at as string),
         UpdatedAt = ParseDate(row.updated_at as string),
     };

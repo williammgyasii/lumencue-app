@@ -3,6 +3,7 @@ using Avalonia.Media;
 using ChurchProjection.Core.Models.Content;
 using ChurchProjection.Core.Models.Slides;
 using ChurchProjection.Core.Models.Theme;
+using ChurchProjection.Core.Services;
 
 namespace ChurchProjection.UI.Services;
 
@@ -22,8 +23,18 @@ public static class DeckBuilder
     public static int MaxCharsPerSlide { get; set; }
 
     /// <summary>Builds a note deck using the note's chosen split mode.</summary>
-    public static SlideDeck BuildNote(string title, string body, string footer, Theme theme, NoteSplitMode splitMode)
+    public static SlideDeck BuildNote(string title, string body, string footer, Theme theme, NoteSplitMode splitMode, int linesPerSlide = 0)
     {
+        if (linesPerSlide > 0)
+        {
+            var lineBodies = NoteSlidePlanner.PlanBodies(body, splitMode, linesPerSlide);
+            if (lineBodies.Count == 0)
+                return SlideDeck.Single(new Slide { Type = SlideType.Note, Title = title, Body = body, Footer = footer });
+            return new SlideDeck(lineBodies
+                .Select(b => new Slide { Type = SlideType.Note, Title = title, Body = b, Footer = footer })
+                .ToList());
+        }
+
         if (splitMode == NoteSplitMode.AutoFit)
             return Build(SlideType.Note, title, body, footer, theme);
 
@@ -43,7 +54,7 @@ public static class DeckBuilder
         // instead of the theme's automatic text-fit.
         if (linesPerSlide > 0)
         {
-            var linePages = SplitByLines(body, linesPerSlide);
+            var linePages = SongLinesPerSlide.SplitPages(body, linesPerSlide).ToList();
             var lineSlides = linePages
                 .Select(p => new Slide { Type = type, Title = title, Body = p, Footer = footer })
                 .ToList();
@@ -168,22 +179,6 @@ public static class DeckBuilder
             ft.LineHeight = lineHeight;
 
         return ft.Height <= maxHeight;
-    }
-
-    /// <summary>Chunks each stanza into pages of at most <paramref name="linesPerSlide"/> lyric lines.</summary>
-    private static List<string> SplitByLines(string body, int linesPerSlide)
-    {
-        var normalized = body.Replace("\r\n", "\n").Replace('\r', '\n').Trim();
-        var pages = new List<string>();
-
-        foreach (var stanza in normalized.Split("\n\n", StringSplitOptions.RemoveEmptyEntries))
-        {
-            var lines = stanza.Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
-            for (int i = 0; i < lines.Count; i += linesPerSlide)
-                pages.Add(string.Join("\n", lines.Skip(i).Take(linesPerSlide)));
-        }
-
-        return pages;
     }
 
     private static FontFamily ResolveFont(string name)

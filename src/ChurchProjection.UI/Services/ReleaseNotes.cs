@@ -11,6 +11,12 @@ public static class ReleaseNotes
 {
     private static readonly Dictionary<string, string[]> Notes = new()
     {
+        ["0.7.27"] =
+        [
+            "Songs: a Sunday Playlist sits under the library, the song editor is a three-pane workspace (artist required, lines per slide, paste-to-break), and Now Singing cards fill the row.",
+            "Notes: saved notes live in the left sidebar. Double-click one to open its slides — they stretch across the center like songs.",
+            "Notes Lines dropdown packs prayer points onto slides; right-click a slide to quick-edit or add another. Notes now have their own Program theme.",
+        ],
         ["0.7.26"] =
         [
             "Live backgrounds: pick a photo or looping video from the tiles when a theme is set to Placeholder — it fills the projector.",

@@ -8,9 +8,9 @@
     <Product>LumenCue</Product>
     <AssemblyTitle>LumenCue</AssemblyTitle>
     <Company>LumenCue</Company>
-    <Version>0.7.26</Version>
-    <FileVersion>0.7.26</FileVersion>
-    <InformationalVersion>0.7.26</InformationalVersion>
+    <Version>0.7.27</Version>
+    <FileVersion>0.7.27</FileVersion>
+    <InformationalVersion>0.7.27</InformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>

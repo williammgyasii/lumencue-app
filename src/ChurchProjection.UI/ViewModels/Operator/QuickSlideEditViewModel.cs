@@ -14,9 +14,11 @@ public sealed class QuickSlideEditViewModel : ReactiveObject
     private string _sectionType;
     private string _text;
 
-    public QuickSlideEditViewModel(string songTitle, string sectionType, string text)
+    public QuickSlideEditViewModel(string songTitle, string sectionType, string text, bool isNote = false)
     {
         Heading = songTitle;
+        ShowSectionType = !isNote;
+        BodyLabel = isNote ? "SLIDE TEXT" : "LYRICS (one line per projected line)";
         _sectionType = string.IsNullOrWhiteSpace(sectionType) ? "verse" : sectionType;
         _text = text ?? "";
 
@@ -29,6 +31,8 @@ public sealed class QuickSlideEditViewModel : ReactiveObject
     }
 
     public string Heading { get; }
+    public bool ShowSectionType { get; }
+    public string BodyLabel { get; }
     public IReadOnlyList<string> SectionTypes => SongSectionVm.Types;
 
     public string SectionType { get => _sectionType; set => this.RaiseAndSetIfChanged(ref _sectionType, value); }

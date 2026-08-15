@@ -10,6 +10,8 @@ public class Note
     public string Title { get; set; } = string.Empty;
     public string Body { get; set; } = string.Empty;
     public NoteSplitMode SplitMode { get; set; } = NoteSplitMode.OneParagraphPerSlide;
+    /// <summary>0 = use <see cref="SplitMode"/> / theme fit. 1–8 packs that many lines per slide.</summary>
+    public int LinesPerSlide { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

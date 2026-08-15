@@ -26,14 +26,13 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
         AddHandler(KeyDownEvent, OnNavPreviewKeyDown, RoutingStrategies.Tunnel);
     }
 
-    // Lock the preview pane to 16:9 of its width so Uniform scaling fills it with no stretch
-    // and no side letterbox.
+    // Lock Program to 16:9 (the Bible-mode monitor) so Songs/Media/Notes cannot stretch it.
     private void OnProgramPreviewHostSizeChanged(object? sender, SizeChangedEventArgs e)
     {
-        if (sender is not Grid host || e.NewSize.Width <= 0) return;
+        if (sender is not Grid host) return;
         var target = e.NewSize.Width * 9.0 / 16.0;
-        if (Math.Abs(host.Height - target) > 0.5)
-            host.Height = target;
+        if (target <= 0 || Math.Abs(host.Height - target) < 0.5) return;
+        host.Height = target;
     }
 
     // Centralised live-paging arrows, run before list controls see the key.
@@ -207,14 +206,61 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
 
     // ----- Notes tab -----
 
-    // Clicking a note card opens its slide breakdown.
-    public void OnNotesSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    public void OnNotesLibraryDoubleTapped(object? sender, TappedEventArgs e)
     {
         if (DataContext is OperatorViewModel vm && sender is ListBox { SelectedItem: NoteSlideItem card })
             vm.OpenNote(card);
     }
 
     // Double-clicking a slide sends it live.
+    public void OnNotePageSendLiveMenu(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is OperatorViewModel vm && sender is MenuItem { DataContext: NotePageSlideItem page })
+            vm.SendNotePageLive(page);
+    }
+
+    public async void OnNotePageQuickEditMenu(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (DataContext is not OperatorViewModel vm) return;
+            if (sender is not MenuItem { DataContext: NotePageSlideItem page }) return;
+
+            var editor = new QuickSlideEditViewModel($"{vm.OpenNoteTitle}  ·  {page.Label}", "note", page.Body, isNote: true);
+            var dialog = new QuickSlideEditWindow { DataContext = editor };
+            await dialog.ShowDialog(this);
+            if (!editor.Confirmed) return;
+
+            var pages = vm.NowNoteSlides.Select(p => p.Body).ToList();
+            await vm.ApplyNotePagesAsync(NoteSlideEdit.Replace(pages, page.Index, editor.Text));
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to quick-edit note slide");
+        }
+    }
+
+    public async void OnNotePageAddAfterMenu(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (DataContext is not OperatorViewModel vm) return;
+            if (sender is not MenuItem { DataContext: NotePageSlideItem page }) return;
+
+            var editor = new QuickSlideEditViewModel($"{vm.OpenNoteTitle}  ·  New slide", "note", "", isNote: true);
+            var dialog = new QuickSlideEditWindow { DataContext = editor };
+            await dialog.ShowDialog(this);
+            if (!editor.Confirmed) return;
+
+            var pages = vm.NowNoteSlides.Select(p => p.Body).ToList();
+            await vm.ApplyNotePagesAsync(NoteSlideEdit.InsertAfter(pages, page.Index, editor.Text));
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to add note slide");
+        }
+    }
+
     public void OnNotePageDoubleTapped(object? sender, TappedEventArgs e)
     {
         if (DataContext is OperatorViewModel vm && sender is ListBox { SelectedItem: NotePageSlideItem page })
@@ -306,13 +352,31 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
             vm.OpenNote(card);
     }
 
-    // Right-click note menu: delete the note.
     public async void OnDeleteNoteMenu(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is OperatorViewModel vm && sender is MenuItem { DataContext: NoteSlideItem card })
+            await DeleteNoteAsync(vm, card);
+    }
+
+    public async void OnDeleteNoteButton(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is OperatorViewModel vm && sender is Button { DataContext: NoteSlideItem card })
+            await DeleteNoteAsync(vm, card);
+    }
+
+    public async void OnDeleteOpenNote(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is OperatorViewModel vm && vm.OpenNoteCard is { } card)
+            await DeleteNoteAsync(vm, card);
+    }
+
+    private async Task DeleteNoteAsync(OperatorViewModel vm, NoteSlideItem card)
     {
         try
         {
-            if (DataContext is OperatorViewModel vm && sender is MenuItem { DataContext: NoteSlideItem card })
-                await vm.Notes.DeleteNoteAsync(card);
+            if (vm.OpenNoteCard?.Note.Id == card.Note.Id)
+                vm.CloseOpenNote();
+            await vm.Notes.DeleteNoteAsync(card);
         }
         catch (Exception ex)
         {
@@ -362,6 +426,37 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
     {
         if (DataContext is OperatorViewModel vm && sender is MenuItem { DataContext: SongSlideItem slide })
             vm.SendSlideLive(slide);
+    }
+
+    public async void OnAddNowSingingSlide(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => await PromptAddSlideAsync(after: null);
+
+    public async void OnAddSlideAfterMenu(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is MenuItem { DataContext: SongSlideItem slide })
+            await PromptAddSlideAsync(slide.Section);
+    }
+
+    private async Task PromptAddSlideAsync(SongSection? after)
+    {
+        try
+        {
+            if (DataContext is not OperatorViewModel vm || !vm.HasNowSinging) return;
+
+            var heading = string.IsNullOrWhiteSpace(vm.NowSingingTitle)
+                ? "New slide"
+                : $"{vm.NowSingingTitle}  ·  New slide";
+            var editor = new QuickSlideEditViewModel(heading, "verse", "");
+            var dialog = new QuickSlideEditWindow { DataContext = editor };
+            await dialog.ShowDialog(this);
+            if (!editor.Confirmed) return;
+
+            await vm.AddNowSingingSlideAsync(editor.SectionType, editor.Text, after);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to add a Now Singing slide");
+        }
     }
 
     // Right-click slide menu: quick-edit just this slide's section in a small dialog.
@@ -549,6 +644,36 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
     {
         if (DataContext is OperatorViewModel vm && sender is MenuItem { DataContext: Song song })
             vm.StartSongLive(song);
+    }
+
+    public void OnAddToSundayPlaylistMenu(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is OperatorViewModel vm && sender is MenuItem { DataContext: Song song })
+            vm.AddToSundayPlaylist(song);
+    }
+
+    public void OnSundayPlaylistDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (DataContext is OperatorViewModel vm && sender is ListBox { SelectedItem: Song song })
+            vm.OpenSundayPlaylistSong(song);
+    }
+
+    public void OnOpenSundaySongMenu(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is OperatorViewModel vm && sender is MenuItem { DataContext: Song song })
+            vm.OpenSundayPlaylistSong(song);
+    }
+
+    public void OnRemoveSundaySongMenu(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is OperatorViewModel vm && sender is MenuItem { DataContext: Song song })
+            vm.RemoveFromSundayPlaylist(song);
+    }
+
+    public void OnRemoveSundaySongButton(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is OperatorViewModel vm && sender is Button { DataContext: Song song })
+            vm.RemoveFromSundayPlaylist(song);
     }
 
     public async void OnEditSongMenu(object? sender, Avalonia.Interactivity.RoutedEventArgs e)

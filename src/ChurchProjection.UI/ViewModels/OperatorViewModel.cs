@@ -687,6 +687,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
             this.RaiseAndSetIfChanged(ref _isSongsMode, value);
             this.RaisePropertyChanged(nameof(IsBibleMode));
             this.RaisePropertyChanged(nameof(IsNotesMode));
+            this.RaisePropertyChanged(nameof(ShowBibleMediaSidebar));
             this.RaisePropertyChanged(nameof(LibraryTabLabel));
             this.RaisePropertyChanged(nameof(SearchWatermark));
             this.RaisePropertyChanged(nameof(ShowScriptureList));
@@ -699,6 +700,9 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     // that swaps the whole center area for the media bin + transport.
     public bool IsBibleMode => !IsSongsMode && !IsMediaMode && !IsNotesMode;
 
+    /// <summary>Bookmarks / media folders — hidden in Songs and Notes, which have their own sidebars.</summary>
+    public bool ShowBibleMediaSidebar => IsBibleMode || IsMediaMode;
+
     /// <summary>True when the center area shows the Media Playback view instead of the content tabs.</summary>
     public bool IsMediaMode
     {
@@ -708,6 +712,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
             this.RaiseAndSetIfChanged(ref _isMediaMode, value);
             this.RaisePropertyChanged(nameof(IsBibleMode));
             this.RaisePropertyChanged(nameof(IsNotesMode));
+            this.RaisePropertyChanged(nameof(ShowBibleMediaSidebar));
             this.RaisePropertyChanged(nameof(IsContentMode));
             this.RaisePropertyChanged(nameof(ShowScriptureList));
             this.RaisePropertyChanged(nameof(ShowNowSinging));
@@ -747,6 +752,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
             this.RaiseAndSetIfChanged(ref _isNotesMode, value);
             this.RaisePropertyChanged(nameof(IsBibleMode));
             this.RaisePropertyChanged(nameof(IsNotesTab));
+            this.RaisePropertyChanged(nameof(ShowBibleMediaSidebar));
             NotifyWorkspaceTabVisibility();
         }
     }
@@ -758,6 +764,8 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         this.RaisePropertyChanged(nameof(ShowParaphrasesTabContent));
         this.RaisePropertyChanged(nameof(ShowSongsTabContent));
         this.RaisePropertyChanged(nameof(ShowNotesTabContent));
+        this.RaisePropertyChanged(nameof(ShowScriptureList));
+        this.RaisePropertyChanged(nameof(ShowNowSinging));
     }
 
     public void EnterBibleMode()
@@ -796,8 +804,8 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         IsNotesMode = true;
         _ = Notes.LoadAsync();
         StatusText = Notes.HasNotes
-            ? "Click a note to open its slides."
-            : "Add a note, then click it to open its slides.";
+            ? "Double-click a note to open its slides."
+            : "Add a note, then double-click it to open its slides.";
     }
 
     public bool HasNewTopical
@@ -839,6 +847,21 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     }
 
     public bool HasLibrarySongs => LibrarySongs.Count > 0;
+
+    /// <summary>This Sunday's setlist — songs added from the library before service.</summary>
+    public ObservableCollection<Song> SundayPlaylist { get; } = [];
+
+    private Song? _selectedSundaySong;
+    public Song? SelectedSundaySong
+    {
+        get => _selectedSundaySong;
+        set => this.RaiseAndSetIfChanged(ref _selectedSundaySong, value);
+    }
+
+    public bool HasSundayPlaylist => SundayPlaylist.Count > 0;
+
+    /// <summary>The song loaded into Now Singing (not just the library selection).</summary>
+    private Song? _nowSingingSong;
 
     /// <summary>Slides of the song currently opened in the "Now Singing" tab (Songs mode, tab 0).</summary>
     public ObservableCollection<SongSlideItem> NowSingingSlides { get; } = [];
@@ -985,6 +1008,8 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     public ReactiveCommand<Unit, Unit> BeginNamePlaylistCommand { get; }
     public ReactiveCommand<SavedPlaylist, Unit> LoadPlaylistCommand { get; }
     public ReactiveCommand<SavedPlaylist, Unit> DeletePlaylistCommand { get; }
+    public ReactiveCommand<Song, Unit> AddToSundayPlaylistCommand { get; }
+    public ReactiveCommand<Song, Unit> RemoveFromSundayPlaylistCommand { get; }
 
     public ReactiveCommand<Unit, Unit> BlankCommand { get; }
     public ReactiveCommand<Unit, Unit> ToggleFollowCommand { get; }
@@ -1109,6 +1134,8 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         });
         ToggleScreenOutputCommand = ReactiveCommand.Create(() => { ScreenOutputEnabled = !ScreenOutputEnabled; });
 
+        AddToSundayPlaylistCommand = ReactiveCommand.Create<Song>(AddToSundayPlaylist);
+        RemoveFromSundayPlaylistCommand = ReactiveCommand.Create<Song>(RemoveFromSundayPlaylist);
         SavePlaylistCommand = ReactiveCommand.Create(SaveCurrentAsPlaylist);
         BeginNamePlaylistCommand = ReactiveCommand.Create(() => { PlaylistsExpanded = true; IsNamingPlaylist = !IsNamingPlaylist; });
         LoadPlaylistCommand = ReactiveCommand.Create<SavedPlaylist>(LoadPlaylist);
@@ -1326,6 +1353,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
             foreach (var song in songs.OrderBy(s => s.Title))
                 LibrarySongs.Add(song);
             this.RaisePropertyChanged(nameof(HasLibrarySongs));
+            HydrateSundayPlaylist();
         }
         catch (Exception ex)
         {
@@ -1409,10 +1437,17 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         NowNoteSlides.Clear();
 
         var theme = _themes.ResolveFor(SlideType.Note);
-        IReadOnlyList<string> bodies = card.Note.SplitMode == NoteSplitMode.AutoFit
-            ? DeckBuilder.BuildNote(card.Title, card.Body, string.Empty, theme, NoteSplitMode.AutoFit)
-                .Slides.Select(s => s.Body).ToList()
-            : NoteSlidePlanner.PlanBodies(card.Body, card.Note.SplitMode);
+        IReadOnlyList<string> bodies = card.Note.LinesPerSlide > 0
+            ? NoteSlidePlanner.PlanBodies(card.Body, card.Note.SplitMode, card.Note.LinesPerSlide)
+            : card.Note.SplitMode == NoteSplitMode.AutoFit
+                ? DeckBuilder.BuildNote(card.Title, card.Body, string.Empty, theme, NoteSplitMode.AutoFit)
+                    .Slides.Select(s => s.Body).ToList()
+                : NoteSlidePlanner.PlanBodies(card.Body, card.Note.SplitMode);
+
+        _suppressNoteLinesApply = true;
+        _nowNoteLines = card.Note.LinesPerSlide;
+        this.RaisePropertyChanged(nameof(NowNoteLinesPerSlideChoice));
+        _suppressNoteLinesApply = false;
 
         if (bodies.Count == 0)
             bodies = [card.Body];
@@ -1421,9 +1456,19 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
             NowNoteSlides.Add(new NotePageSlideItem(card, i, bodies[i], bodies.Count));
 
         SelectedNotePage = NowNoteSlides.Count > 0 ? NowNoteSlides[0] : null;
-        Notes.SelectedCard = card;
+        Notes.MarkOpen(card);
         this.RaisePropertyChanged(nameof(HasOpenNote));
         StatusText = $"{card.Title} — {NowNoteSlides.Count} slide{(NowNoteSlides.Count == 1 ? "" : "s")}";
+    }
+
+    /// <summary>Writes planned note pages back to the note body, persists, and rebuilds the cards.</summary>
+    public async Task ApplyNotePagesAsync(IReadOnlyList<string> pages)
+    {
+        if (OpenNoteCard is null) return;
+        var card = OpenNoteCard;
+        card.Note.Body = NoteSlideEdit.Join(pages, card.Note.LinesPerSlide);
+        await Notes.PersistAsync(card.Note);
+        OpenNote(card);
     }
 
     /// <summary>Returns to the note library grid from the slide breakdown.</summary>
@@ -1433,7 +1478,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         OpenNoteTitle = null;
         NowNoteSlides.Clear();
         SelectedNotePage = null;
-        Notes.SelectedCard = null;
+        Notes.MarkOpen(null);
         this.RaisePropertyChanged(nameof(HasOpenNote));
         StatusText = Notes.HasNotes ? "Click a note to open its slides." : "Add a note, then click it to open its slides.";
     }
@@ -1444,7 +1489,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         if (page is null || OpenNoteCard is null) return;
         var card = OpenNoteCard;
         var theme = _themes.ResolveFor(SlideType.Note);
-        var deck = DeckBuilder.BuildNote(card.Title, card.Body, string.Empty, theme, card.Note.SplitMode);
+        var deck = DeckBuilder.BuildNote(card.Title, card.Body, string.Empty, theme, card.Note.SplitMode, card.Note.LinesPerSlide);
         _projection.ProjectDeck(new SlideDeck(deck.Slides, page.Index));
         SetLiveSlideType(SlideType.Note);
 
@@ -2122,6 +2167,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     {
         if (song is null) return;
         SelectedLibrarySong = song;
+        _nowSingingSong = song;
         RebuildNowSingingSlides(song);
         NowSingingTitle = string.IsNullOrWhiteSpace(song.Artist) ? song.Title : $"{song.Title}  ·  {song.Artist}";
         _nowSingingLines = song.LinesPerSlide;
@@ -2131,6 +2177,18 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         StatusText = $"Opened \"{song.Title}\" — double-click a slide to project it";
     }
 
+    /// <summary>Inserts a section after <paramref name="after"/> (or after the selected card, or at
+    /// the end), persists, and reloads Now Singing so the new slide is immediately editable.</summary>
+    public async Task AddNowSingingSlideAsync(string sectionType, string text, SongSection? after = null)
+    {
+        if (_nowSingingSong is null) return;
+        after ??= SelectedNowSingingSlide?.Section;
+        var created = SongSlideInsert.After(_nowSingingSong.Sections, after, sectionType, text);
+        await SaveSongEditAsync(_nowSingingSong);
+        SelectedNowSingingSlide = NowSingingSlides.FirstOrDefault(s => ReferenceEquals(s.Section, created))
+            ?? NowSingingSlides.FirstOrDefault(s => s.Section.Text == created.Text && s.Section.SectionType == created.SectionType);
+    }
+
     /// <summary>Rebuilds the Now Singing cards so each card equals one projected slide: sections are
     /// paginated exactly as they'll appear on screen (honouring the song's lines-per-slide breaking).</summary>
     private void RebuildNowSingingSlides(Song song)
@@ -2138,13 +2196,17 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         ResetFollowState();
         NowSingingSlides.Clear();
         var theme = _themes.ResolveFor(SlideType.Lyric);
-        foreach (var section in song.Sections.OrderBy(s => s.SectionOrder))
+        var verse = 0;
+        foreach (var section in song.Sections)
         {
+            var baseLabel = section.SectionType == "verse"
+                ? $"Verse {++verse}"
+                : section.Label;
             var pages = DeckBuilder.Build(SlideType.Lyric, "", section.Text, "", theme, song.LinesPerSlide).Slides;
             var multi = pages.Count > 1;
             for (var i = 0; i < pages.Count; i++)
             {
-                var label = multi ? $"{section.Label} ({i + 1})" : section.Label;
+                var label = multi ? $"{baseLabel} ({i + 1})" : baseLabel;
                 var slide = new SongSlideItem(song, section, pages[i].Body, label);
                 slide.ApplyScale(_slideScale);
                 NowSingingSlides.Add(slide);
@@ -2284,9 +2346,40 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         }
     }
 
+    private int _nowNoteLines;
+    private bool _suppressNoteLinesApply;
+
+    public IReadOnlyList<string> NoteLinesPerSlideChoices => SongLinesPerSlide.Choices;
+
+    /// <summary>Lines-per-slide for the opened note. Changing it re-pages the cards and persists.</summary>
+    public string NowNoteLinesPerSlideChoice
+    {
+        get => SongLinesPerSlide.ToChoice(_nowNoteLines);
+        set
+        {
+            var lines = SongLinesPerSlide.FromChoice(value);
+            if (_nowNoteLines == lines) return;
+            _nowNoteLines = lines;
+            this.RaisePropertyChanged(nameof(NowNoteLinesPerSlideChoice));
+            if (!_suppressNoteLinesApply)
+                ApplyNowNoteLines(lines);
+        }
+    }
+
+    private void ApplyNowNoteLines(int lines)
+    {
+        if (OpenNoteCard is null) return;
+        OpenNoteCard.Note.LinesPerSlide = lines;
+        OpenNote(OpenNoteCard);
+        _ = Notes.PersistAsync(OpenNoteCard.Note);
+        StatusText = lines == 0
+            ? $"{OpenNoteCard.Title} — auto-fit / split mode"
+            : $"{OpenNoteCard.Title} — {lines} line{(lines == 1 ? "" : "s")} per slide";
+    }
+
     private void ApplyNowSingingLines(int lines)
     {
-        var song = SelectedLibrarySong;
+        var song = _nowSingingSong ?? SelectedLibrarySong;
         if (song is null) return;
         song.LinesPerSlide = lines;
         RebuildNowSingingSlides(song);
@@ -2398,6 +2491,80 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     {
         if (playlist is null) return;
         Playlists.Remove(playlist);
+        this.RaisePropertyChanged(nameof(HasPlaylists));
+        _ = PersistPlaylistsAsync();
+    }
+
+    public void AddToSundayPlaylist(Song? song)
+    {
+        if (song is null) return;
+        var titles = SundayPlaylist.Select(s => s.Title).ToList();
+        if (!SundaySetlist.TryAdd(titles, song.Title))
+        {
+            StatusText = $"\"{song.Title}\" is already on the Sunday playlist";
+            return;
+        }
+
+        SundayPlaylist.Add(song);
+        this.RaisePropertyChanged(nameof(HasSundayPlaylist));
+        PersistSundayPlaylist();
+        StatusText = $"Added \"{song.Title}\" to Sunday playlist";
+    }
+
+    public void RemoveFromSundayPlaylist(Song? song)
+    {
+        if (song is null) return;
+        var match = SundayPlaylist.FirstOrDefault(s =>
+            s.Title.Equals(song.Title, StringComparison.OrdinalIgnoreCase));
+        if (match is null) return;
+        SundayPlaylist.Remove(match);
+        this.RaisePropertyChanged(nameof(HasSundayPlaylist));
+        PersistSundayPlaylist();
+    }
+
+    public void OpenSundayPlaylistSong(Song? song)
+    {
+        if (song is null) return;
+        OpenSong(song);
+        SelectedSundaySong = song;
+    }
+
+    private void HydrateSundayPlaylist()
+    {
+        var saved = Playlists.FirstOrDefault(p =>
+            p.Name.Equals(SundaySetlist.StorageName, StringComparison.OrdinalIgnoreCase));
+        SundayPlaylist.Clear();
+        if (saved is null)
+        {
+            this.RaisePropertyChanged(nameof(HasSundayPlaylist));
+            return;
+        }
+
+        foreach (var item in saved.Items)
+        {
+            var song = LibrarySongs.FirstOrDefault(s =>
+                s.Title.Equals(item.Title, StringComparison.OrdinalIgnoreCase));
+            if (song is not null) SundayPlaylist.Add(song);
+        }
+        this.RaisePropertyChanged(nameof(HasSundayPlaylist));
+    }
+
+    private void PersistSundayPlaylist()
+    {
+        var existing = Playlists.FirstOrDefault(p =>
+            p.Name.Equals(SundaySetlist.StorageName, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null) Playlists.Remove(existing);
+
+        Playlists.Insert(0, new SavedPlaylist
+        {
+            Name = SundaySetlist.StorageName,
+            Items = SundayPlaylist.Select(s => new QueueSlide
+            {
+                Title = s.Title,
+                Footer = s.Artist ?? "",
+                SlideType = SlideType.Lyric,
+            }).ToList(),
+        });
         this.RaisePropertyChanged(nameof(HasPlaylists));
         _ = PersistPlaylistsAsync();
     }
