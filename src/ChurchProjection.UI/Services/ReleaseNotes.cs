@@ -11,6 +11,13 @@ public static class ReleaseNotes
 {
     private static readonly Dictionary<string, string[]> Notes = new()
     {
+        ["0.7.26"] =
+        [
+            "Live backgrounds: pick a photo or looping video from the tiles when a theme is set to Placeholder — it fills the projector.",
+            "Shift+click two verses to highlight a range, then right-click Bookmark Verse to save the whole span (like Genesis 1:3-8).",
+            "Compare Translations sits next to Program — pick up to two translations and double-click a card to send it live.",
+            "Theme Studio: delete a theme with the trash button next to the name. The + menu is create-only now.",
+        ],
         ["0.7.25"] =
         [
             "Cloud sign-in, library sync and live transcription are back — the app now connects to our new hosting.",
