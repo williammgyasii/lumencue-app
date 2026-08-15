@@ -160,6 +160,12 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
         if (DataContext is OperatorViewModel vm) vm.AdvanceForward();
     }
 
+    public void OnLiveCompareDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (DataContext is OperatorViewModel vm && sender is Control { DataContext: LiveCompareCard card })
+            vm.SendCompareLive(card);
+    }
+
     public void OnContentListDoubleTapped(object? sender, TappedEventArgs e)
     {
         if (DataContext is not OperatorViewModel vm) return;

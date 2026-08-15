@@ -53,6 +53,8 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     // The scripture reference currently shown live, so a translation switch can re-render it.
     private ScriptureReference? _liveScriptureRef;
     private int _translationRefreshGeneration;
+    private int _compareGeneration;
+    private readonly List<string> _compareChosen = [];
 
     // The chapter we've already auto-loaded into the Scripture tab, so projecting another verse from
     // the same chapter doesn't reload it. Lets the operator instantly hop to adjacent verses (the
@@ -136,6 +138,14 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
 
     /// <summary>The swappable background media palette (still images + motion loops).</summary>
     public BackgroundsViewModel Backgrounds { get; }
+
+    /// <summary>Up to two other translations of the live verse, shown in Now Live.</summary>
+    public ObservableCollection<LiveCompareCard> CompareCards { get; } = [];
+
+    /// <summary>Checkbox rows in the Now Live cog. At most two can be selected.</summary>
+    public ObservableCollection<LiveCompareOption> CompareOptions { get; } = [];
+
+    public bool HasCompareCards => CompareCards.Count > 0;
 
     /// <summary>The Media Playback bin: full-screen / lower-third graphics and videos sent live to all screens or one.</summary>
     public Operator.MediaPlaybackViewModel MediaPlayback { get; }
@@ -1046,6 +1056,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         _themeAssetStore = themeAssetStore;
         Backgrounds = new BackgroundsViewModel(liveBackground);
         MediaPlayback = new Operator.MediaPlaybackViewModel(announcements, Outputs);
+        CompareCards.CollectionChanged += (_, _) => this.RaisePropertyChanged(nameof(HasCompareCards));
 
         _updates = updates;
         var asmVersion = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version;
@@ -1362,6 +1373,8 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         _followPendingTarget = -1;
         _followPendingCount = 0;
         StatusText = $"Live: {item.Title}";
+        if (item.IsScripture) _ = RefreshLiveCompareAsync();
+        else CompareCards.Clear();
     }
 
     /// <summary>Projects a single Now Singing slide and marks it as the one currently on output.</summary>
@@ -1541,6 +1554,8 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
             _liveScriptureRef = null;
         this.RaisePropertyChanged(nameof(LiveThemeName));
         SyncBackgroundSelectionGate();
+        if (type != SlideType.Scripture)
+            CompareCards.Clear();
     }
 
     /// <summary>
@@ -1551,6 +1566,131 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     {
         var kind = _themes.ResolveFor(_liveSlideType).BackgroundKind;
         Backgrounds.ThemeAcceptsLiveSelection = ThemeBackgroundResolve.AcceptsLiveSelection(kind);
+    }
+
+    /// <summary>Double-click a Now Live compare card to project that translation.</summary>
+    public void SendCompareLive(LiveCompareCard? card)
+    {
+        if (card is null || !card.IsReady) return;
+        ContentSearch.SelectedTranslation = card.Translation;
+    }
+
+    private bool TrySetCompare(string code, bool selected)
+    {
+        var already = _compareChosen.Any(c => string.Equals(c, code, StringComparison.OrdinalIgnoreCase));
+        if (selected == already) return true;
+        if (!LiveCompareSelection.Toggle(_compareChosen, code))
+        {
+            StatusText = "Compare Translations shows 2 — uncheck one first.";
+            return false;
+        }
+
+        _ = _settings.SetAsync("live_compare_translations", LiveCompareSelection.Format(_compareChosen));
+        SyncCompareOptionEnabled();
+        _ = RefreshLiveCompareAsync();
+        return true;
+    }
+
+    private void RebuildCompareOptions()
+    {
+        CompareOptions.Clear();
+        foreach (var code in ContentSearch.AvailableTranslations)
+        {
+            var on = _compareChosen.Any(c => string.Equals(c, code, StringComparison.OrdinalIgnoreCase));
+            CompareOptions.Add(new LiveCompareOption(code, on, TrySetCompare));
+        }
+        SyncCompareOptionEnabled();
+    }
+
+    private void SyncCompareOptionEnabled()
+    {
+        var atCap = _compareChosen.Count >= LiveCompareSelection.MaxSlots;
+        foreach (var option in CompareOptions)
+            option.IsEnabled = option.IsSelected || !atCap;
+    }
+
+    private async Task RefreshLiveCompareAsync()
+    {
+        var generation = Interlocked.Increment(ref _compareGeneration);
+        var reference = _liveScriptureRef;
+        if (reference is null || _liveSlideType != SlideType.Scripture)
+        {
+            CompareCards.Clear();
+            return;
+        }
+
+        var codes = LiveCompareSelection.ForDisplay(
+            _compareChosen, ContentSearch.SelectedTranslation, ContentSearch.AvailableTranslations);
+        if (!codes.SequenceEqual(_compareChosen, StringComparer.OrdinalIgnoreCase))
+        {
+            _compareChosen.Clear();
+            _compareChosen.AddRange(codes);
+            _ = _settings.SetAsync("live_compare_translations", LiveCompareSelection.Format(_compareChosen));
+            RebuildCompareOptions();
+        }
+
+        CompareCards.Clear();
+        foreach (var code in codes)
+            CompareCards.Add(new LiveCompareCard { Translation = code, Title = code, Body = "Loading…" });
+
+        foreach (var code in codes)
+        {
+            var loaded = await LoadCompareCardAsync(reference, code).ConfigureAwait(true);
+            if (generation != _compareGeneration) return;
+            var card = CompareCards.FirstOrDefault(c => c.Translation == code);
+            if (card is null || loaded is null) continue;
+            card.Title = loaded.Title;
+            card.Body = loaded.Body;
+            card.Footer = loaded.Footer;
+            card.IsReady = loaded.IsReady;
+        }
+    }
+
+    private async Task<LiveCompareCard> LoadCompareCardAsync(ScriptureReference reference, string translation)
+    {
+        try
+        {
+            var verses = await _contentLibrary
+                .GetOrFetchVersesAsync(reference, translation, localOnly: false)
+                .ConfigureAwait(true);
+            if (verses.Count == 0)
+            {
+                var fallback = await _contentLibrary
+                    .GetOrFetchScriptureAsync(reference, translation)
+                    .ConfigureAwait(true);
+                if (fallback is not null)
+                    verses = [fallback];
+            }
+
+            if (verses.Count == 0)
+                return new LiveCompareCard { Translation = translation, Title = translation, Body = "Not available yet.", IsReady = false };
+
+            var ordered = verses.OrderBy(v => v.VerseStart).ToList();
+            var first = ordered[0];
+            var last = ordered[^1];
+            var label = ordered.Count == 1
+                ? first.Reference
+                : $"{first.Book} {first.Chapter}:{first.VerseStart}-{last.VerseStart}";
+            var body = ordered.Count == 1
+                ? first.Text
+                : string.Join(" ", ordered.Select(v => v.Text));
+            if (string.IsNullOrWhiteSpace(body))
+                return new LiveCompareCard { Translation = translation, Title = translation, Body = "No text in this translation.", IsReady = false };
+
+            return new LiveCompareCard
+            {
+                Translation = translation,
+                Title = $"{label} ({translation})",
+                Body = body,
+                Footer = translation,
+                IsReady = true,
+            };
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to load compare translation {Translation} for {Ref}", translation, reference);
+            return new LiveCompareCard { Translation = translation, Title = translation, Body = "Couldn't load.", IsReady = false };
+        }
     }
 
     /// <summary>Clears the IsLive ring from the previously-live content item and suggestion.</summary>
@@ -1691,6 +1831,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
             var theme = _themes.ResolveFor(SlideType.Scripture);
             _projection.ProjectDeck(DeckBuilder.Build(SlideType.Scripture, label, body, footer, theme));
             StatusText = $"Switched live to {translation}: {label}";
+            _ = RefreshLiveCompareAsync();
         }
         catch (Exception ex)
         {
@@ -2332,6 +2473,12 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         var savedTranslation = await _settings.GetAsync("bible_translation");
         if (!string.IsNullOrEmpty(savedTranslation) && ContentSearch.AvailableTranslations.Contains(savedTranslation))
             ContentSearch.SelectedTranslation = savedTranslation;
+
+        var savedCompare = await _settings.GetAsync("live_compare_translations");
+        _compareChosen.Clear();
+        foreach (var code in LiveCompareSelection.Parse(string.IsNullOrWhiteSpace(savedCompare) ? "MSG,AMP" : savedCompare))
+            _compareChosen.Add(code);
+        RebuildCompareOptions();
 
         _aiMatcher.CurrentTranslation = ContentSearch.SelectedTranslation;
         // Match the AI suggestion scope to the current workspace mode (Bible = scripture only).
