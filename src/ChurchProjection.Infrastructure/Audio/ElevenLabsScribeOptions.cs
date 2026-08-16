@@ -1,9 +1,10 @@
 namespace ChurchProjection.Infrastructure.Audio;
 
 /// <summary>
-/// Streaming listen options for a local ElevenLabs Scribe v2 Realtime trial.
+/// Streaming listen options for ElevenLabs Scribe v2 Realtime.
 /// Keyterms are capped at Scribe realtime limits (50 terms, 20 chars, no spaces)
-/// so the WebSocket query stays valid.
+/// so the WebSocket query stays valid. Production auth is a single-use
+/// <c>token</c> query param; a long-lived <c>xi-api-key</c> is local-dev only.
 /// </summary>
 public sealed record ElevenLabsScribeOptions(
     string ModelId,
@@ -52,7 +53,7 @@ public sealed record ElevenLabsScribeOptions(
             Keyterms: keyterms);
     }
 
-    public Uri BuildWebSocketUri()
+    public Uri BuildWebSocketUri(string? singleUseToken = null)
     {
         var query = new List<string>
         {
@@ -62,6 +63,8 @@ public sealed record ElevenLabsScribeOptions(
             $"audio_format={Uri.EscapeDataString(AudioFormat)}",
             "filter_background_audio=true",
         };
+        if (!string.IsNullOrWhiteSpace(singleUseToken))
+            query.Add($"token={Uri.EscapeDataString(singleUseToken)}");
         foreach (var term in Keyterms)
             query.Add($"keyterms={Uri.EscapeDataString(term)}");
 

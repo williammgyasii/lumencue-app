@@ -10,7 +10,8 @@ namespace ChurchProjection.Infrastructure.Audio;
 
 public sealed class ElevenLabsTranscriptionService : ITranscriptionService
 {
-    private readonly string _apiKey;
+    private readonly ISttTokenProvider? _tokenProvider;
+    private readonly string? _apiKey;
     private readonly double _minConfidence;
     private volatile float _inputGain;
     private readonly bool _vadGate;
@@ -69,9 +70,22 @@ public sealed class ElevenLabsTranscriptionService : ITranscriptionService
         set => _inputGain = (float)Math.Clamp(value, 1.0, 20.0);
     }
 
+    public ElevenLabsTranscriptionService(ISttTokenProvider tokenProvider, double minConfidence = 0.5,
+        double inputGain = 1.0, bool vadGate = true, double vadThreshold = 0.01)
+        : this(tokenProvider, apiKey: null, minConfidence, inputGain, vadGate, vadThreshold)
+    {
+    }
+
     public ElevenLabsTranscriptionService(string apiKey, double minConfidence = 0.5,
         double inputGain = 1.0, bool vadGate = true, double vadThreshold = 0.01)
+        : this(tokenProvider: null, apiKey, minConfidence, inputGain, vadGate, vadThreshold)
     {
+    }
+
+    private ElevenLabsTranscriptionService(ISttTokenProvider? tokenProvider, string? apiKey,
+        double minConfidence, double inputGain, bool vadGate, double vadThreshold)
+    {
+        _tokenProvider = tokenProvider;
         _apiKey = apiKey;
         _minConfidence = Math.Clamp(minConfidence, 0.0, 1.0);
         InputGain = (float)inputGain;
@@ -107,15 +121,33 @@ public sealed class ElevenLabsTranscriptionService : ITranscriptionService
         var options = ElevenLabsScribeOptions.Create(_captureSampleRate);
         _streamSampleRate = options.SampleRate;
 
+        string? singleUseToken = null;
+        if (_tokenProvider is not null)
+        {
+            singleUseToken = await _tokenProvider.GetTokenAsync().ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(singleUseToken))
+            {
+                Log.Error("No ElevenLabs Scribe token available");
+                _statusMessage.OnNext("Speech token unavailable");
+                return;
+            }
+        }
+        else if (string.IsNullOrWhiteSpace(_apiKey))
+        {
+            _statusMessage.OnNext("Speech token unavailable");
+            return;
+        }
+
         var ws = new ClientWebSocket();
-        ws.Options.SetRequestHeader("xi-api-key", _apiKey);
+        if (singleUseToken is null)
+            ws.Options.SetRequestHeader("xi-api-key", _apiKey);
         var cts = new CancellationTokenSource();
         _runCts = cts;
         _ws = ws;
 
         try
         {
-            await ws.ConnectAsync(options.BuildWebSocketUri(), cts.Token);
+            await ws.ConnectAsync(options.BuildWebSocketUri(singleUseToken), cts.Token);
         }
         catch (Exception ex)
         {

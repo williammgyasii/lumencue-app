@@ -11,6 +11,11 @@ public static class ReleaseNotes
 {
     private static readonly Dictionary<string, string[]> Notes = new()
     {
+        ["0.7.28"] =
+        [
+            "Live listening is clearer and still in the cloud — sign in as usual; your church's minutes stay on your church.",
+            "Each campus is metered on its own, so one branch cannot use another's listening allowance.",
+        ],
         ["0.7.27"] =
         [
             "Songs: a Sunday Playlist sits under the library, the song editor is a three-pane workspace (artist required, lines per slide, paste-to-break), and Now Singing cards fill the row.",

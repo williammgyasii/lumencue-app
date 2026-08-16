@@ -53,6 +53,39 @@ public class ElevenLabsScribeTests
         Assert.Contains("audio_format=pcm_16000", uri.Query);
         Assert.Contains("commit_strategy=vad", uri.Query);
         Assert.Contains("keyterms=Genesis", uri.Query);
+        Assert.DoesNotContain("token=", uri.Query);
+    }
+
+    [Fact]
+    public void BuildUri_WithSingleUseToken_PutsTokenInQuery()
+    {
+        var options = ElevenLabsScribeOptions.Create(sampleRate: 16000);
+        var uri = options.BuildWebSocketUri("scribe-token-abc");
+
+        Assert.Contains("token=scribe-token-abc", uri.Query);
+        Assert.Contains("model_id=scribe_v2_realtime", uri.Query);
+    }
+
+    [Fact]
+    public void ParseMintResponse_ReadsToken()
+    {
+        var token = ElevenLabsScribeToken.Parse("""{"token":"sut_live_abc"}""");
+
+        Assert.Equal("sut_live_abc", token);
+    }
+
+    [Fact]
+    public void ParseMintResponse_MissingToken_IsNull()
+    {
+        Assert.Null(ElevenLabsScribeToken.Parse("""{"error":"unauthorized"}"""));
+        Assert.Null(ElevenLabsScribeToken.Parse(""));
+    }
+
+    [Fact]
+    public void MintPath_IsRealtimeScribeSingleUse()
+    {
+        Assert.Equal("v1/single-use-token/realtime_scribe", ElevenLabsScribeToken.MintPath);
+        Assert.Equal(900, ElevenLabsScribeToken.LifetimeSeconds);
     }
 
     [Fact]

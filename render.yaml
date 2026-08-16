@@ -28,6 +28,8 @@ services:
         fromDatabase:
           name: lumencue-db
           property: connectionString
+      - key: ELEVENLABS_API_KEY
+        sync: false
       - key: DEEPGRAM_API_KEY
         sync: false
       - key: APIBIBLE_API_KEY

@@ -36,14 +36,14 @@ connectionString = ConnectionStrings.Normalize(connectionString);
 var dataSource = new NpgsqlDataSourceBuilder(connectionString).Build();
 builder.Services.AddSingleton(dataSource);
 
-// Deepgram project key stays server-side; clients only ever receive short-lived JWTs.
-var deepgramKey = builder.Configuration["Deepgram:ApiKey"];
-if (string.IsNullOrWhiteSpace(deepgramKey))
-    deepgramKey = Environment.GetEnvironmentVariable("DEEPGRAM_API_KEY");
+// ElevenLabs workspace key stays server-side; clients only ever receive single-use Scribe tokens.
+var elevenLabsKey = builder.Configuration["ElevenLabs:ApiKey"];
+if (string.IsNullOrWhiteSpace(elevenLabsKey))
+    elevenLabsKey = Environment.GetEnvironmentVariable("ELEVENLABS_API_KEY");
 
-builder.Services.AddHttpClient("deepgram", c =>
+builder.Services.AddHttpClient("elevenlabs", c =>
 {
-    c.BaseAddress = new Uri("https://api.deepgram.com/");
+    c.BaseAddress = new Uri("https://api.elevenlabs.io/");
     c.Timeout = TimeSpan.FromSeconds(15);
 });
 
@@ -289,13 +289,14 @@ app.MapPut("/orgs/{orgId}/songs", async (string orgId, List<Song> songs, HttpReq
 });
 
 // --- Speech-to-text token -------------------------------------------------
-// Mints a short-lived Deepgram JWT for an authenticated seat. The client streams
-// audio directly to Deepgram with this token, so the project key never ships.
+// Mints a single-use ElevenLabs Scribe token for an authenticated seat. The client
+// streams audio directly to ElevenLabs with this token, so the workspace key never ships.
 
-// Grants are short-lived (GrantTtlSeconds) and the client refreshes a little before expiry, so each
-// grant maps to roughly one window of live streaming. We meter by booking that window's worth of
-// usage per grant: a conservative cost backstop (it slightly over-counts) that needs no client trust.
+// We still book a fixed window per mint (not the token's 15-minute lifetime) so a short
+// listen does not consume a church's whole allowance. Real streamed-seconds is the next slice.
 const int GrantTtlSeconds = 300;
+const int ScribeTokenLifetimeSeconds = 900;
+const string ScribeMintPath = "v1/single-use-token/realtime_scribe";
 
 app.MapPost("/stt/token", async (HttpRequest http, NpgsqlDataSource ds, IHttpClientFactory httpFactory) =>
 {
@@ -316,23 +317,22 @@ app.MapPost("/stt/token", async (HttpRequest http, NpgsqlDataSource ds, IHttpCli
     if (usedSeconds >= access.stt_minutes_per_month * 60)
         return Results.Json("Monthly AI-listening limit reached. It resets next month.", statusCode: 429);
 
-    if (string.IsNullOrWhiteSpace(deepgramKey))
+    if (string.IsNullOrWhiteSpace(elevenLabsKey))
         return Results.Json("Speech service is not configured.", statusCode: 503);
 
-    var client = httpFactory.CreateClient("deepgram");
-    using var req = new HttpRequestMessage(HttpMethod.Post, "v1/auth/grant");
-    req.Headers.TryAddWithoutValidation("Authorization", $"Token {deepgramKey}");
-    req.Content = JsonContent.Create(new { ttl_seconds = GrantTtlSeconds });
+    var client = httpFactory.CreateClient("elevenlabs");
+    using var req = new HttpRequestMessage(HttpMethod.Post, ScribeMintPath);
+    req.Headers.TryAddWithoutValidation("xi-api-key", elevenLabsKey);
 
     using var resp = await client.SendAsync(req);
     if (!resp.IsSuccessStatusCode)
     {
-        app.Logger.LogWarning("Deepgram grant failed: {Status}", resp.StatusCode);
+        app.Logger.LogWarning("ElevenLabs Scribe mint failed: {Status}", resp.StatusCode);
         return Results.Json("Could not mint a speech token.", statusCode: 502);
     }
 
-    var grant = await resp.Content.ReadFromJsonAsync<DeepgramGrant>();
-    if (grant is null || string.IsNullOrWhiteSpace(grant.access_token))
+    var mint = await resp.Content.ReadFromJsonAsync<ElevenLabsScribeMint>();
+    if (mint is null || string.IsNullOrWhiteSpace(mint.token))
         return Results.Json("Empty token from speech service.", statusCode: 502);
 
     // Book this grant's window against today's usage and keep the seat fresh.
@@ -346,7 +346,7 @@ app.MapPost("/stt/token", async (HttpRequest http, NpgsqlDataSource ds, IHttpCli
         new { Org = seat.organization_id, Branch = seat.branch_id, Secs = GrantTtlSeconds });
     await conn.ExecuteAsync("update seats set last_seen_at = now() where id = @Id", new { Id = seat.id });
 
-    return Results.Ok(new SttTokenResponse(grant.access_token, grant.expires_in ?? 30));
+    return Results.Ok(new SttTokenResponse(mint.token, ScribeTokenLifetimeSeconds));
 });
 
 // --- Bible proxy (premium API.Bible translations) -------------------------

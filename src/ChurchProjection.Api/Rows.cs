@@ -36,8 +36,8 @@ public sealed class AccessRow
     public string features { get; set; } = "{}";
 }
 
-// Deepgram POST /v1/auth/grant response (snake_case to match the API payload).
-public sealed record DeepgramGrant(string access_token, double? expires_in);
+// ElevenLabs POST /v1/single-use-token/realtime_scribe response.
+public sealed record ElevenLabsScribeMint(string? token);
 
 // What the client receives from POST /stt/token.
 public sealed record SttTokenResponse(string AccessToken, double ExpiresIn);
