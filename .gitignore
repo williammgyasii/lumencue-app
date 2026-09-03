@@ -16,6 +16,13 @@ vosk-model*/
 *.db-shm
 appsettings.*.json
 !appsettings.json
+.neon
+.env
+.env.*
+!.env.example
+.dev.vars
+node_modules/
+.wrangler/
 publish/
 # Generated/hosted Bible translation files (uploaded to S3, not source). Also avoids committing
 # copyrighted translation text into the repo.

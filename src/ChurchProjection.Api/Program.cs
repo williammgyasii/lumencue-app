@@ -16,25 +16,39 @@ var builder = WebApplication.CreateBuilder(args);
 if (builder.Environment.IsDevelopment())
     builder.Configuration.AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true);
 
-// In hosted environments (Fly) bind the port the platform assigns. Locally PORT is unset,
-// so the address from appsettings.json ("http://localhost:5080") is used unchanged.
+// Hosted environments set PORT. Bind IPv4 explicitly: `http://+:port` becomes `[::]:port`
+// on Linux, and Cloudflare's Firecracker proxy connects over IPv4.
 var port = Environment.GetEnvironmentVariable("PORT");
 if (!string.IsNullOrWhiteSpace(port))
-    builder.WebHost.UseUrls($"http://+:{port}");
+    builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
 // Note: appsettings.json ships an empty "Neon" placeholder, so check for blank (not just null)
-// before falling back to the env var that Fly injects from the secret.
+// before falling back to the env var the host injects from the secret.
 var connectionString = builder.Configuration.GetConnectionString("Neon");
 if (string.IsNullOrWhiteSpace(connectionString))
     connectionString = Environment.GetEnvironmentVariable("NEON_CONNECTION_STRING");
-if (string.IsNullOrWhiteSpace(connectionString))
-    throw new InvalidOperationException(
-        "No Neon connection string. Set ConnectionStrings:Neon in appsettings.local.json or the NEON_CONNECTION_STRING environment variable.");
 
-// Render/Fly inject a postgres:// URI; RDS/local use key=value.
-connectionString = ConnectionStrings.Normalize(connectionString);
-var dataSource = new NpgsqlDataSourceBuilder(connectionString).Build();
+// Never throw before Kestrel binds. Cloudflare's proxy checks 10.0.0.1:8080; if we
+// exit during DI setup the VM looks "crashed" even though the image is fine.
+var neonConfigured = !string.IsNullOrWhiteSpace(connectionString);
+string? neonConfigError = neonConfigured ? null : "NEON_CONNECTION_STRING is not set.";
+NpgsqlDataSource dataSource;
+try
+{
+    if (!neonConfigured)
+        throw new InvalidOperationException(neonConfigError);
+    connectionString = ConnectionStrings.Normalize(connectionString!);
+    dataSource = new NpgsqlDataSourceBuilder(connectionString).Build();
+}
+catch (Exception ex)
+{
+    neonConfigError = Health.SafeError(ex);
+    Console.Error.WriteLine($"Neon config failed before listen ({neonConfigError}); /live still binds.");
+    dataSource = new NpgsqlDataSourceBuilder(
+        "Host=127.0.0.1;Username=none;Password=none;Database=none").Build();
+}
 builder.Services.AddSingleton(dataSource);
+var healthHints = new HealthHints(neonConfigured && neonConfigError is null, neonConfigError);
 
 // ElevenLabs workspace key stays server-side; clients only ever receive single-use Scribe tokens.
 var elevenLabsKey = builder.Configuration["ElevenLabs:ApiKey"];
@@ -68,8 +82,9 @@ var app = builder.Build();
 // listens on plain HTTP inside the VM, so no in-app UseHttpsRedirection (it would loop).
 app.UseCors();
 
-// Ensure schema + seed tenants on startup so the API is usable immediately.
-await Db.InitializeAsync(dataSource, app.Logger);
+// Liveness for container orchestrators. Must not depend on Postgres — Cloudflare
+// checks that port 8080 is listening before the database may be reachable.
+app.MapGet("/live", () => Results.Ok(new { ok = true }));
 
 // Anti-abuse tuning. A seat idle longer than the active window auto-frees so a dead machine never
 // blocks a branch; the move limit caps distinct machines a branch can activate in a rolling window.
@@ -78,12 +93,7 @@ const int MoveWindowDays = 30;
 const int MoveSlack = 3; // distinct machines allowed beyond the seat count per move window
 
 app.MapGet("/", () => Results.Ok(new { service = "LumenCue Cloud API", status = "ok" }));
-app.MapGet("/health", async (NpgsqlDataSource ds) =>
-{
-    await using var conn = await ds.OpenConnectionAsync();
-    var now = await conn.ExecuteScalarAsync<DateTime>("select now()");
-    return Results.Ok(new { ok = true, dbTime = now });
-});
+app.MapGet("/health", (NpgsqlDataSource ds) => Health.CheckAsync(ds, healthHints));
 
 // --- Auth -----------------------------------------------------------------
 
@@ -381,7 +391,17 @@ app.MapGet("/bible/{**path}", async (string path, HttpRequest http, NpgsqlDataSo
     return Results.Content(body, "application/json", System.Text.Encoding.UTF8, (int)resp.StatusCode);
 });
 
-app.Run();
+// Bind the port first so the container health check can pass, then apply schema.
+await app.StartAsync();
+try
+{
+    await Db.InitializeAsync(dataSource, app.Logger);
+}
+catch (Exception ex)
+{
+    app.Logger.LogError(ex, "Database initialization failed; /live stays up so the container is not killed.");
+}
+await app.WaitForShutdownAsync();
 
 // --- Helpers --------------------------------------------------------------
 

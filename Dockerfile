@@ -21,12 +21,15 @@ RUN dotnet publish src/ChurchProjection.Api/ChurchProjection.Api.csproj \
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app ./
+COPY workers/api/container-entrypoint.sh /container-entrypoint.sh
+RUN chmod +x /container-entrypoint.sh
 
-# Render/Fly containers exhaust inotify limits if config reload watchers are enabled.
+# Hosted containers exhaust inotify limits if config reload watchers are enabled.
 ENV DOTNET_HOSTBUILDER__RELOADCONFIGONCHANGE=false
 ENV DOTNET_USE_POLLING_FILE_WATCHER=true
 ENV PORT=8080
 ENV ASPNETCORE_ENVIRONMENT=Production
+ENV ASPNETCORE_URLS=http://0.0.0.0:8080
 EXPOSE 8080
 
-ENTRYPOINT ["dotnet", "ChurchProjection.Api.dll"]
+ENTRYPOINT ["/container-entrypoint.sh"]
