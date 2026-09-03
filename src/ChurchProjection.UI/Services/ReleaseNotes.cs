@@ -11,6 +11,10 @@ public static class ReleaseNotes
 {
     private static readonly Dictionary<string, string[]> Notes = new()
     {
+        ["0.7.29"] =
+        [
+            "Cloud sign-in and listening now use our new hosting — same church login, more reliable connection.",
+        ],
         ["0.7.28"] =
         [
             "Live listening is clearer and still in the cloud — sign in as usual; your church's minutes stay on your church.",
