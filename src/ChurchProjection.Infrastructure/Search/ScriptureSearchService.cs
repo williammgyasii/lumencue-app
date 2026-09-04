@@ -17,7 +17,7 @@ public sealed class ScriptureSearchService : IScriptureSearchService
     private const int FileMagic = 0x42494256; // "BIBV"
     private const int FileVersion = 1;
     private const int EmbeddingDim = 384;
-    private const double MinSemanticScore = 0.25;
+    private const double MinSemanticScore = ScriptureSearchRanker.MinSemanticScore;
 
     private readonly ScriptureRepository _repo;
     private readonly SemanticEmbeddingService _embeddings;
@@ -123,23 +123,14 @@ public sealed class ScriptureSearchService : IScriptureSearchService
         // Keep the semantic index warm/fresh in the background (self-guards if already current).
         _ = EnsureIndexedAsync(translation);
 
-        var tokens = Tokenize(query);
+        var tokens = ScriptureSearchRanker.Tokenize(query);
 
-        // Keyword half (always available).
+        // Keyword half (always available). Ranker re-scores with word boundaries.
         var keywordHits = tokens.Count > 0
             ? await _repo.SearchByKeywordsAsync(tokens, translation, maxResults * 3).ConfigureAwait(false)
             : [];
 
-        var merged = new Dictionary<string, (ScripturePassage Passage, double Score, string Kind)>();
-
-        foreach (var p in keywordHits)
-        {
-            var matched = tokens.Count(t => p.Text.Contains(t, StringComparison.OrdinalIgnoreCase));
-            var frac = tokens.Count == 0 ? 0 : (double)matched / tokens.Count;
-            merged[Key(p)] = (p, 0.55 * frac, ScriptureSearchHit.KindKeyword);
-        }
-
-        // Semantic half (when indexed for this translation).
+        var semanticHits = new List<(ScripturePassage Passage, double Cosine)>();
         var index = _index;
         if (index is not null && string.Equals(index.Translation, translation, StringComparison.OrdinalIgnoreCase) && _embeddings.IsReady)
         {
@@ -156,51 +147,11 @@ public sealed class ScriptureSearchService : IScriptureSearchService
                 }
 
                 foreach (var (idx, sim) in scored.OrderByDescending(s => s.Score).Take(maxResults * 3))
-                {
-                    var p = index.Verses[idx];
-                    var key = Key(p);
-                    if (merged.TryGetValue(key, out var existing))
-                        merged[key] = (p, Math.Min(1.0, sim * 0.8 + existing.Score * 0.5), ScriptureSearchHit.KindHybrid);
-                    else
-                        merged[key] = (p, sim, ScriptureSearchHit.KindSemantic);
-                }
+                    semanticHits.Add((index.Verses[idx], sim));
             }
         }
 
-        return merged.Values
-            .OrderByDescending(m => m.Score)
-            .Take(maxResults)
-            .Select(m => new ScriptureSearchHit(m.Passage, m.Score, m.Kind))
-            .ToList();
-    }
-
-    private static string Key(ScripturePassage p) => $"{p.Book}|{p.Chapter}|{p.VerseStart}";
-
-    private static readonly HashSet<string> StopWords = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "the", "a", "an", "and", "or", "of", "to", "in", "into", "on", "at", "for", "with", "that",
-        "this", "is", "are", "was", "were", "be", "it", "its", "as", "by", "from", "you", "your",
-        "we", "us", "our", "he", "she", "they", "them", "his", "her", "their", "i", "me", "my",
-        "about", "where", "when", "what", "who", "how", "can", "will", "would", "should", "shall",
-        "go", "get", "got", "say", "says", "said", "talk", "talks", "scripture", "verse", "verses",
-        "passage", "part", "find", "show", "bring", "give", "please", "thing", "things", "some",
-    };
-
-    private static List<string> Tokenize(string query)
-    {
-        var words = query
-            .Split([' ', ',', '.', ';', ':', '!', '?', '"', '\'', '(', ')', '-', '\n', '\t'],
-                StringSplitOptions.RemoveEmptyEntries);
-
-        var result = new List<string>();
-        foreach (var w in words)
-        {
-            var token = w.Trim().ToLowerInvariant();
-            if (token.Length < 3 || StopWords.Contains(token)) continue;
-            if (!result.Contains(token)) result.Add(token);
-            if (result.Count >= 8) break;
-        }
-        return result;
+        return ScriptureSearchRanker.Rank(query, keywordHits, semanticHits, maxResults);
     }
 
     private string CacheFilePath(string translation) =>
