@@ -17,7 +17,7 @@ public interface ITranscriptionService : IDisposable
     IObservable<bool> IsListening { get; }
     IObservable<string> StatusMessage { get; }
     IObservable<float> AudioLevel { get; }
-    /// <summary>Human-readable name of the active engine (e.g. "Deepgram · Cloud").</summary>
+    /// <summary>Human-readable name of the active engine (e.g. "Transcription agent").</summary>
     IObservable<string> EngineName { get; }
 
     Task<List<string>> GetAvailableDevicesAsync();

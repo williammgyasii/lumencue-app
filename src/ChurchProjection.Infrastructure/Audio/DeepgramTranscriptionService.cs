@@ -72,7 +72,7 @@ public class DeepgramTranscriptionService : ITranscriptionService
     public IObservable<bool> IsListening => _isListening.AsObservable();
     public IObservable<string> StatusMessage => _statusMessage.AsObservable();
     public IObservable<float> AudioLevel => _audioLevel.AsObservable();
-    public IObservable<string> EngineName => Observable.Return("Deepgram · Cloud");
+    public IObservable<string> EngineName => Observable.Return(SttOperatorCopy.EngineLabel);
     public bool IsRunning => _isListening.Value;
 
     public float InputGain
@@ -116,7 +116,7 @@ public class DeepgramTranscriptionService : ITranscriptionService
 
     private async Task ConnectAndStartAsync(string? deviceName)
     {
-        _statusMessage.OnNext("Connecting to Deepgram...");
+        _statusMessage.OnNext(SttOperatorCopy.Connecting);
         _connectionAlive = false;
 
         // Fetch a fresh short-lived JWT for this connection. The token only needs to be valid at

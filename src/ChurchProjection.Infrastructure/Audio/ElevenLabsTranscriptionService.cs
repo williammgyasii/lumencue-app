@@ -61,7 +61,7 @@ public sealed class ElevenLabsTranscriptionService : ITranscriptionService
     public IObservable<bool> IsListening => _isListening.AsObservable();
     public IObservable<string> StatusMessage => _statusMessage.AsObservable();
     public IObservable<float> AudioLevel => _audioLevel.AsObservable();
-    public IObservable<string> EngineName => Observable.Return("ElevenLabs · Scribe v2");
+    public IObservable<string> EngineName => Observable.Return(SttOperatorCopy.EngineLabel);
     public bool IsRunning => _isListening.Value;
 
     public float InputGain
@@ -114,7 +114,7 @@ public sealed class ElevenLabsTranscriptionService : ITranscriptionService
 
     private async Task ConnectAndStartAsync(string? deviceName)
     {
-        _statusMessage.OnNext("Connecting to ElevenLabs...");
+        _statusMessage.OnNext(SttOperatorCopy.Connecting);
         _connectionAlive = false;
 
         PrepareCapture(deviceName);
@@ -238,7 +238,7 @@ public sealed class ElevenLabsTranscriptionService : ITranscriptionService
                 break;
             case ElevenLabsScribeKind.Error:
                 Log.Error("ElevenLabs Scribe error: {Error}", parsed.Error);
-                _statusMessage.OnNext(parsed.Error is { Length: > 0 } ? parsed.Error : "Scribe error");
+                _statusMessage.OnNext(SttOperatorCopy.TranscriptionError);
                 if (string.Equals(parsed.Error, "invalid key", StringComparison.OrdinalIgnoreCase)
                     || json.Contains("auth_error", StringComparison.Ordinal))
                 {
