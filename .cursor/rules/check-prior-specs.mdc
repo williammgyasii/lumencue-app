@@ -1,0 +1,32 @@
+---
+description: When a new bug hits a surface we already shipped, read the prior OpenSpec before changing it.
+alwaysApply: true
+---
+
+# Check prior specs before re-fixing
+
+If the bug is on a surface we already specced or shipped in this repo, **read those specs first**. Do not invent a second layout or search rule that fights the first.
+
+```
+openspec/changes/<change>/specs/**/spec.md
+openspec/specs/**/spec.md   (after archive)
+```
+
+## Do
+
+- Search `openspec/changes/` and `openspec/specs/` for the capability (Now Singing cards, Scripture grid, song live-sync, shortcuts, …).
+- Keep the existing WHEN/THEN true. A new fix is a delta, not a rewrite.
+- If two specs conflict, stop and say so — do not silently pick.
+
+## Do not
+
+```
+// ❌ BAD — Scripture already specs “3 columns fill width, hug height”
+//          then a later fix switches to ragged WrapPanel widths
+//          because the width binding failed.
+
+// ✅ GOOD — same spec; bind width on the card item (Now Singing pattern)
+//          so columns still fill and cards stay short
+```
+
+Tiny typos/comments can skip this. New workstreams still go explore → spec → TDD.
