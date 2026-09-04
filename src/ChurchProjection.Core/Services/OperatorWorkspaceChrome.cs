@@ -31,6 +31,13 @@ public static class OperatorWorkspaceChrome
     public const bool ShowParaphrasesSubtab = false;
     public const bool NowSingingCardsHugContent = true;
     public const bool NowSingingUsesWrapPanel = true;
+    public const bool ScriptureCardsHugContent = true;
+    public const bool ScriptureUsesWrapPanel = true;
+    public const int ScriptureGridColumns = 3;
+    public const double ScriptureListPaddingX = 16;
+    public const double ScriptureCardMarginX = 12;
+    public const double ScriptureCardMinWidth = 120;
+    public const double ScriptureRowSlack = 8;
     public const bool NowSingingToolbarInTabStrip = true;
     public const bool NowSingingShowsInnerTitleBar = false;
     public const bool NowSingingTitleIsBubble = true;
@@ -43,6 +50,15 @@ public static class OperatorWorkspaceChrome
     public const string AiListeningBorder = "#2B5A7A";
     public const string AiListeningHeaderBackground = "#163044";
     public const string AiListeningAccent = "#38BDF8";
+
+    public static double ScriptureCardWidth(double paneWidth)
+    {
+        if (paneWidth <= 0) return ScriptureCardMinWidth;
+        var inner = paneWidth - ScriptureListPaddingX - ScriptureRowSlack;
+        var cell = Math.Floor(inner / ScriptureGridColumns);
+        var width = cell - ScriptureCardMarginX;
+        return width < ScriptureCardMinWidth ? ScriptureCardMinWidth : width;
+    }
 
     public static double ProgramPreviewMaxHeight(double railHeight)
     {

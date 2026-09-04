@@ -927,12 +927,13 @@
                          SelectedItem="{Binding ContentSearch.SelectedItem}"
                          Tapped="OnContentListTapped"
                          DoubleTapped="OnContentListDoubleTapped"
+                         SizeChanged="OnContentListSizeChanged"
                          Background="Transparent" BorderThickness="0" Padding="8,10"
                          IsVisible="{Binding ShowScriptureList}"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          ScrollViewer.VerticalScrollBarVisibility="Auto">
                   <ListBox.ItemsPanel>
-                    <ItemsPanelTemplate><UniformGrid Columns="3" /></ItemsPanelTemplate>
+                    <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
                   </ListBox.ItemsPanel>
                   <ListBox.Styles>
                     <Style Selector="ListBoxItem">
@@ -941,8 +942,10 @@
                       <Setter Property="CornerRadius" Value="8" />
                       <Setter Property="Background" Value="Transparent" />
                       <Setter Property="MinHeight" Value="0" />
-                      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                      <Setter Property="HorizontalAlignment" Value="Stretch" />
+                      <Setter Property="VerticalAlignment" Value="Top" />
+                      <Setter Property="HorizontalAlignment" Value="Left" />
+                      <Setter Property="VerticalContentAlignment" Value="Top" />
+                      <Setter Property="HorizontalContentAlignment" Value="Left" />
                     </Style>
                     <Style Selector="ListBoxItem:selected Border#scrCard">
                       <Setter Property="BorderBrush" Value="#7C6CF6" />
@@ -953,9 +956,11 @@
                   </ListBox.Styles>
                   <ListBox.ItemTemplate>
                     <DataTemplate x:DataType="content:ContentItem">
-                      <Panel HorizontalAlignment="Stretch">
+                      <Panel HorizontalAlignment="Left" VerticalAlignment="Top"
+                             Width="{Binding CardWidth}">
                         <Border x:Name="scrCard" Background="#0B0D12" CornerRadius="8"
                                 ClipToBounds="True" BorderBrush="#2A303C" BorderThickness="2" Cursor="Hand"
+                                VerticalAlignment="Top"
                                 ToolTip.Tip="Click to preview · Shift+click another card for a range · double-click to send live">
                           <Border.ContextMenu>
                             <ContextMenu>

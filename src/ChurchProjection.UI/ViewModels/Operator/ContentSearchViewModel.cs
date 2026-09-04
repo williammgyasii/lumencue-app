@@ -38,6 +38,7 @@ public class ContentSearchViewModel : ViewModelBase
 
     private ContentItem? _rangeAnchor;
     private bool _hasRangeSelection;
+    private double _cardWidth = OperatorWorkspaceChrome.ScriptureCardMinWidth;
 
     public string SearchQuery
     {
@@ -61,6 +62,26 @@ public class ContentSearchViewModel : ViewModelBase
         ["BSB", "KJV", "NIV", "NKJV", "NLT", "ASV", "LSV", "WEB", "FBV", "DRA", "GNV", "RV", "T4T"];
 
     public ObservableCollection<ContentItem> Results { get; } = [];
+
+    /// <summary>One third of the Scripture list width so cards fill the row without UniformGrid stretch.</summary>
+    public double CardWidth
+    {
+        get => _cardWidth;
+        private set => this.RaiseAndSetIfChanged(ref _cardWidth, value);
+    }
+
+    public void SetCardPaneWidth(double paneWidth)
+    {
+        CardWidth = OperatorWorkspaceChrome.ScriptureCardWidth(paneWidth);
+        foreach (var item in Results)
+            item.CardWidth = CardWidth;
+    }
+
+    private void AddCard(ContentItem item)
+    {
+        item.CardWidth = CardWidth;
+        Results.Add(item);
+    }
 
     /// <summary>True when Shift+click has painted two or more cards as a range.</summary>
     public bool HasRangeSelection
@@ -268,7 +289,7 @@ public class ContentSearchViewModel : ViewModelBase
     {
         foreach (var section in song.Sections)
         {
-            Results.Add(new ContentItem
+            AddCard(new ContentItem
             {
                 Type = ContentItemType.Song,
                 // Title is just the song name; the section (Verse 5 / Chorus …) shows via the Tag badge.
@@ -368,7 +389,7 @@ public class ContentSearchViewModel : ViewModelBase
                     Source = s,
                     IsOrigin = originVerse > 0 && s.VerseStart == originVerse
                 };
-                Results.Add(item);
+                AddCard(item);
                 if (item.IsOrigin) origin = item;
             }
 
@@ -428,7 +449,7 @@ public class ContentSearchViewModel : ViewModelBase
                         Source = s,
                         IsOrigin = originChapter == chapter && originVerse > 0 && s.VerseStart == originVerse,
                     };
-                    Results.Add(item);
+                    AddCard(item);
                     if (item.IsOrigin) origin = item;
                 }
             }
@@ -523,7 +544,7 @@ public class ContentSearchViewModel : ViewModelBase
 
             foreach (var s in scriptures)
             {
-                Results.Add(new ContentItem
+                AddCard(new ContentItem
                 {
                     Type = ContentItemType.Scripture,
                     Title = s.Reference,

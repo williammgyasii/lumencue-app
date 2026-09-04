@@ -11,6 +11,7 @@ public class ContentItem : INotifyPropertyChanged
     private bool _isLive;
     private bool _isOrigin;
     private bool _isRangeSelected;
+    private double _cardWidth = 206;
 
     public ContentItemType Type { get; set; }
     public string Title { get; set; } = "";
@@ -62,6 +63,18 @@ public class ContentItem : INotifyPropertyChanged
         {
             if (_isRangeSelected == value) return;
             _isRangeSelected = value;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>Scripture-tab column width (one third of the list). Same idea as Now Singing cards.</summary>
+    public double CardWidth
+    {
+        get => _cardWidth;
+        set
+        {
+            if (Math.Abs(_cardWidth - value) < 0.5) return;
+            _cardWidth = value;
             OnPropertyChanged();
         }
     }

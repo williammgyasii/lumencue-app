@@ -82,6 +82,37 @@ public class OperatorWorkspaceChromeTests
     }
 
     [Fact]
+    public void Scripture_cards_fill_three_columns_and_hug_height()
+    {
+        Assert.True(OperatorWorkspaceChrome.ScriptureCardsHugContent);
+        Assert.True(OperatorWorkspaceChrome.ScriptureUsesWrapPanel);
+        Assert.Equal(3, OperatorWorkspaceChrome.ScriptureGridColumns);
+        var pane = 616;
+        var width = OperatorWorkspaceChrome.ScriptureCardWidth(pane);
+        Assert.True(width >= OperatorWorkspaceChrome.ScriptureCardMinWidth);
+        Assert.True(width * 3
+                    + OperatorWorkspaceChrome.ScriptureCardMarginX * 3
+                    + OperatorWorkspaceChrome.ScriptureListPaddingX
+                    <= pane - 1);
+        Assert.True(width > pane / 4);
+    }
+
+    [Theory]
+    [InlineData(500)]
+    [InlineData(616)]
+    [InlineData(900)]
+    [InlineData(1400)]
+    public void Three_scripture_cards_still_fit_after_the_pane_resizes(double pane)
+    {
+        var width = OperatorWorkspaceChrome.ScriptureCardWidth(pane);
+        var used = width * 3
+                   + OperatorWorkspaceChrome.ScriptureCardMarginX * 3
+                   + OperatorWorkspaceChrome.ScriptureListPaddingX;
+        Assert.True(used <= pane - 1, $"used {used} pane {pane}");
+        Assert.True(OperatorWorkspaceChrome.ScriptureCardWidth(pane + 200) > width);
+    }
+
+    [Fact]
     public void Now_singing_cards_hug_content_instead_of_filling_the_pane()
     {
         Assert.True(OperatorWorkspaceChrome.NowSingingCardsHugContent);

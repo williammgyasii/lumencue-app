@@ -31,6 +31,7 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
         // Now Singing card or scripture verse was clicked (the list had focus and ate the key).
         AddHandler(KeyDownEvent, OnNavPreviewKeyDown, RoutingStrategies.Tunnel);
         DataContextChanged += OnOperatorDataContextChanged;
+        SizeChanged += OnOperatorWindowSizeChanged;
     }
 
     private void OnOperatorDataContextChanged(object? sender, EventArgs e)
@@ -72,6 +73,20 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
     {
         if (sender is not Grid host) return;
         ApplyProgramPreviewHeight(host, e.NewSize.Width, ProgramRailGrid?.Bounds.Height ?? 0);
+    }
+
+    private void OnOperatorWindowSizeChanged(object? sender, SizeChangedEventArgs e)
+        => ApplyScriptureCardWidths();
+
+    private void OnContentListSizeChanged(object? sender, SizeChangedEventArgs e)
+        => ApplyScriptureCardWidths();
+
+    private void ApplyScriptureCardWidths()
+    {
+        if (DataContext is not OperatorViewModel vm || ContentListBox is null) return;
+        var width = ContentListBox.Bounds.Width;
+        if (width <= 0) return;
+        vm.ContentSearch.SetCardPaneWidth(width);
     }
 
     private static void ApplyProgramPreviewHeight(Grid host, double railWidth, double railHeight)
