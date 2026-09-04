@@ -1,7 +1,7 @@
 namespace ChurchProjection.Core.Services;
 
 /// <summary>
-/// Now Live can show two other translations of the verse on screen.
+/// Now Live can show up to two other translations of the verse on screen.
 /// The operator picks them with checkboxes; this keeps the cap and the live-skip rule.
 /// </summary>
 public static class LiveCompareSelection
@@ -20,28 +20,30 @@ public static class LiveCompareSelection
     public static string Format(IEnumerable<string> codes)
         => string.Join(",", codes.Where(c => !string.IsNullOrWhiteSpace(c)).Take(MaxSlots));
 
+    /// <summary>Keep only codes that appear in the picker, still capped at two.</summary>
+    public static IReadOnlyList<string> Sanitize(IEnumerable<string> chosen, IEnumerable<string> available)
+    {
+        var allowed = available.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return chosen
+            .Where(c => !string.IsNullOrWhiteSpace(c) && allowed.Contains(c))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(MaxSlots)
+            .ToList();
+    }
+
     /// <summary>
-    /// The two cards to show. Drops the translation that just went live, then fills the empty
-    /// slot from <paramref name="available"/> so both boxes stay occupied.
+    /// Cards to show: the operator’s picks, minus the translation already live.
+    /// Does not fill empty slots from the full list.
     /// </summary>
     public static IReadOnlyList<string> ForDisplay(
         IEnumerable<string> chosen,
         string? liveTranslation,
         IEnumerable<string>? available = null)
     {
+        _ = available;
         var shown = new List<string>();
         foreach (var code in chosen)
             TryAdd(shown, code, liveTranslation);
-
-        if (available is not null)
-        {
-            foreach (var code in available)
-            {
-                if (shown.Count >= MaxSlots) break;
-                TryAdd(shown, code, liveTranslation);
-            }
-        }
-
         return shown;
     }
 

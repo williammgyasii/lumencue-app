@@ -436,14 +436,14 @@
                     <TextBlock Grid.Column="0" Classes="sectionLabel" Text="COMPARE"
                                Foreground="#A78BFA" TextTrimming="CharacterEllipsis" />
                     <Button Grid.Column="1" Classes="hdrIcon" Padding="4,2"
-                            ToolTip.Tip="Choose exactly 2 translations">
+                            ToolTip.Tip="Choose up to 2 translations">
                       <icons:MaterialIcon Kind="Cog" Width="14" Height="14" Foreground="#8A92A0" />
                       <Button.Flyout>
                         <Flyout Placement="BottomEdgeAlignedRight">
                           <StackPanel Width="168" Spacing="6">
-                            <TextBlock Text="PICK 2 TRANSLATIONS" FontSize="10" FontWeight="Bold"
+                            <TextBlock Text="PICK UP TO 2 TRANSLATIONS" FontSize="10" FontWeight="Bold"
                                        Foreground="#8A92A0" LetterSpacing="0.6" />
-                            <TextBlock Text="Two at a time. Uncheck one to pick another."
+                            <TextBlock Text="These sit beside the live translation. One or two."
                                        FontSize="10" Foreground="#6E7682" TextWrapping="Wrap" />
                             <ItemsControl ItemsSource="{Binding CompareOptions}">
                               <ItemsControl.ItemTemplate>
@@ -489,7 +489,7 @@
                     <StackPanel Spacing="4" VerticalAlignment="Center" IsVisible="{Binding !HasCompareCards}">
                       <TextBlock Text="No compare translations" Foreground="#6E7682" FontSize="12" FontWeight="SemiBold"
                                  TextWrapping="Wrap" />
-                      <TextBlock Text="Put a verse live, then use the cog to pick 2 translations."
+                      <TextBlock Text="Put a verse live, then use the cog to pick up to 2 translations."
                                  Foreground="#4B515C" FontSize="11" TextWrapping="Wrap" LineHeight="16" />
                     </StackPanel>
                   </Panel>

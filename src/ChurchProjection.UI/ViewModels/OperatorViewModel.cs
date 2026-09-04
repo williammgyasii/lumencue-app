@@ -1802,15 +1802,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
             return;
         }
 
-        var codes = LiveCompareSelection.ForDisplay(
-            _compareChosen, ContentSearch.SelectedTranslation, ContentSearch.AvailableTranslations);
-        if (!codes.SequenceEqual(_compareChosen, StringComparer.OrdinalIgnoreCase))
-        {
-            _compareChosen.Clear();
-            _compareChosen.AddRange(codes);
-            _ = _settings.SetAsync("live_compare_translations", LiveCompareSelection.Format(_compareChosen));
-            RebuildCompareOptions();
-        }
+        var codes = LiveCompareSelection.ForDisplay(_compareChosen, ContentSearch.SelectedTranslation);
 
         CompareCards.Clear();
         foreach (var code in codes)
@@ -2854,7 +2846,9 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
 
         var savedCompare = await _settings.GetAsync("live_compare_translations");
         _compareChosen.Clear();
-        foreach (var code in LiveCompareSelection.Parse(string.IsNullOrWhiteSpace(savedCompare) ? "MSG,AMP" : savedCompare))
+        foreach (var code in LiveCompareSelection.Sanitize(
+                     LiveCompareSelection.Parse(savedCompare),
+                     ContentSearch.AvailableTranslations))
             _compareChosen.Add(code);
         RebuildCompareOptions();
 

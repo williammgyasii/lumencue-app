@@ -22,14 +22,30 @@ public class LiveCompareSelectionTests
     }
 
     [Fact]
-    public void ForDisplay_FillsTheEmptySlotWhenACardGoesLive()
+    public void ForDisplay_DoesNotFillFromAvailable()
     {
         var shown = LiveCompareSelection.ForDisplay(
-            ["MSG", "AMP"],
+            ["AMP"],
             liveTranslation: "MSG",
             available: ["KJV", "MSG", "AMP", "NIV"]);
 
-        Assert.Equal(["AMP", "KJV"], shown);
+        Assert.Equal(["AMP"], shown);
+    }
+
+    [Fact]
+    public void ForDisplay_OnePickShowsOneCard()
+    {
+        var shown = LiveCompareSelection.ForDisplay(["NIV"], liveTranslation: "BSB");
+
+        Assert.Equal(["NIV"], shown);
+    }
+
+    [Fact]
+    public void ForDisplay_TwoPicksShowTwoCards()
+    {
+        var shown = LiveCompareSelection.ForDisplay(["NIV", "KJV"], liveTranslation: "BSB");
+
+        Assert.Equal(["NIV", "KJV"], shown);
     }
 
     [Fact]
@@ -38,6 +54,14 @@ public class LiveCompareSelectionTests
         var shown = LiveCompareSelection.ForDisplay(["MSG", "AMP"], liveTranslation: "KJV");
 
         Assert.Equal(["MSG", "AMP"], shown);
+    }
+
+    [Fact]
+    public void Sanitize_DropsCodesNotInThePicker()
+    {
+        var kept = LiveCompareSelection.Sanitize(["MSG", "NIV", "AMP"], ["BSB", "KJV", "NIV"]);
+
+        Assert.Equal(["NIV"], kept);
     }
 
     [Fact]
