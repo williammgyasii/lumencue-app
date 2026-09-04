@@ -1,0 +1,58 @@
+---
+description: Always OpenSpec-explore then spec, then TDD. Other rules defer to this sequence.
+alwaysApply: true
+---
+
+# OpenSpec + TDD (always)
+
+OpenSpec decides **what must be true**. TDD proves each requirement **before** production code. Other project rules yield to this sequence when they conflict.
+
+```
+explore (options) → propose/spec → TDD apply (red → green) → verify
+```
+
+## 1. Explore first — no code
+
+For any feature, fix, or behavior change, invoke `.cursor/skills/openspec-explore` (`/opsx-explore`) **before** proposing or implementing.
+
+- Compare 2–3 options. Recommend one. Wait for the user.
+- Read-only. Do not edit `src/`, `tests/`, or app XAML.
+- Tiny exceptions only: typo, comment, or the user says "skip spec".
+
+## 2. Write the spec — still no production code
+
+After a path is chosen, invoke `.cursor/skills/openspec-propose` (`/opsx-propose`). Stop when artifacts exist. Do not apply in the same turn.
+
+Each spec scenario must be testable (WHEN / THEN). Vague "make it nicer" is not a scenario.
+
+## 3. Apply with TDD
+
+Invoke `.cursor/skills/openspec-apply`. For **each** task:
+
+1. Write a failing test that encodes **one** spec scenario.
+2. Run it. Confirm it fails because the behavior is missing (not a typo).
+3. Pause if the user wants to review the test; otherwise write the minimum code to pass.
+4. Re-run. Green. Then next task.
+
+```
+// ❌ BAD — code first, test after (or no spec)
+Add MaxWidth=560 in SettingsWindow.axaml, then maybe test constants.
+
+// ✅ GOOD — spec scenario → red test → minimal code
+// Spec: WHEN Settings is open, THEN no control is wider than the content pane.
+[Fact]
+public void Form_fits_inside_the_content_pane()
+{
+    var pane = SettingsFormChrome.WindowWidth
+        - SettingsFormChrome.SidebarWidth
+        - SettingsFormChrome.ContentPaddingX;
+    Assert.True(SettingsFormChrome.ContentMaxWidth <= pane);
+}
+```
+
+## Never
+
+- Implement from conversation vibe while a change should be a spec.
+- Mark a task done if you did not see the test fail first.
+- Mix two workstreams into one OpenSpec change.
+- Commit / push / PR unless the user asked.
