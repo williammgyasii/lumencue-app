@@ -154,12 +154,17 @@ public class ContentLibraryService : IContentLibraryService
 
     public async Task<List<ScripturePassage>> SearchScripturesAsync(string query, string translation = "BSB", CancellationToken cancellationToken = default)
     {
-        // Typed search tolerates fat-finger typos ("matew 1 1" → Matthew 1:1); the live spoken path
-        // keeps using the strict TryParse so free speech is never auto-corrected.
-        var reference = ScriptureReferenceParser.TryParse(query, allowFuzzyBook: true);
-        if (reference is not null)
+        // Typed box: compact / I-John / comma / cross-chapter slices. Spoken path never calls this.
+        var slices = ScriptureReferenceParser.TryParseTypedQuery(query);
+        if (slices.Count > 0)
         {
-            return await GetOrFetchVersesAsync(reference, translation, cancellationToken: cancellationToken).ConfigureAwait(false);
+            var combined = new List<ScripturePassage>();
+            foreach (var slice in slices)
+            {
+                combined.AddRange(await GetOrFetchVersesAsync(slice, translation, cancellationToken: cancellationToken)
+                    .ConfigureAwait(false));
+            }
+            return combined;
         }
 
         // The operator is mid-typing a reference (e.g. "mat " before the numbers land). Don't run the

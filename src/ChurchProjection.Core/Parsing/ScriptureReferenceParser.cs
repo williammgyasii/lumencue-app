@@ -118,6 +118,29 @@ public static partial class ScriptureReferenceParser
         RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex InlineReferencePattern();
 
+    // Typed box only: "John 3:16-4:2"
+    [GeneratedRegex(
+        @"^(?<book>(?:[123]\s*)?[A-Za-z]+(?:\s+of\s+[A-Za-z]+)?)\s+(?<c1>\d{1,3})\s*:\s*(?<v1>\d{1,3})\s*[-–—]\s*(?<c2>\d{1,3})\s*:\s*(?<v2>\d{1,3})\s*$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex CrossChapterPattern();
+
+    // Typed box only: "John 3:16,18"
+    [GeneratedRegex(
+        @"^(?<book>(?:[123]\s*)?[A-Za-z]+(?:\s+of\s+[A-Za-z]+)?)\s+(?<chapter>\d{1,3})\s*:\s*(?<verses>\d{1,3}(?:\s*,\s*\d{1,3})+)\s*$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex CommaVersePattern();
+
+    [GeneratedRegex(
+        @"^(?<prefix>III|II|I|3rd|2nd|1st)\s*(?<book>Samuel|Kings|Chronicles|Corinthians|Thessalonians|Timothy|Peter|John)\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex NumberedBookPrefixPattern();
+
+    // "John3" / "1John3" — book glued to digits, no colon yet. Still typing John3:16.
+    [GeneratedRegex(
+        @"^(?:[123]\s*)?[A-Za-z]+(?:\s+of\s+[A-Za-z]+)?\d+\s*$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex CompactPartialPattern();
+
     public static ScriptureReference? TryParse(string input) => TryParse(input, allowFuzzyBook: false);
 
     /// <param name="allowFuzzyBook">
@@ -177,6 +200,88 @@ public static partial class ScriptureReferenceParser
     }
 
     /// <summary>
+    /// Scripture-tab typed box only. Expands compact, roman/ordinal numbered books, comma lists,
+    /// and cross-chapter ranges into one chapter-slice each. Spoken <see cref="TryParse(string)"/>
+    /// must not call this.
+    /// </summary>
+    public static IReadOnlyList<ScriptureReference> TryParseTypedQuery(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return [];
+        if (IsCompactPartial(input)) return [];
+
+        var normalized = NormalizeTypedQuery(input.Trim());
+
+        var cross = CrossChapterPattern().Match(normalized);
+        if (cross.Success)
+        {
+            var book = NormalizeBookFuzzy(cross.Groups["book"].Value.Trim());
+            if (book is not null)
+            {
+                var c1 = int.Parse(cross.Groups["c1"].Value);
+                var v1 = int.Parse(cross.Groups["v1"].Value);
+                var c2 = int.Parse(cross.Groups["c2"].Value);
+                var v2 = int.Parse(cross.Groups["v2"].Value);
+                if (c2 >= c1 && v1 >= 1 && v2 >= 1)
+                    return ExpandCrossChapter(book, c1, v1, c2, v2);
+            }
+        }
+
+        var commas = CommaVersePattern().Match(normalized);
+        if (commas.Success)
+        {
+            var book = NormalizeBookFuzzy(commas.Groups["book"].Value.Trim());
+            if (book is not null)
+            {
+                var chapter = int.Parse(commas.Groups["chapter"].Value);
+                var verses = commas.Groups["verses"].Value
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(int.Parse)
+                    .ToList();
+                return verses
+                    .Select(v => new ScriptureReference(book, chapter, v))
+                    .ToList();
+            }
+        }
+
+        var single = TryParse(normalized, allowFuzzyBook: true);
+        return single is null ? [] : [single];
+    }
+
+    private static string NormalizeTypedQuery(string input)
+    {
+        var prefixed = NumberedBookPrefixPattern().Replace(input, match =>
+        {
+            var n = match.Groups["prefix"].Value.ToLowerInvariant() switch
+            {
+                "i" or "1st" => "1",
+                "ii" or "2nd" => "2",
+                "iii" or "3rd" => "3",
+                _ => match.Groups["prefix"].Value
+            };
+            return $"{n} {match.Groups["book"].Value}";
+        }, 1);
+
+        var lettersThenDigits = Regex.Replace(prefixed, @"(?<=[A-Za-z])(?=\d)", " ");
+        return Regex.Replace(lettersThenDigits, @"(?<=\d)(?=[A-Za-z])", " ");
+    }
+
+    private static List<ScriptureReference> ExpandCrossChapter(
+        string book, int startChapter, int startVerse, int endChapter, int endVerse)
+    {
+        if (startChapter == endChapter)
+            return [new ScriptureReference(book, startChapter, startVerse, endVerse)];
+
+        var slices = new List<ScriptureReference>
+        {
+            new(book, startChapter, startVerse, ScriptureReference.WholeChapterSentinel)
+        };
+        for (var chapter = startChapter + 1; chapter < endChapter; chapter++)
+            slices.Add(new ScriptureReference(book, chapter, 1, ScriptureReference.WholeChapterSentinel));
+        slices.Add(new ScriptureReference(book, endChapter, 1, endVerse));
+        return slices;
+    }
+
+    /// <summary>
     /// True when the input reads as a reference the operator is still typing — a book (or fuzzy book)
     /// token followed only by whitespace/digits, but not yet a complete, parseable reference. The
     /// typed search uses this to skip the semantic phrase fallback (which otherwise surfaces unrelated
@@ -186,6 +291,7 @@ public static partial class ScriptureReferenceParser
     public static bool LooksLikePartialReference(string input)
     {
         if (string.IsNullOrWhiteSpace(input)) return false;
+        if (IsCompactPartial(input)) return true;
 
         // A complete reference is not "partial" — let the normal lookup handle it.
         if (TryParse(input, allowFuzzyBook: true) is not null) return false;
@@ -204,6 +310,19 @@ public static partial class ScriptureReferenceParser
 
         var hasNumberPart = tokens.Length > bookTokens;
         return hasNumberPart || hasTrailingSpace;
+    }
+
+    /// <summary>Raw typed box: book letters glued to digits and no finished verse — still typing <c>John3:16</c>.</summary>
+    private static bool IsCompactPartial(string input)
+    {
+        var trimmed = input.Trim();
+        var colon = trimmed.IndexOf(':');
+        if (colon >= 0)
+        {
+            if (colon < trimmed.Length - 1) return false;
+            trimmed = trimmed[..colon];
+        }
+        return CompactPartialPattern().IsMatch(trimmed);
     }
 
     private static int ResolveLeadingBook(string[] tokens, out string? book)
