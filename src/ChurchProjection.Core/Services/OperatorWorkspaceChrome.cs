@@ -35,6 +35,7 @@ public static class OperatorWorkspaceChrome
     public const bool ScriptureUsesWrapPanel = true;
     public const bool FindScriptureCardsHugContent = true;
     public const bool FindScriptureUsesWrapPanel = true;
+    public const bool SlideRegionsClipToBounds = true;
     public const int ScriptureGridColumns = 3;
     public const double ScriptureListPaddingX = 16;
     public const double ScriptureCardMarginX = 12;

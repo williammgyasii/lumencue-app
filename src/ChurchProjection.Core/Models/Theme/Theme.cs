@@ -330,6 +330,14 @@ public sealed class Theme
         return ResolveRegions().Body;
     }
 
+    /// <summary>Inner box the renderer actually paints — region minus text padding.</summary>
+    public (double Width, double Height) UsablePaginationBox(ThemeRegion region)
+    {
+        var width = Math.Max(100, region.Width - region.TextPaddingX * 2);
+        var height = Math.Max(80, region.Height - region.TextPaddingY * 2);
+        return (width, height);
+    }
+
     /// <summary>
     /// Returns the resolved layout boxes for title/body/footer, deriving defaults from padding and
     /// layout when a region has not been explicitly set. Always returns concrete regions so callers

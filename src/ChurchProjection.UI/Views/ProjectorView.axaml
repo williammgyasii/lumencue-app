@@ -66,6 +66,7 @@
         <!-- TITLE region -->
         <Grid Canvas.Left="{Binding TitleRegion.X}" Canvas.Top="{Binding TitleRegion.Y}"
               Width="{Binding TitleRegion.Width}" Height="{Binding TitleRegion.Height}"
+              ClipToBounds="True"
               IsVisible="{Binding TitleRegion.Visible}">
           <Border Background="{Binding TitleRegion.BackgroundBrush}" CornerRadius="{Binding TitleRegion.BackgroundCorner}" ClipToBounds="True">
             <Image Source="{Binding TitleRegion.DisplayImage}" IsVisible="{Binding TitleRegion.HasDisplayImage}"
@@ -93,6 +94,7 @@
         <!-- BODY region -->
         <Grid Canvas.Left="{Binding BodyRegion.X}" Canvas.Top="{Binding BodyRegion.Y}"
               Width="{Binding BodyRegion.Width}" Height="{Binding BodyRegion.Height}"
+              ClipToBounds="True"
               IsVisible="{Binding BodyRegion.Visible}">
           <Border Background="{Binding BodyRegion.BackgroundBrush}" CornerRadius="{Binding BodyRegion.BackgroundCorner}" ClipToBounds="True">
             <Image Source="{Binding BodyRegion.DisplayImage}" IsVisible="{Binding BodyRegion.HasDisplayImage}"
@@ -121,6 +123,7 @@
         <!-- FOOTER region -->
         <Grid Canvas.Left="{Binding FooterRegion.X}" Canvas.Top="{Binding FooterRegion.Y}"
               Width="{Binding FooterRegion.Width}" Height="{Binding FooterRegion.Height}"
+              ClipToBounds="True"
               IsVisible="{Binding FooterRegion.Visible}">
           <Border Background="{Binding FooterRegion.BackgroundBrush}" CornerRadius="{Binding FooterRegion.BackgroundCorner}" ClipToBounds="True">
             <Image Source="{Binding FooterRegion.DisplayImage}" IsVisible="{Binding FooterRegion.HasDisplayImage}"

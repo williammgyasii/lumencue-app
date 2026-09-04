@@ -83,8 +83,7 @@ public static class DeckBuilder
 
         // The renderer insets the text by the region's padding, so subtract it from the usable box
         // (otherwise pagination thinks more fits than really does and the text overflows/clips).
-        var maxWidth = Math.Max(100, bodyRegion.Width - bodyRegion.TextPaddingX * 2);
-        var maxHeight = Math.Max(80, bodyRegion.Height - bodyRegion.TextPaddingY * 2);
+        var (maxWidth, maxHeight) = theme.UsablePaginationBox(bodyRegion);
         var separator = type == SlideType.Scripture ? " " : "\n\n";
         var maxChars = MaxCharsPerSlide;
 
@@ -167,6 +166,9 @@ public static class DeckBuilder
     {
         // Hard character cap (when enabled) keeps pages small enough for a downstream message box.
         if (maxChars > 0 && text.Length > maxChars)
+            return false;
+
+        if (!ThemeTextBox.Fits(text, maxWidth, maxHeight, fontSize, lineHeight / fontSize))
             return false;
 
         var ft = new FormattedText(
