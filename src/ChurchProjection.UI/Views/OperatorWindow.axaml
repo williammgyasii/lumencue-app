@@ -780,6 +780,7 @@
             <DockPanel>
               <Border DockPanel.Dock="Top" Background="#1B202A" BorderBrush="#2A303C" BorderThickness="0,0,0,1"
                       IsVisible="{Binding !IsNotesMode}">
+                <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Orientation="Horizontal" Spacing="0">
                   <!-- Shared content tab: "Scripture" (reference lookups) in Bible mode, "Library" in Songs mode -->
                   <Panel>
@@ -839,8 +840,8 @@
                     <Border Height="2" VerticalAlignment="Bottom" Background="#38BDF8"
                             IsVisible="{Binding IsTopicalTab}" />
                   </Panel>
-                  <!-- AI Paraphrases tab (Bible mode): verses auto-detected from live preaching -->
-                  <Panel IsVisible="{Binding IsBibleMode}">
+                  <!-- AI Paraphrases tab — hidden until that feature is rebuilt. -->
+                  <Panel IsVisible="{Binding ShowParaphrasesSubtab}">
                     <Button Command="{Binding ShowParaphrasesTabCommand}" Padding="16,10" CornerRadius="0"
                             Background="Transparent" BorderThickness="0" Cursor="Hand">
                       <StackPanel Orientation="Horizontal" Spacing="8">
@@ -877,6 +878,46 @@
                             IsVisible="{Binding IsSongsTab}" />
                   </Panel>
                 </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8"
+                            VerticalAlignment="Center" Margin="8,0,12,0"
+                            IsVisible="{Binding ShowNowSingingToolbar}">
+                  <Border Background="#3B1D3A" BorderBrush="#F472B6" BorderThickness="1"
+                          CornerRadius="10" Padding="10,3"
+                          MaxWidth="{x:Static svc:OperatorWorkspaceChrome.NowSingingTitleBubbleMaxWidth}">
+                    <TextBlock Text="{Binding NowSingingTitle}" Foreground="#F9A8D4"
+                               FontSize="12" FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis" MaxLines="1"
+                               VerticalAlignment="Center"
+                               ToolTip.Tip="{Binding NowSingingTitle}" />
+                  </Border>
+                  <TextBlock Text="{Binding FollowStatus}" Foreground="#F59E0B" FontSize="11"
+                             FontWeight="SemiBold" VerticalAlignment="Center" IsVisible="{Binding IsFollowOn}" />
+                  <ToggleButton IsChecked="{Binding IsFollowOn, Mode=OneWay}" Command="{Binding ToggleFollowCommand}"
+                                FontSize="12" Padding="11,5" CornerRadius="6"
+                                ToolTip.Tip="Lyric Follow (Assist): listens and suggests the slide being sung from THIS song only. You still press send. Requires the mic on.">
+                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                      <Ellipse Width="8" Height="8" VerticalAlignment="Center" Fill="#F59E0B"
+                               IsVisible="{Binding IsFollowOn}" />
+                      <TextBlock Text="Follow" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </ToggleButton>
+                  <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center"
+                              ToolTip.Tip="How many lyric lines per slide (0 = auto-fit to theme)">
+                    <TextBlock Text="Lines" Foreground="#959DAB" FontSize="11" VerticalAlignment="Center" />
+                    <ComboBox ItemsSource="{Binding LinesPerSlideOptions}" SelectedItem="{Binding NowSingingLinesPerSlide}"
+                              FontSize="12" MinWidth="64" VerticalAlignment="Center" />
+                  </StackPanel>
+                  <Button Content="+" FontSize="16" FontWeight="Bold" Padding="11,4" CornerRadius="6"
+                          Background="#262446" Foreground="#C4B5FD" Click="OnAddNowSingingSlide"
+                          ToolTip.Tip="Add a new slide to this song" />
+                  <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <TextBlock Text="A" Foreground="#6E7682" FontSize="11" VerticalAlignment="Center" />
+                    <Slider Width="90" Minimum="0.7" Maximum="2.2" Value="{Binding SlideScale}"
+                            VerticalAlignment="Center" ToolTip.Tip="Resize the slide cards" />
+                    <TextBlock Text="A" Foreground="#ECEEF2" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" />
+                  </StackPanel>
+                </StackPanel>
+                </Grid>
               </Border>
 
               <Panel>
@@ -985,42 +1026,6 @@
 
                 <!-- Now Singing (Songs mode, tab 0): the opened song's slides; double-click one to project it -->
                 <DockPanel IsVisible="{Binding ShowNowSinging}">
-                  <Border DockPanel.Dock="Top" Padding="14,8" BorderBrush="#2A303C" BorderThickness="0,0,0,1"
-                          IsVisible="{Binding HasNowSinging}">
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                      <TextBlock Text="{Binding NowSingingTitle}" Foreground="#ECEEF2" FontSize="14" FontWeight="SemiBold"
-                                 TextTrimming="CharacterEllipsis" MaxLines="1" VerticalAlignment="Center"
-                                 ToolTip.Tip="Double-click a slide to send it live · ← → step live" />
-                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding FollowStatus}" Foreground="#F59E0B" FontSize="11"
-                                   FontWeight="SemiBold" VerticalAlignment="Center" IsVisible="{Binding IsFollowOn}" />
-                        <ToggleButton IsChecked="{Binding IsFollowOn, Mode=OneWay}" Command="{Binding ToggleFollowCommand}"
-                                      FontSize="12" Padding="11,5" CornerRadius="6"
-                                      ToolTip.Tip="Lyric Follow (Assist): listens and suggests the slide being sung from THIS song only. You still press send. Requires the mic on.">
-                          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                            <Ellipse Width="8" Height="8" VerticalAlignment="Center" Fill="#F59E0B"
-                                     IsVisible="{Binding IsFollowOn}" />
-                            <TextBlock Text="Follow" VerticalAlignment="Center" />
-                          </StackPanel>
-                        </ToggleButton>
-                        <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center"
-                                    ToolTip.Tip="How many lyric lines per slide (0 = auto-fit to theme)">
-                          <TextBlock Text="Lines" Foreground="#959DAB" FontSize="11" VerticalAlignment="Center" />
-                          <ComboBox ItemsSource="{Binding LinesPerSlideOptions}" SelectedItem="{Binding NowSingingLinesPerSlide}"
-                                    FontSize="12" MinWidth="64" VerticalAlignment="Center" />
-                        </StackPanel>
-                        <Button Content="+" FontSize="16" FontWeight="Bold" Padding="11,4" CornerRadius="6"
-                                Background="#262446" Foreground="#C4B5FD" Click="OnAddNowSingingSlide"
-                                ToolTip.Tip="Add a new slide to this song" />
-                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                          <TextBlock Text="A" Foreground="#6E7682" FontSize="11" VerticalAlignment="Bottom" />
-                          <Slider Width="90" Minimum="0.7" Maximum="2.2" Value="{Binding SlideScale}"
-                                  VerticalAlignment="Center" ToolTip.Tip="Resize the slide cards" />
-                          <TextBlock Text="A" Foreground="#ECEEF2" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" />
-                        </StackPanel>
-                      </StackPanel>
-                    </Grid>
-                  </Border>
                   <Panel>
                     <StackPanel IsVisible="{Binding !HasNowSinging}"
                                 HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="6">
@@ -1039,7 +1044,7 @@
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              ScrollViewer.VerticalScrollBarVisibility="Auto">
                       <ListBox.ItemsPanel>
-                        <ItemsPanelTemplate><UniformGrid Columns="3" /></ItemsPanelTemplate>
+                        <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
                       </ListBox.ItemsPanel>
                       <ListBox.Styles>
                         <Style Selector="ListBoxItem">
@@ -1048,8 +1053,10 @@
                           <Setter Property="CornerRadius" Value="8" />
                           <Setter Property="Background" Value="Transparent" />
                           <Setter Property="MinHeight" Value="0" />
-                          <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                          <Setter Property="HorizontalAlignment" Value="Stretch" />
+                          <Setter Property="VerticalAlignment" Value="Top" />
+                          <Setter Property="HorizontalAlignment" Value="Left" />
+                          <Setter Property="VerticalContentAlignment" Value="Top" />
+                          <Setter Property="HorizontalContentAlignment" Value="Left" />
                         </Style>
                         <Style Selector="ListBoxItem:selected Border#nowCard">
                           <Setter Property="BorderBrush" Value="#F472B6" />
@@ -1060,9 +1067,11 @@
                       </ListBox.Styles>
                       <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="op:SongSlideItem">
-                          <Panel HorizontalAlignment="Stretch">
+                          <Panel HorizontalAlignment="Left" VerticalAlignment="Top"
+                                 Width="{Binding CardWidth}">
                             <Border x:Name="nowCard" Background="#0B0D12" CornerRadius="8"
                                     ClipToBounds="True" BorderBrush="#2A303C" BorderThickness="2" Cursor="Hand"
+                                    VerticalAlignment="Top"
                                     ToolTip.Tip="Double-click to send this section live · right-click for options">
                               <Border.ContextFlyout>
                                 <MenuFlyout>
@@ -1126,7 +1135,7 @@
                                  IsVisible="{Binding AiNearLimit}" />
                     </StackPanel>
                   </Border>
-                  <Border DockPanel.Dock="Top" Padding="12,8" IsVisible="{Binding !Transcription.IsListening}">
+                  <Border DockPanel.Dock="Top" Padding="12,8" IsVisible="{Binding ShowSuggestionsStartPrompt}">
                     <StackPanel Spacing="6">
                       <!-- AI available: normal start -->
                       <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding CanUseAi}">
@@ -1698,10 +1707,11 @@
         <!-- Gutter: content <-> right rail -->
 
         <!-- RIGHT RAIL: compact Program monitor (top) + Now Live readout (below) -->
-        <Grid x:Name="ProgramRailGrid" Grid.Column="4" ClipToBounds="True">
+        <Grid x:Name="ProgramRailGrid" Grid.Column="4" ClipToBounds="True" MinHeight="0"
+              VerticalAlignment="Stretch" SizeChanged="OnProgramRailSizeChanged">
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
+            <RowDefinition Height="*" MinHeight="0" />
           </Grid.RowDefinitions>
 
           <!-- PROGRAM: the same compact 16:9 monitor in every mode (the Bible-mode shape). -->
@@ -1769,11 +1779,11 @@
           </Border>
           </Border>
 
-          <!-- AI LISTENING: under Program on the right rail. Tinted so it reads as its own panel. -->
-          <Border Grid.Row="1" Margin="0,6,0,0"
+          <!-- AI LISTENING: leftover rail only. Transcript fills; controls stay pinned. -->
+          <Border Grid.Row="1" Margin="0,6,0,0" MinHeight="0" VerticalAlignment="Stretch"
                   Background="#12202E" CornerRadius="10" BorderBrush="#2B5A7A" BorderThickness="1" ClipToBounds="True">
-            <DockPanel LastChildFill="True">
-              <Border DockPanel.Dock="Top" Background="#163044" BorderBrush="#2B5A7A" BorderThickness="0,0,0,1">
+            <Grid RowDefinitions="Auto,*,Auto">
+              <Border Grid.Row="0" Background="#163044" BorderBrush="#2B5A7A" BorderThickness="0,0,0,1">
                 <Button Classes="ghost" Command="{Binding ToggleAiListeningSectionCommand}"
                         HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="12,8"
                         ToolTip.Tip="Show or hide AI listening controls">
@@ -1788,18 +1798,25 @@
                 </Button>
               </Border>
 
-              <ScrollViewer IsVisible="{Binding AiListeningExpanded}" Padding="12,8">
-                <StackPanel Spacing="10" DataContext="{Binding Transcription}">
-                  <Border IsVisible="{Binding ShowTranscript}" Height="90" ClipToBounds="True"
-                          Background="#0E1014" CornerRadius="8" Padding="10,8"
-                          BorderBrush="#2A303C" BorderThickness="1">
-                    <Grid RowDefinitions="Auto,*">
-                      <TextBlock Grid.Row="0" Text="LIVE TRANSCRIPT" Classes="section" Foreground="#6E7682" FontSize="10" Margin="0,0,0,6" />
-                      <TextBlock Grid.Row="1" Text="{Binding RecentTranscript}" Foreground="#C9D2DE" FontSize="13" LineHeight="18"
-                                 TextWrapping="Wrap" VerticalAlignment="Bottom" />
-                    </Grid>
-                  </Border>
+              <Border Grid.Row="1" Margin="12,8,12,0" MinHeight="{x:Static svc:OperatorWorkspaceChrome.TranscriptBoxMinHeight}"
+                      IsVisible="{Binding AiListeningExpanded}"
+                      ClipToBounds="True"
+                      Background="#0E1014" CornerRadius="8" Padding="10,8"
+                      BorderBrush="#2A303C" BorderThickness="1">
+                <Grid RowDefinitions="Auto,*" DataContext="{Binding Transcription}">
+                  <TextBlock Grid.Row="0" Text="LIVE TRANSCRIPT" Classes="section" Foreground="#6E7682" FontSize="10" Margin="0,0,0,6" />
+                  <ScrollViewer x:Name="TranscriptScroll" Grid.Row="1"
+                                VerticalScrollBarVisibility="Auto"
+                                HorizontalScrollBarVisibility="Disabled">
+                    <TextBlock Text="{Binding RecentTranscript}" Foreground="#C9D2DE" FontSize="13" LineHeight="18"
+                               TextWrapping="Wrap" />
+                  </ScrollViewer>
+                </Grid>
+              </Border>
 
+              <StackPanel Grid.Row="2" Spacing="8" Margin="12,8,12,10"
+                          IsVisible="{Binding AiListeningExpanded}">
+              <StackPanel Spacing="8" DataContext="{Binding Transcription}">
                   <StackPanel Orientation="Horizontal" Spacing="8">
                     <Button Classes="ghost" Command="{Binding ToggleTranscriptCommand}" Padding="6,3" FontSize="12"
                             ToolTip.Tip="Show / hide the live transcript">
@@ -1815,9 +1832,6 @@
                                  TextTrimming="CharacterEllipsis" />
                     </Border>
                   </StackPanel>
-
-                  <TextBlock Text="{Binding LastHeard}" Foreground="#7E8794" FontSize="12" FontStyle="Italic"
-                             TextTrimming="CharacterEllipsis" MaxLines="2" TextWrapping="Wrap" />
 
                   <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsListening}">
                     <Ellipse Width="8" Height="8" VerticalAlignment="Center" IsVisible="{Binding HasSignal}">
@@ -1874,9 +1888,9 @@
                       </Style>
                     </Button.Styles>
                   </Button>
-                </StackPanel>
-              </ScrollViewer>
-            </DockPanel>
+              </StackPanel>
+              </StackPanel>
+            </Grid>
           </Border>
 
         </Grid>
@@ -2107,6 +2121,30 @@
                     Background="#A78BFA" Foreground="White" CornerRadius="8"
                     Command="{Binding OpenCheckoutCommand}" />
           </StackPanel>
+        </StackPanel>
+      </Border>
+    </Border>
+
+    <!-- SHORTCUT CHEATSHEET — session overlay; ? toggles, Esc hides without blanking. -->
+    <Border Grid.RowSpan="5" ZIndex="90" Background="#B3000000"
+            IsVisible="{Binding ShowShortcutCheatsheet}">
+      <Border Width="420" HorizontalAlignment="Center" VerticalAlignment="Center"
+              Background="#171B22" CornerRadius="14" BorderBrush="#2A303C" BorderThickness="1"
+              Padding="22" BoxShadow="0 18 60 0 #99000000">
+        <StackPanel Spacing="14">
+          <TextBlock Text="Keyboard shortcuts" Foreground="#ECEEF2" FontSize="18" FontWeight="Bold" />
+          <ItemsControl ItemsSource="{x:Static svc:OperatorShortcutChrome.Rows}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="svc:ShortcutRow">
+                <Grid ColumnDefinitions="120,*" Margin="0,0,0,8">
+                  <TextBlock Grid.Column="0" Text="{Binding KeyLabel}" Foreground="#A78BFA"
+                             FontFamily="Menlo, Consolas, monospace" FontSize="13" />
+                  <TextBlock Grid.Column="1" Text="{Binding ActionLabel}" Foreground="#C2C8D2" FontSize="13" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Text="Press ? or Esc to hide" Foreground="#8B93A1" FontSize="12" />
         </StackPanel>
       </Border>
     </Border>

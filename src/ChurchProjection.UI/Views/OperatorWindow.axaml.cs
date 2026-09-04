@@ -1,10 +1,12 @@
 using System;
+using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.ReactiveUI;
+using Avalonia.Threading;
 using ChurchProjection.Core.Models.Content;
 using ChurchProjection.Core.Models.Slides;
 using ChurchProjection.Core.Services;
@@ -28,44 +30,91 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
         // them for its own selection movement. This is why arrows previously did nothing once a
         // Now Singing card or scripture verse was clicked (the list had focus and ate the key).
         AddHandler(KeyDownEvent, OnNavPreviewKeyDown, RoutingStrategies.Tunnel);
+        DataContextChanged += OnOperatorDataContextChanged;
     }
 
-    // Lock Program to 16:9 (the Bible-mode monitor) so Songs/Media/Notes cannot stretch it.
+    private void OnOperatorDataContextChanged(object? sender, EventArgs e)
+    {
+        if (_transcriptVm is not null)
+            _transcriptVm.PropertyChanged -= OnTranscriptPropertyChanged;
+        _transcriptVm = (DataContext as OperatorViewModel)?.Transcription;
+        if (_transcriptVm is not null)
+            _transcriptVm.PropertyChanged += OnTranscriptPropertyChanged;
+    }
+
+    private TranscriptionViewModel? _transcriptVm;
+
+    private void OnTranscriptPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is not (nameof(TranscriptionViewModel.Transcript)
+            or nameof(TranscriptionViewModel.RecentTranscript)))
+            return;
+        Dispatcher.UIThread.Post(ScrollTranscriptToLatest, DispatcherPriority.Render);
+    }
+
+    private void ScrollTranscriptToLatest()
+    {
+        var sv = TranscriptScroll;
+        if (sv is null) return;
+        var y = Math.Max(0, sv.Extent.Height - sv.Viewport.Height);
+        sv.Offset = new Vector(0, y);
+    }
+
+    // Cap Program so the AI panel always keeps a leftover slot. Then lock the preview to 16:9
+    // inside that cap so Songs/Media/Notes cannot stretch it.
+    private void OnProgramRailSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        if (ProgramPreviewHost is null) return;
+        ApplyProgramPreviewHeight(ProgramPreviewHost, ProgramPreviewHost.Bounds.Width, e.NewSize.Height);
+    }
+
     private void OnProgramPreviewHostSizeChanged(object? sender, SizeChangedEventArgs e)
     {
         if (sender is not Grid host) return;
-        var target = e.NewSize.Width * 9.0 / 16.0;
+        ApplyProgramPreviewHeight(host, e.NewSize.Width, ProgramRailGrid?.Bounds.Height ?? 0);
+    }
+
+    private static void ApplyProgramPreviewHeight(Grid host, double railWidth, double railHeight)
+    {
+        var sixteenNine = railWidth * 9.0 / 16.0;
+        var cap = OperatorWorkspaceChrome.ProgramPreviewMaxHeight(railHeight);
+        var target = sixteenNine;
+        if (cap > 0) target = Math.Min(sixteenNine, cap);
         if (target <= 0 || Math.Abs(host.Height - target) < 0.5) return;
         host.Height = target;
     }
 
-    // Centralised live-paging arrows, run before list controls see the key.
-    // Now Singing: step the live marker through the song's slides. Everywhere else: page the live
-    // deck (and roll over to the next/prev queue item at the ends).
+    // Fixed live-console map + paging arrows, in the TUNNEL phase so a focused ListBox cannot
+    // swallow digits / Space / Esc / Left-Right. Text boxes are left alone so typing still works.
     private void OnNavPreviewKeyDown(object? sender, KeyEventArgs e)
     {
         if (DataContext is not OperatorViewModel vm) return;
-        if (e.Source is TextBox) return; // never hijack typing / caret movement
+        if (e.Source is TextBox) return;
+
+        var mods = e.KeyModifiers;
+        var action = OperatorShortcuts.Resolve(
+            TokenFromKey(e.Key, mods),
+            shift: mods.HasFlag(KeyModifiers.Shift),
+            ctrl: mods.HasFlag(KeyModifiers.Control),
+            alt: mods.HasFlag(KeyModifiers.Alt),
+            meta: mods.HasFlag(KeyModifiers.Meta),
+            isTextInput: false,
+            cheatsheetVisible: vm.ShowShortcutCheatsheet);
+
+        if (action != OperatorShortcutAction.None)
+        {
+            ExecuteShortcut(vm, action);
+            e.Handled = true;
+            return;
+        }
 
         var inNowSinging = vm.ShowNowSinging && vm.HasNowSinging;
         var inOpenNote = vm.IsNotesTab && vm.HasOpenNote;
 
+        // Up/Down only drive live stepping inside Now Singing / open note; elsewhere they stay
+        // free for normal list navigation (search results, queue, etc.).
         switch (e.Key)
         {
-            case Key.Right:
-                if (inNowSinging) vm.StepLive(+1);
-                else if (inOpenNote) vm.StepNoteLive(+1);
-                else vm.AdvanceForward();
-                e.Handled = true;
-                break;
-            case Key.Left:
-                if (inNowSinging) vm.StepLive(-1);
-                else if (inOpenNote) vm.StepNoteLive(-1);
-                else vm.AdvanceBackward();
-                e.Handled = true;
-                break;
-            // Up/Down only drive live stepping inside Now Singing; elsewhere they stay free for
-            // normal list navigation (search results, queue, etc.).
             case Key.Down:
                 if (inNowSinging) { vm.StepLive(+1); e.Handled = true; }
                 else if (inOpenNote) { vm.StepNoteLive(+1); e.Handled = true; }
@@ -79,41 +128,81 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
-        if (DataContext is not OperatorViewModel vm)
+        if (e.Source is TextBox && e.Key == Key.Escape)
         {
-            base.OnKeyDown(e);
-            return;
-        }
-
-        if (e.Source is TextBox)
-        {
-            if (e.Key == Key.Escape)
-            {
-                (e.Source as TextBox)?.ClearValue(TextBox.TextProperty);
-                e.Handled = true;
-            }
-            base.OnKeyDown(e);
-            return;
-        }
-
-        switch (e.Key)
-        {
-            // Left/Right (and Up/Down in Now Singing) are handled in OnNavPreviewKeyDown (tunnel).
-
-            case Key.Space:
-            case Key.Enter:
-                vm.TransitionCommand.Execute().Subscribe();
-                e.Handled = true;
-                break;
-
-            case Key.Escape:
-                vm.BlankCommand.Execute().Subscribe();
-                e.Handled = true;
-                break;
+            (e.Source as TextBox)?.ClearValue(TextBox.TextProperty);
+            e.Handled = true;
         }
 
         if (!e.Handled)
             base.OnKeyDown(e);
+    }
+
+    private static string TokenFromKey(Key key, KeyModifiers modifiers) => key switch
+    {
+        Key.D1 or Key.NumPad1 => "1",
+        Key.D2 or Key.NumPad2 => "2",
+        Key.D3 or Key.NumPad3 => "3",
+        Key.D4 or Key.NumPad4 => "4",
+        Key.O => "O",
+        Key.OemComma => ",",
+        Key.Space => "Space",
+        Key.Enter => "Enter",
+        _ when IsQuestionMark(key, modifiers) => "?",
+        Key.Escape => "Escape",
+        Key.Left => "Left",
+        Key.Right => "Right",
+        _ => key.ToString()
+    };
+
+    private static bool IsQuestionMark(Key key, KeyModifiers modifiers)
+        => key is Key.OemQuestion or Key.Oem2 && modifiers.HasFlag(KeyModifiers.Shift);
+
+    private void ExecuteShortcut(OperatorViewModel vm, OperatorShortcutAction action)
+    {
+        switch (action)
+        {
+            case OperatorShortcutAction.Bible:
+                vm.EnterBibleMode();
+                break;
+            case OperatorShortcutAction.Songs:
+                vm.EnterSongsMode();
+                break;
+            case OperatorShortcutAction.Media:
+                vm.EnterMediaMode();
+                break;
+            case OperatorShortcutAction.Notes:
+                vm.EnterNotesMode();
+                break;
+            case OperatorShortcutAction.ToggleOutput:
+                vm.ToggleScreenOutputCommand.Execute().Subscribe();
+                break;
+            case OperatorShortcutAction.OpenSettings:
+                _ = OpenSettingsAsync(this);
+                break;
+            case OperatorShortcutAction.ToggleCheatsheet:
+                vm.ShowShortcutCheatsheet = !vm.ShowShortcutCheatsheet;
+                break;
+            case OperatorShortcutAction.DismissCheatsheet:
+                vm.ShowShortcutCheatsheet = false;
+                break;
+            case OperatorShortcutAction.SendLive:
+                vm.TransitionCommand.Execute().Subscribe();
+                break;
+            case OperatorShortcutAction.Blank:
+                vm.BlankCommand.Execute().Subscribe();
+                break;
+            case OperatorShortcutAction.PageForward:
+                if (vm.ShowNowSinging && vm.HasNowSinging) vm.StepLive(+1);
+                else if (vm.IsNotesTab && vm.HasOpenNote) vm.StepNoteLive(+1);
+                else vm.AdvanceForward();
+                break;
+            case OperatorShortcutAction.PageBack:
+                if (vm.ShowNowSinging && vm.HasNowSinging) vm.StepLive(-1);
+                else if (vm.IsNotesTab && vm.HasOpenNote) vm.StepNoteLive(-1);
+                else vm.AdvanceBackward();
+                break;
+        }
     }
 
     // Single click selects/previews. Shift+click paints a range. Double-click (or Settings →
@@ -696,7 +785,7 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
             if (DataContext is not OperatorViewModel vm) return;
             var editor = vm.CreateSongEditor();
             if (song is not null) editor.SetSong(song);
-            editor.Saved += () => _ = vm.RefreshLibraryAsync();
+            editor.Saved += song => _ = vm.AfterSongPersistedAsync(song);
             var dialog = new SongEditorWindow { DataContext = editor };
             await dialog.ShowDialog(this);
         }
@@ -732,11 +821,14 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
     }
 
     public async void OnSettingsClicked(object? sender, RoutedEventArgs e)
+        => await OpenSettingsAsync(sender as Control);
+
+    private async Task OpenSettingsAsync(Control? trigger)
     {
         try
         {
             if (DataContext is not OperatorViewModel vm) return;
-            await ShowOwnedDialogAsync(new SettingsWindow { DataContext = vm }, sender as Control);
+            await ShowOwnedDialogAsync(new SettingsWindow { DataContext = vm }, trigger);
         }
         catch (Exception ex)
         {

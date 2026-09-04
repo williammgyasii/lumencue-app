@@ -51,4 +51,47 @@ public class OperatorWorkspaceChromeTests
         Assert.NotEqual("#181C24", OperatorWorkspaceChrome.AiListeningBackground);
         Assert.DoesNotContain("A78BFA", OperatorWorkspaceChrome.AiListeningBackground);
     }
+
+    [Fact]
+    public void Ai_listening_clips_to_the_rail_and_transcript_scrolls()
+    {
+        Assert.True(OperatorWorkspaceChrome.AiListeningClipsToRail);
+        Assert.True(OperatorWorkspaceChrome.TranscriptScrollsInsideBox);
+        Assert.True(OperatorWorkspaceChrome.TranscriptStickToLatest);
+        Assert.True(OperatorWorkspaceChrome.TranscriptFillsRemainingRail);
+        Assert.False(OperatorWorkspaceChrome.ShowLastHeardInExpandedPanel);
+        Assert.True(OperatorWorkspaceChrome.TranscriptBoxMinHeight > 40);
+        Assert.True(OperatorWorkspaceChrome.AiListeningMinBodyHeight > OperatorWorkspaceChrome.TranscriptBoxMinHeight);
+        Assert.True(OperatorWorkspaceChrome.ProgramPreviewMaxHeight(500)
+                    <= 500 - OperatorWorkspaceChrome.AiListeningMinBodyHeight);
+    }
+
+    [Fact]
+    public void Now_singing_toolbar_lives_on_the_tab_row_with_a_title_bubble()
+    {
+        Assert.True(OperatorWorkspaceChrome.NowSingingToolbarInTabStrip);
+        Assert.False(OperatorWorkspaceChrome.NowSingingShowsInnerTitleBar);
+        Assert.True(OperatorWorkspaceChrome.NowSingingTitleIsBubble);
+        Assert.False(OperatorWorkspaceChrome.NowSingingToolbarOnSongsTab);
+        Assert.Equal("#3B1D3A", OperatorWorkspaceChrome.NowSingingTitleBubbleBackground);
+        Assert.Equal("#F9A8D4", OperatorWorkspaceChrome.NowSingingTitleBubbleForeground);
+        Assert.Equal("#F472B6", OperatorWorkspaceChrome.NowSingingTitleBubbleBorder);
+        Assert.NotEqual("#ECEEF2", OperatorWorkspaceChrome.NowSingingTitleBubbleForeground);
+        Assert.NotEqual("#181C24", OperatorWorkspaceChrome.NowSingingTitleBubbleBackground);
+        Assert.True(OperatorWorkspaceChrome.NowSingingTitleBubbleMaxWidth >= 160);
+    }
+
+    [Fact]
+    public void Now_singing_cards_hug_content_instead_of_filling_the_pane()
+    {
+        Assert.True(OperatorWorkspaceChrome.NowSingingCardsHugContent);
+        Assert.True(OperatorWorkspaceChrome.NowSingingUsesWrapPanel);
+    }
+
+    [Fact]
+    public void Suggestions_tab_hides_start_when_off_and_paraphrases_is_gone()
+    {
+        Assert.False(OperatorWorkspaceChrome.SuggestionsTabShowsStartWhenOff);
+        Assert.False(OperatorWorkspaceChrome.ShowParaphrasesSubtab);
+    }
 }

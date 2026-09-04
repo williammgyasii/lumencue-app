@@ -102,6 +102,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     private string _upgradePromptTitle = "";
     private string _upgradePromptMessage = "";
     private bool _isWhatsNewOpen;
+    private bool _showShortcutCheatsheet;
     private bool _screenOutputEnabled = true;
     private double _previewWidth = 1920;
     private double _previewHeight = 1080;
@@ -488,6 +489,13 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         set => this.RaiseAndSetIfChanged(ref _isWhatsNewOpen, value);
     }
 
+    /// <summary>Session-only `?` cheatsheet. Hidden on restart.</summary>
+    public bool ShowShortcutCheatsheet
+    {
+        get => _showShortcutCheatsheet;
+        set => this.RaiseAndSetIfChanged(ref _showShortcutCheatsheet, value);
+    }
+
     public string WhatsNewTitle { get; private set; } = "";
     public ObservableCollection<string> WhatsNewItems { get; } = [];
 
@@ -674,6 +682,8 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         get => _selectedContentTab;
         set
         {
+            if (!OperatorWorkspaceChrome.ShowParaphrasesSubtab && value == ParaphrasesTabIndex)
+                value = 0;
             this.RaiseAndSetIfChanged(ref _selectedContentTab, value);
             if (value == SuggestionsTabIndex) HasNewSuggestions = false;
             if (value == TopicalTabIndex) HasNewTopical = false;
@@ -764,10 +774,19 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     /// <summary>Tab 0 shows the loaded song's slide cards only in Songs mode.</summary>
     public bool ShowNowSinging => IsLibraryTab && IsSongsMode;
 
+    /// <summary>Title bubble + Follow / Lines / size sit on the Songs tab strip, only while
+    /// Now Singing has a loaded song.</summary>
+    public bool ShowNowSingingToolbar => ShowNowSinging && HasNowSinging;
+
     /// <summary>Center tab bodies gated by workspace mode so stacked panels never bleed through.</summary>
     public bool ShowSuggestionsTabContent => IsBibleMode && IsSuggestionsTab;
+    public bool ShowSuggestionsStartPrompt =>
+        OperatorWorkspaceChrome.SuggestionsTabShowsStartWhenOff && !Transcription.IsListening;
     public bool ShowTopicalTabContent => IsBibleMode && IsTopicalTab;
-    public bool ShowParaphrasesTabContent => IsBibleMode && IsParaphrasesTab;
+    public bool ShowParaphrasesTabContent =>
+        OperatorWorkspaceChrome.ShowParaphrasesSubtab && IsBibleMode && IsParaphrasesTab;
+    public bool ShowParaphrasesSubtab =>
+        OperatorWorkspaceChrome.ShowParaphrasesSubtab && IsBibleMode;
     public bool ShowSongsTabContent => IsSongsMode && IsSongsTab;
     public bool ShowNotesTabContent => IsNotesMode;
 
@@ -787,12 +806,15 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     private void NotifyWorkspaceTabVisibility()
     {
         this.RaisePropertyChanged(nameof(ShowSuggestionsTabContent));
+        this.RaisePropertyChanged(nameof(ShowSuggestionsStartPrompt));
         this.RaisePropertyChanged(nameof(ShowTopicalTabContent));
         this.RaisePropertyChanged(nameof(ShowParaphrasesTabContent));
+        this.RaisePropertyChanged(nameof(ShowParaphrasesSubtab));
         this.RaisePropertyChanged(nameof(ShowSongsTabContent));
         this.RaisePropertyChanged(nameof(ShowNotesTabContent));
         this.RaisePropertyChanged(nameof(ShowScriptureList));
         this.RaisePropertyChanged(nameof(ShowNowSinging));
+        this.RaisePropertyChanged(nameof(ShowNowSingingToolbar));
         this.RaisePropertyChanged(nameof(ProgramEmptyHintDetail));
         this.RaisePropertyChanged(nameof(ShowProgramEmptyHint));
     }
@@ -1297,7 +1319,11 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         // Reflect mic state in the follow status (e.g. "start the mic to begin" → "Listening…").
         Transcription.WhenAnyValue(x => x.IsListening)
             .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(_ => { if (FollowMode != LyricFollowMode.Off) OnFollowModeChanged(); });
+            .Subscribe(_ =>
+            {
+                this.RaisePropertyChanged(nameof(ShowSuggestionsStartPrompt));
+                if (FollowMode != LyricFollowMode.Off) OnFollowModeChanged();
+            });
 
         var canTransition = this.WhenAnyValue<OperatorViewModel, bool>(x => x.HasPreview);
         TransitionCommand = ReactiveCommand.Create(DoTransition, canTransition);
@@ -2287,6 +2313,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         _nowSingingLines = song.LinesPerSlide;
         this.RaisePropertyChanged(nameof(NowSingingLinesPerSlide));
         this.RaisePropertyChanged(nameof(HasNowSinging));
+        this.RaisePropertyChanged(nameof(ShowNowSingingToolbar));
         SelectedContentTab = 0;
         StatusText = $"Opened \"{song.Title}\" — double-click a slide to project it";
     }
@@ -2498,6 +2525,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         song.LinesPerSlide = lines;
         RebuildNowSingingSlides(song);
         this.RaisePropertyChanged(nameof(HasNowSinging));
+        this.RaisePropertyChanged(nameof(ShowNowSingingToolbar));
         _ = SaveSongQuietAsync(song);
         StatusText = lines == 0
             ? "Slides: auto-fit to theme"
@@ -2542,20 +2570,86 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     }
 
     /// <summary>Persists edits made to a song (e.g. from the slide quick-edit dialog), refreshes the
-    /// library, and reloads the "Now Singing" slides so the change appears immediately.</summary>
+    /// library, and reloads the "Now Singing" slides so the change appears immediately.
+    /// If that song's slide is live, the projector is rewritten to the saved text.</summary>
     public async Task SaveSongEditAsync(Song song)
     {
         try
         {
+            var place = CaptureLiveSongPlace();
             var saved = await _contentLibrary.SaveSongAsync(song);
-            await RefreshLibraryAsync();
-            OpenSong(saved);
+            await AfterSongPersistedAsync(saved, place);
             StatusText = $"Saved \"{saved.Title}\"";
         }
         catch (Exception ex)
         {
             Log.Warning(ex, "Failed to save song edit for {Title}", song.Title);
         }
+    }
+
+    /// <summary>Library + Now Singing refresh after a song is already on disk (full editor Save).
+    /// Re-projects only when the saved song is the one currently live and the section still exists.</summary>
+    public async Task AfterSongPersistedAsync(Song saved, LiveSongPlace? place = null)
+    {
+        place ??= CaptureLiveSongPlace();
+        await RefreshLibraryAsync();
+        if (_nowSingingSong is { } current && current.Id == saved.Id)
+            OpenSong(saved);
+        ApplySongLiveSync(saved, place);
+    }
+
+    public readonly record struct LiveSongPlace(long SongId, SongLiveSync.SectionKey Key);
+
+    private LiveSongPlace? CaptureLiveSongPlace()
+    {
+        for (var i = 0; i < NowSingingSlides.Count; i++)
+        {
+            var slide = NowSingingSlides[i];
+            if (!slide.IsLive) continue;
+            var page = 0;
+            for (var j = 0; j < i; j++)
+                if (ReferenceEquals(NowSingingSlides[j].Section, slide.Section))
+                    page++;
+            return new LiveSongPlace(slide.Song.Id, new SongLiveSync.SectionKey(
+                slide.Section.SectionType, slide.Section.SectionOrder, page));
+        }
+
+        return null;
+    }
+
+    private List<SongLiveSync.SectionKey> RebuiltSectionKeys()
+    {
+        var keys = new List<SongLiveSync.SectionKey>(NowSingingSlides.Count);
+        SongSection? prev = null;
+        var page = 0;
+        foreach (var slide in NowSingingSlides)
+        {
+            if (!ReferenceEquals(slide.Section, prev))
+            {
+                page = 0;
+                prev = slide.Section;
+            }
+            else
+            {
+                page++;
+            }
+
+            keys.Add(new SongLiveSync.SectionKey(
+                slide.Section.SectionType, slide.Section.SectionOrder, page));
+        }
+
+        return keys;
+    }
+
+    private void ApplySongLiveSync(Song saved, LiveSongPlace? place)
+    {
+        var savedIsLive = place is { } p && SongLiveSync.IsSavedSongLive(saved.Id, p.SongId);
+        var index = -1;
+        var exists = place is { } live
+            && SongLiveSync.TryMatch(live.Key, RebuiltSectionKeys(), out index);
+        if (!SongLiveSync.ShouldRefreshLive(savedIsLive, exists) || index < 0)
+            return;
+        SendSlideLive(NowSingingSlides[index]);
     }
 
     /// <summary>Opens the playlist's song in Now Singing (Songs mode setlist).</summary>

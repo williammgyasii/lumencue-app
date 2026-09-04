@@ -102,7 +102,7 @@ public sealed class SongEditorViewModel : ViewModelBase, IDisposable
     public ReactiveCommand<Unit, Unit> PreviewPrevCommand { get; }
     public ReactiveCommand<Unit, Unit> PreviewNextCommand { get; }
 
-    public event Action? Saved;
+    public event Action<Song>? Saved;
 
     /// <summary>Raised after a successful save so the host window can close itself.</summary>
     public event Action? CloseRequested;
@@ -374,7 +374,7 @@ public sealed class SongEditorViewModel : ViewModelBase, IDisposable
             var saved = await _library.SaveSongAsync(song);
             _songId = saved.Id;
             this.RaisePropertyChanged(nameof(WindowTitle));
-            Saved?.Invoke();
+            Saved?.Invoke(saved);
             CloseRequested?.Invoke();
         }
         catch (Exception ex)
