@@ -41,7 +41,7 @@ public enum VideoFrameEngine
 /// <summary>Start options for <see cref="VideoFramePlayerFactory"/>.</summary>
 public sealed record VideoPlayRequest(
     string Path,
-    bool Loop = true,
+    bool Loop = false,
     bool Audio = false,
     string? AudioDeviceId = null,
     int MaxWidth = 1280,

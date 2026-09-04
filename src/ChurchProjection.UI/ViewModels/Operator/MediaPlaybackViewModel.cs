@@ -11,7 +11,9 @@ using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using ChurchProjection.Core.Models.Projection;
+using ChurchProjection.Core.Services;
 using ChurchProjection.UI.Services;
+using ChurchProjection.UI.Services.Video;
 using ReactiveUI;
 using Serilog;
 
@@ -25,7 +27,11 @@ public sealed record MediaTargetOption(string Key, string Name);
 /// a null <see cref="Id"/> with IsAll=false is "Uncategorized" (media not filed into any folder); any
 /// other Id is a real user collection.
 /// </summary>
-public sealed record MediaFolderOption(string? Id, string Name, bool IsAll = false);
+public sealed record MediaFolderOption(string? Id, string Name, bool IsAll = false)
+{
+    /// <summary>All media / Uncategorized are built-in views and cannot be removed.</summary>
+    public bool CanDelete => !IsAll && !string.IsNullOrWhiteSpace(Id);
+}
 
 /// <summary>
 /// The Media Playback bin (a content tab, like Songs/Scripture). Shows every graphic/video at a glance;
@@ -63,6 +69,7 @@ public sealed class MediaPlaybackViewModel : ReactiveObject, IDisposable
     private bool _hasVideoLive;
     private bool _isPaused;
     private bool _updatingFromPlayer;
+    private double _lastPolledPosition;
     private double _positionFraction;
     private string _positionText = "0:00";
     private string _durationText = "0:00";
@@ -87,6 +94,7 @@ public sealed class MediaPlaybackViewModel : ReactiveObject, IDisposable
     public ReactiveCommand<Unit, Unit> SkipBackCommand { get; }
     public ReactiveCommand<Unit, Unit> SkipForwardCommand { get; }
     public ReactiveCommand<Unit, Unit> CreateFolderCommand { get; }
+    public ReactiveCommand<MediaFolderOption, Unit> DeleteFolderCommand { get; }
 
     /// <summary>Toggles the inline "name your folder" row in the sidebar (mirrors the Playlists +).</summary>
     public ReactiveCommand<Unit, Unit> BeginNameFolderCommand { get; }
@@ -112,6 +120,7 @@ public sealed class MediaPlaybackViewModel : ReactiveObject, IDisposable
         SkipBackCommand = ReactiveCommand.Create(() => _service.SkipSeconds(TargetKey, -10));
         SkipForwardCommand = ReactiveCommand.Create(() => _service.SkipSeconds(TargetKey, 10));
         CreateFolderCommand = ReactiveCommand.CreateFromTask(CreateFolderAsync);
+        DeleteFolderCommand = ReactiveCommand.CreateFromTask<MediaFolderOption>(DeleteFolderAsync);
         BeginNameFolderCommand = ReactiveCommand.Create(() => { IsNamingFolder = !IsNamingFolder; });
 
         _selectedFolder = new MediaFolderOption(null, "All media", IsAll: true);
@@ -199,6 +208,17 @@ public sealed class MediaPlaybackViewModel : ReactiveObject, IDisposable
         SelectedFolder = Folders.FirstOrDefault(f => f.Id == created.Id) ?? _selectedFolder;
     }
 
+    public Task DeleteFolderAsync(MediaFolderOption? folder)
+    {
+        if (folder is null || !folder.CanDelete || folder.Id is null)
+            return Task.CompletedTask;
+
+        if (SelectedFolder.Id == folder.Id)
+            SelectedFolder = Folders.FirstOrDefault(f => f.IsAll) ?? Folders[0];
+
+        return _service.DeleteCollectionAsync(folder.Id);
+    }
+
     /// <summary>Sends a tile to a specific target (used by the per-tile right-click menu).</summary>
     public void SendTileTo(MediaTileViewModel? tile, string targetKey)
     {
@@ -272,7 +292,7 @@ public sealed class MediaPlaybackViewModel : ReactiveObject, IDisposable
         set
         {
             this.RaiseAndSetIfChanged(ref _positionFraction, value);
-            if (!_updatingFromPlayer)
+            if (ScrubSeekPolicy.ShouldSeek(value, _lastPolledPosition, _updatingFromPlayer))
                 _service.Seek(TargetKey, value);
         }
     }
@@ -315,25 +335,21 @@ public sealed class MediaPlaybackViewModel : ReactiveObject, IDisposable
         {
             IsPaused = status.IsPaused;
 
+            _lastPolledPosition = status.Position;
             _updatingFromPlayer = true;
             PositionFraction = status.Position;
             _updatingFromPlayer = false;
 
-            PositionText = FormatMs(status.TimeMs);
-            DurationText = FormatMs(status.LengthMs);
+            var clock = PlaybackClock.From(status.TimeMs, status.LengthMs, status.Position);
+            PositionText = clock.Elapsed;
+            DurationText = clock.Duration;
         }
         else
         {
+            _lastPolledPosition = 0;
             PositionText = "0:00";
             DurationText = "0:00";
         }
-    }
-
-    private static string FormatMs(long ms)
-    {
-        if (ms <= 0) return "0:00";
-        var t = TimeSpan.FromMilliseconds(ms);
-        return t.TotalHours >= 1 ? $"{(int)t.TotalHours}:{t.Minutes:D2}:{t.Seconds:D2}" : $"{t.Minutes}:{t.Seconds:D2}";
     }
 
     private void OnOutputsChanged(object? sender, NotifyCollectionChangedEventArgs e) => RebuildTargets();
@@ -470,29 +486,97 @@ public sealed class MediaTileViewModel : ReactiveObject, IDisposable
 {
     private bool _isLive;
     private string _liveOn = string.Empty;
+    private Bitmap? _thumbnail;
+    private IVideoFramePlayer? _preview;
+    private bool _gotStill;
 
     public MediaTileViewModel(AnnouncementMedia model)
     {
         Model = model;
+        if (model.Kind == AnnouncementMediaKind.Video)
+        {
+            var clip = MediaClipInfo.TryRead(model.Path);
+            ClipBadge = clip?.TileBadge ?? "VIDEO";
+        }
 
         if (model.Kind == AnnouncementMediaKind.Image && File.Exists(model.Path))
         {
             try
             {
                 using var fs = File.OpenRead(model.Path);
-                Thumbnail = Bitmap.DecodeToWidth(fs, 320);
+                Thumbnail = Bitmap.DecodeToWidth(fs, MediaTilePreview.MaxWidth);
             }
             catch (Exception ex)
             {
                 Log.Debug(ex, "Could not build media thumbnail for {Path}", model.Path);
             }
+            return;
         }
+
+        StartVideoStill();
+    }
+
+    private void StartVideoStill()
+    {
+        var request = MediaTilePreview.RequestFor(Model);
+        if (request is null || !File.Exists(Model.Path)) return;
+
+        try
+        {
+            _preview = VideoFramePlayerFactory.Start(request, OnPreviewFrame);
+            if (!_preview.IsRunning)
+            {
+                _preview.Dispose();
+                _preview = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "Could not start media thumbnail for {Path}", Model.Path);
+            _preview?.Dispose();
+            _preview = null;
+        }
+    }
+
+    private void OnPreviewFrame(Bitmap frame)
+    {
+        if (_gotStill) return;
+        _gotStill = true;
+
+        try
+        {
+            using var ms = new MemoryStream();
+            frame.Save(ms);
+            ms.Position = 0;
+            Thumbnail = new Bitmap(ms);
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "Could not freeze media thumbnail for {Path}", Model.Path);
+            Thumbnail = frame;
+            return;
+        }
+
+        var player = _preview;
+        _preview = null;
+        Dispatcher.UIThread.Post(() => player?.Dispose(), DispatcherPriority.Background);
     }
 
     public AnnouncementMedia Model { get; }
     public string Name => Model.Name;
     public bool IsVideo => Model.Kind == AnnouncementMediaKind.Video;
-    public Bitmap? Thumbnail { get; }
+    public string ClipBadge { get; } = "VIDEO";
+
+    public Bitmap? Thumbnail
+    {
+        get => _thumbnail;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _thumbnail, value);
+            this.RaisePropertyChanged(nameof(HasThumbnail));
+        }
+    }
+
     public bool HasThumbnail => Thumbnail is not null;
 
     public bool IsLive
@@ -515,5 +599,10 @@ public sealed class MediaTileViewModel : ReactiveObject, IDisposable
 
     // Retire the thumbnail after the next render commit — disposing a bound bitmap mid-paint segfaults
     // Skia (see SafeBitmapDisposal). Matters because tiles are disposed when media is removed.
-    public void Dispose() => SafeBitmapDisposal.Retire(Thumbnail);
+    public void Dispose()
+    {
+        _preview?.Dispose();
+        _preview = null;
+        SafeBitmapDisposal.Retire(Thumbnail);
+    }
 }

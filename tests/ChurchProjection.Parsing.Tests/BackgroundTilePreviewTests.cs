@@ -7,7 +7,7 @@ namespace ChurchProjection.Parsing.Tests;
 public class BackgroundTilePreviewTests
 {
     [Fact]
-    public void RequestFor_Video_IsMutedLoopAtThumbnailSize()
+    public void RequestFor_Video_IsMutedStillAtThumbnailSize()
     {
         var item = new LiveBackground
         {
@@ -20,7 +20,7 @@ public class BackgroundTilePreviewTests
 
         Assert.NotNull(request);
         Assert.Equal("/tmp/clip.mp4", request.Path);
-        Assert.True(request.Loop);
+        Assert.False(request.Loop);
         Assert.False(request.Audio);
         Assert.Equal(BackgroundTilePreview.MaxWidth, request.MaxWidth);
         Assert.Equal(BackgroundTilePreview.MaxHeight, request.MaxHeight);

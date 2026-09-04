@@ -11,6 +11,7 @@ using Avalonia.Media.Imaging;
 using ChurchProjection.Core.Models.Projection;
 using ChurchProjection.Infrastructure.Data;
 using ChurchProjection.UI.Services.Video;
+using ChurchProjection.UI.ViewModels.Operator;
 using Serilog;
 
 namespace ChurchProjection.UI.Services;
@@ -132,6 +133,30 @@ public sealed class AnnouncementService : IAnnouncementService, IDisposable
         return collection;
     }
 
+    public async Task DeleteCollectionAsync(string collectionId)
+    {
+        if (string.IsNullOrWhiteSpace(collectionId)) return;
+
+        var removed = _collections.RemoveAll(c => c.Id == collectionId);
+        if (removed == 0) return;
+
+        var moved = false;
+        foreach (var item in _items)
+        {
+            if (item.CollectionId != collectionId) continue;
+            item.CollectionId = null;
+            moved = true;
+        }
+
+        _collectionsChanged.OnNext(CollectionsSnapshot());
+        await PersistCollectionsAsync();
+        if (moved)
+        {
+            _itemsChanged.OnNext(Snapshot());
+            await PersistAsync();
+        }
+    }
+
     public async Task MoveToCollectionAsync(string mediaId, string? collectionId)
     {
         var item = _items.FirstOrDefault(i => i.Id == mediaId);
@@ -203,8 +228,15 @@ public sealed class AnnouncementService : IAnnouncementService, IDisposable
 
         if (item.Kind == AnnouncementMediaKind.Video)
         {
+            var request = AnnouncementPlayback.RequestFor(item, _audioDeviceId);
+            if (request is null)
+            {
+                slot.Frame.OnNext(null);
+                return;
+            }
+
             slot.Player = VideoFramePlayerFactory.Start(
-                new VideoPlayRequest(item.Path, Loop: true, Audio: true, AudioDeviceId: _audioDeviceId),
+                request,
                 bmp => slot.Frame.OnNext(bmp));
             if (slot.Player.IsRunning)
             {

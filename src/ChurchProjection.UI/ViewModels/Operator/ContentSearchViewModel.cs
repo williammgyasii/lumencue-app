@@ -208,6 +208,62 @@ public class ContentSearchViewModel : ViewModelBase
             await LoadFullChapterAsync("Genesis", 1);
     }
 
+    /// <summary>Session place for the current mode, or null when nothing has been browsed yet.</summary>
+    public WorkspaceModePlace? CapturePlace()
+    {
+        if (string.IsNullOrEmpty(_browseBook) && string.IsNullOrWhiteSpace(SearchQuery))
+            return null;
+        return new WorkspaceModePlace(SearchQuery, _browseBook, _browseChapter);
+    }
+
+    /// <summary>Restores a saved Bible or Songs place without wiping to Genesis 1 / the full library.</summary>
+    public async Task RestorePlaceAsync(WorkspaceModePlace place, bool songsMode)
+    {
+        _searchCts?.Cancel();
+        _searchCts?.Dispose();
+        _searchCts = null;
+        _songsMode = songsMode;
+        SelectedItem = null;
+
+        if (songsMode)
+        {
+            if (!string.IsNullOrWhiteSpace(place.SearchQuery))
+            {
+                _suppressedQuery = place.SearchQuery;
+                SearchQuery = place.SearchQuery;
+                await RunSearchAsync(place.SearchQuery);
+            }
+            else
+            {
+                await LoadAllContentAsync();
+            }
+
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(place.BrowseBook) && place.BrowseChapter is > 0)
+        {
+            await LoadFullChapterAsync(place.BrowseBook, place.BrowseChapter.Value);
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(place.BrowseBook))
+        {
+            await LoadFullBookAsync(place.BrowseBook);
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(place.SearchQuery))
+        {
+            _suppressedQuery = place.SearchQuery;
+            SearchQuery = place.SearchQuery;
+            await RunSearchAsync(place.SearchQuery);
+            return;
+        }
+
+        await LoadFullChapterAsync("Genesis", 1);
+    }
+
     private void AddSongSections(Song song)
     {
         foreach (var section in song.Sections)

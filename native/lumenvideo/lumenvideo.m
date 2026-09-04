@@ -14,8 +14,13 @@
 @property (nonatomic) BOOL loop;
 @property (nonatomic) BOOL running;
 @property (nonatomic) BOOL observingStatus;
+@property (nonatomic) BOOL audioEnabled;
+@property (nonatomic) int32_t volumePercent;
+@property (nonatomic) Float64 durationSeconds;
 @property (nonatomic, strong) id endObserver;
 @end
+
+static void ApplyAudio(LCVideoPlayer *ctx);
 
 @implementation LCVideoPlayer
 - (void)observeValueForKeyPath:(NSString *)keyPath
@@ -26,6 +31,7 @@
     if ([keyPath isEqualToString:@"status"] &&
         self.player.currentItem.status == AVPlayerItemStatusReadyToPlay)
     {
+        ApplyAudio(self);
         [self.player play];
     }
 }
@@ -46,13 +52,43 @@ static LCVideoPlayer *PlayerFrom(lc_video_handle handle)
     return (__bridge LCVideoPlayer *)handle;
 }
 
-static Float64 DurationSeconds(AVPlayer *player)
+static Float64 SecondsFrom(CMTime time)
 {
-    CMTime duration = player.currentItem.duration;
-    if (CMTIME_IS_INVALID(duration) || CMTIME_IS_INDEFINITE(duration))
+    if (CMTIME_IS_INVALID(time) || CMTIME_IS_INDEFINITE(time))
         return 0;
-    Float64 seconds = CMTimeGetSeconds(duration);
-    return seconds > 0 ? seconds : 0;
+    Float64 seconds = CMTimeGetSeconds(time);
+    return seconds > 0 && !isnan(seconds) ? seconds : 0;
+}
+
+static Float64 BestDurationSeconds(AVURLAsset *asset, AVAssetTrack *track, NSURL *url)
+{
+    Float64 reported = fmax(SecondsFrom(asset.duration), SecondsFrom(track.timeRange.duration));
+
+    float bps = track.estimatedDataRate;
+    NSNumber *size = nil;
+    [url getResourceValue:&size forKey:NSURLFileSizeKey error:nil];
+    Float64 estimated = 0;
+    if (bps > 1000 && size && size.unsignedLongLongValue > 1000)
+        estimated = (Float64)size.unsignedLongLongValue * 8.0 / bps;
+
+    // YouTube/fMP4 files often store a ~1/12 container duration. Prefer the bitrate
+    // estimate when the container looks far too short for the file size.
+    if (estimated > 2 && (reported <= 0 || (reported < 120 && estimated > reported * 3)))
+        return estimated;
+    return fmax(reported, 0);
+}
+
+static Float64 DurationSeconds(LCVideoPlayer *ctx)
+{
+    if (!ctx) return 0;
+    Float64 duration = ctx.durationSeconds;
+    Float64 item = SecondsFrom(ctx.player.currentItem.duration);
+    if (item > duration)
+        duration = item;
+    Float64 current = SecondsFrom(ctx.player.currentTime);
+    if (current > duration)
+        duration = current;
+    return duration;
 }
 
 lc_video_handle lc_video_open(const char *path, int32_t loop, int32_t audio,
@@ -116,8 +152,8 @@ lc_video_handle lc_video_open(const char *path, int32_t loop, int32_t audio,
         [item addOutput:output];
 
         AVPlayer *player = [AVPlayer playerWithPlayerItem:item];
-        player.volume = audio ? 1.0f : 0.0f;
         player.actionAtItemEnd = AVPlayerActionAtItemEndNone;
+        player.allowsExternalPlayback = NO;
 
         LCVideoPlayer *ctx = [LCVideoPlayer new];
         ctx.player = player;
@@ -127,6 +163,10 @@ lc_video_handle lc_video_open(const char *path, int32_t loop, int32_t audio,
         ctx.stride = width * 4;
         ctx.loop = loop != 0;
         ctx.running = YES;
+        ctx.audioEnabled = audio != 0;
+        ctx.volumePercent = ctx.audioEnabled ? 100 : 0;
+        ctx.durationSeconds = BestDurationSeconds(asset, track, url);
+        ApplyAudio(ctx);
 
         [output setDelegate:ctx queue:dispatch_get_main_queue()];
         [output requestNotificationOfMediaDataChangeWithAdvanceInterval:0.03];
@@ -214,7 +254,7 @@ float lc_video_get_position(lc_video_handle handle)
 {
     LCVideoPlayer *ctx = PlayerFrom(handle);
     if (!ctx) return 0;
-    Float64 duration = DurationSeconds(ctx.player);
+    Float64 duration = DurationSeconds(ctx);
     if (duration <= 0) return 0;
     Float64 current = CMTimeGetSeconds(ctx.player.currentTime);
     if (current < 0) current = 0;
@@ -228,7 +268,7 @@ void lc_video_set_position(lc_video_handle handle, float position)
 {
     LCVideoPlayer *ctx = PlayerFrom(handle);
     if (!ctx) return;
-    Float64 duration = DurationSeconds(ctx.player);
+    Float64 duration = DurationSeconds(ctx);
     if (duration <= 0) return;
     if (position < 0) position = 0;
     if (position > 1) position = 1;
@@ -249,26 +289,38 @@ int64_t lc_video_get_length_ms(lc_video_handle handle)
 {
     LCVideoPlayer *ctx = PlayerFrom(handle);
     if (!ctx) return 0;
-    return (int64_t)llround(DurationSeconds(ctx.player) * 1000.0);
+    return (int64_t)llround(DurationSeconds(ctx) * 1000.0);
+}
+
+static void ApplyAudio(LCVideoPlayer *ctx)
+{
+    if (!ctx.player) return;
+    ctx.player.allowsExternalPlayback = NO;
+    if (!ctx.audioEnabled)
+    {
+        ctx.player.muted = YES;
+        ctx.player.volume = 0;
+        return;
+    }
+    ctx.player.muted = ctx.volumePercent <= 0;
+    ctx.player.volume = ctx.volumePercent / 100.0f;
 }
 
 int32_t lc_video_get_volume(lc_video_handle handle)
 {
     LCVideoPlayer *ctx = PlayerFrom(handle);
     if (!ctx) return 0;
-    float volume = ctx.player.volume;
-    if (volume < 0) volume = 0;
-    if (volume > 1) volume = 1;
-    return (int32_t)lround(volume * 100.0f);
+    return ctx.volumePercent;
 }
 
 void lc_video_set_volume(lc_video_handle handle, int32_t volume)
 {
     LCVideoPlayer *ctx = PlayerFrom(handle);
-    if (!ctx) return;
+    if (!ctx || !ctx.audioEnabled) return;
     if (volume < 0) volume = 0;
     if (volume > 100) volume = 100;
-    ctx.player.volume = volume / 100.0f;
+    ctx.volumePercent = volume;
+    ApplyAudio(ctx);
 }
 
 int32_t lc_video_is_paused(lc_video_handle handle)

@@ -1,0 +1,26 @@
+schema: spec-driven
+
+context: |
+  LumenCue is an Avalonia/.NET church projection desktop app.
+  Workflow is mandatory: OpenSpec explore → propose/spec → TDD apply.
+  Cursor rule: .cursor/rules/openspec-tdd.mdc (alwaysApply). Other rules defer to it.
+
+rules:
+  proposal:
+    - State the options that were explored and which one was chosen.
+    - Keep the change to one workstream.
+  specs:
+    - Every requirement needs at least one WHEN/THEN scenario a unit test can encode.
+  tasks:
+    - Each task is one TDD slice: failing test for a spec scenario, then minimal code.
+    - Do not mark a task done unless that test was seen red, then green.
+
+operations:
+  apply:
+    guidance:
+      - Follow .cursor/rules/openspec-tdd.mdc.
+      - If the change is still ambiguous, go back to explore. Do not invent scope.
+      - No production code without a failing test that maps to a spec scenario.
+  archive:
+    guidance:
+      - Confirm spec scenarios are covered by tests before archiving.

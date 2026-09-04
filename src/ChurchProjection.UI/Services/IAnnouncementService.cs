@@ -43,6 +43,9 @@ public interface IAnnouncementService
     /// <summary>Creates a new (empty) collection with the given name and returns it.</summary>
     Task<MediaCollection> CreateCollectionAsync(string name);
 
+    /// <summary>Deletes a collection. Media in it becomes Uncategorized; the files stay in the library.</summary>
+    Task DeleteCollectionAsync(string collectionId);
+
     /// <summary>Moves a media item into a collection (or to no folder / "All media" when
     /// <paramref name="collectionId"/> is null). No-op if the item isn't found.</summary>
     Task MoveToCollectionAsync(string mediaId, string? collectionId);

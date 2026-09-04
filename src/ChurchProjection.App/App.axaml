@@ -1,5 +1,6 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              x:Class="ChurchProjection.App.App"
              RequestedThemeVariant="Dark">
 
@@ -50,6 +51,7 @@
   <Application.Styles>
     <FluentTheme />
     <StyleInclude Source="avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml" />
+    <materialIcons:MaterialIconStyles />
 
     <!-- Inter is the default for every control + text. -->
     <Style Selector=":is(TemplatedControl)">

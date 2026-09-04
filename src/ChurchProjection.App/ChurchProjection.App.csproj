@@ -19,6 +19,7 @@
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.8" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.8" />
     <PackageReference Include="Avalonia.ReactiveUI" Version="11.3.8" />
+    <PackageReference Include="Material.Icons.Avalonia" Version="2.4.1" />
     <!-- Debug-only: F12 inspector overlay. Not referenced in Release. -->
     <PackageReference Include="Avalonia.Diagnostics" Version="11.3.8" Condition="'$(Configuration)' == 'Debug'" />
     <!-- Debug-only XAML hot reload (HotAvalonia no-ops in Release and is not published). -->

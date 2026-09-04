@@ -8,17 +8,17 @@
         xmlns:slides="using:ChurchProjection.Core.Models.Slides"
         xmlns:proj="using:ChurchProjection.Core.Models.Projection"
         xmlns:uisvc="using:ChurchProjection.UI.Services"
+        xmlns:icons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
         x:Class="ChurchProjection.UI.Views.OperatorWindow"
         x:DataType="vm:OperatorViewModel"
         Title="LumenCue"
         Icon="/Assets/app-icon.png"
         Width="1400" Height="900"
         MinWidth="1100" MinHeight="700"
-        WindowState="Maximized"
+        CanResize="True"
+        WindowState="Normal"
         WindowStartupLocation="CenterScreen"
-        ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaChromeHints="PreferSystemChrome"
-        ExtendClientAreaTitleBarHeightHint="-1"
+        SystemDecorations="Full"
         Background="#0E1014">
 
   <Window.Styles>
@@ -81,10 +81,34 @@
       <Setter Property="Padding" Value="14,7" />
       <Setter Property="CornerRadius" Value="9" />
       <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Opacity" Value="{x:Static svc:OperatorWorkspaceChrome.InactiveOpacity}" />
     </Style>
     <Style Selector="Button.topNav:pointerover">
       <Setter Property="Background" Value="#262446" />
       <Setter Property="BorderBrush" Value="#7C6CF6" />
+    </Style>
+    <Style Selector="Button.topNav.active">
+      <Setter Property="Opacity" Value="{x:Static svc:OperatorWorkspaceChrome.ActiveOpacity}" />
+      <Setter Property="BorderThickness" Value="2" />
+    </Style>
+    <Style Selector="Button.topNav.bible.active">
+      <Setter Property="Background" Value="#11324A" />
+      <Setter Property="BorderBrush" Value="#38BDF8" />
+    </Style>
+    <Style Selector="Button.topNav.songs.active">
+      <Setter Property="Background" Value="#2A2444" />
+      <Setter Property="BorderBrush" Value="#A78BFA" />
+    </Style>
+    <Style Selector="Button.topNav.media.active">
+      <Setter Property="Background" Value="#0E3A40" />
+      <Setter Property="BorderBrush" Value="#22D3EE" />
+    </Style>
+    <Style Selector="Button.topNav.notes.active">
+      <Setter Property="Background" Value="#3A2A12" />
+      <Setter Property="BorderBrush" Value="#FBBF24" />
+    </Style>
+    <Style Selector="Button.topNav.themeNav">
+      <Setter Property="Opacity" Value="1" />
     </Style>
     <Style Selector="Button.queueBtn">
       <Setter Property="Background" Value="#2A303C" />
@@ -98,6 +122,45 @@
     </Style>
     <Style Selector="Button.queueBtn:pointerover">
       <Setter Property="Background" Value="#3C4350" />
+    </Style>
+    <Style Selector="Button.iconBtn Path">
+      <Setter Property="Fill" Value="#D8DCE3" />
+      <Setter Property="Stretch" Value="Uniform" />
+      <Setter Property="Width" Value="14" />
+      <Setter Property="Height" Value="14" />
+    </Style>
+    <!-- Compact on/off — Fluent ToggleSwitch has a wide On/Off content slot and will not
+         shrink, so it overlaps neighbors. This is a fixed 40×22 track. -->
+    <Style Selector="ToggleButton.compactSwitch">
+      <Setter Property="Width" Value="40" />
+      <Setter Property="Height" Value="22" />
+      <Setter Property="MinWidth" Value="40" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border x:Name="track" Width="40" Height="22" CornerRadius="11" Background="#3C4350">
+            <Panel>
+              <Ellipse x:Name="knobOff" Width="16" Height="16" Fill="#ECEEF2"
+                       HorizontalAlignment="Left" Margin="3,0" />
+              <Ellipse x:Name="knobOn" Width="16" Height="16" Fill="#0E1014"
+                       HorizontalAlignment="Right" Margin="3,0" IsVisible="False" />
+            </Panel>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="ToggleButton.compactSwitch:checked /template/ Border#track">
+      <Setter Property="Background" Value="#22C55E" />
+    </Style>
+    <Style Selector="ToggleButton.compactSwitch:checked /template/ Ellipse#knobOff">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="ToggleButton.compactSwitch:checked /template/ Ellipse#knobOn">
+      <Setter Property="IsVisible" Value="True" />
     </Style>
     <!-- Background palette tile -->
     <Style Selector="Border.bgTile">
@@ -136,10 +199,10 @@
     </Style>
   </Window.Styles>
 
-  <Grid RowDefinitions="Auto,*,Auto,Auto,Auto,Auto">
+  <Grid RowDefinitions="Auto,*,Auto,Auto,Auto">
 
-    <!-- TOP TOOLBAR (doubles as the window title bar; right inset clears the OS caption buttons) -->
-    <Border Grid.Row="0" Background="#14181F" Padding="16,9,148,9" BorderBrush="#2A303C" BorderThickness="0,0,0,1"
+    <!-- TOP TOOLBAR — system title bar above this handles move / resize / min / max / close. -->
+    <Border Grid.Row="0" Background="#14181F" Padding="16,9" BorderBrush="#2A303C" BorderThickness="0,0,0,1"
             ClipToBounds="True">
       <Grid ColumnDefinitions="Auto,*,Auto" ClipToBounds="True">
         <!-- LEFT: logo + optional subscription banner -->
@@ -161,100 +224,67 @@
                       MinWidth="0" Margin="8,0">
         <StackPanel HorizontalAlignment="Center" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
           <!-- Bible mode -->
-          <Panel>
-            <Button Classes="topNav" Command="{Binding ShowBibleModeCommand}"
-                    ToolTip.Tip="Scripture mode: search verses, AI suggestions and bookmarks">
-              <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
-                <Border Width="26" Height="26" CornerRadius="7" Background="#11324A">
-                  <TextBlock Text="&#10013;" FontSize="15" FontWeight="Bold" Foreground="#38BDF8"
-                             HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Border>
-                <TextBlock Text="Bible" FontSize="14" FontWeight="Bold" Foreground="#ECEEF2" VerticalAlignment="Center" />
-              </StackPanel>
-            </Button>
-            <Border Height="3" CornerRadius="2" VerticalAlignment="Bottom" Margin="8,0,8,-1"
-                    Background="#38BDF8" IsVisible="{Binding IsBibleMode}" />
-          </Panel>
-          <!-- Songs mode -->
-          <Panel>
-            <Button Classes="topNav" Command="{Binding ShowSongsModeCommand}"
-                    ToolTip.Tip="Songs mode: smart lyric search and your song library">
-              <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
-                <Border Width="26" Height="26" CornerRadius="7" Background="#2A2444">
-                  <TextBlock Text="&#9835;" FontSize="15" FontWeight="Bold" Foreground="#A78BFA"
-                             HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Border>
-                <TextBlock Text="Songs" FontSize="14" FontWeight="Bold" Foreground="#ECEEF2" VerticalAlignment="Center" />
-              </StackPanel>
-            </Button>
-            <Border Height="3" CornerRadius="2" VerticalAlignment="Bottom" Margin="8,0,8,-1"
-                    Background="#A78BFA" IsVisible="{Binding IsSongsMode}" />
-          </Panel>
-          <!-- Media mode: graphics + videos with transport, sent live per channel -->
-          <Panel>
-            <Button Classes="topNav" Command="{Binding ShowMediaModeCommand}"
-                    ToolTip.Tip="Media: send full-screen / lower-third graphics and videos (with sound) per channel">
-              <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
-                <Border Width="26" Height="26" CornerRadius="7" Background="#0E3A40">
-                  <TextBlock Text="&#9658;" FontSize="13" FontWeight="Bold" Foreground="#22D3EE"
-                             HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Border>
-                <TextBlock Text="Media" FontSize="14" FontWeight="Bold" Foreground="#ECEEF2" VerticalAlignment="Center" />
-              </StackPanel>
-            </Button>
-            <Border Height="3" CornerRadius="2" VerticalAlignment="Bottom" Margin="8,0,8,-1"
-                    Background="#22D3EE" IsVisible="{Binding IsMediaMode}" />
-          </Panel>
-          <!-- Notes (own workspace, not a Bible tab) -->
-          <Panel>
-            <Button Classes="topNav" Command="{Binding ShowNotesTabCommand}"
-                    ToolTip.Tip="Notes: prayer points and announcements">
-              <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
-                <Border Width="26" Height="26" CornerRadius="7" Background="#3A2A12">
-                  <TextBlock Text="&#x1F4DD;" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Border>
-                <TextBlock Text="Notes" FontSize="14" FontWeight="Bold" Foreground="#ECEEF2" VerticalAlignment="Center" />
-              </StackPanel>
-            </Button>
-            <Border Height="3" CornerRadius="2" VerticalAlignment="Bottom" Margin="8,0,8,-1"
-                    Background="#FBBF24" IsVisible="{Binding IsNotesMode}" />
-          </Panel>
-          <!-- Themes (opens the Theme Studio dialog) -->
-          <Button Classes="topNav" Tapped="OnThemeStudioClicked"
-                  ToolTip.Tip="Design themes — one look for scripture, songs, notes, and announcements">
+          <Button Classes="topNav bible" Classes.active="{Binding IsBibleMode}"
+                  Command="{Binding ShowBibleModeCommand}"
+                  ToolTip.Tip="Scripture mode: search verses, AI suggestions and bookmarks">
             <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
-              <Border Width="26" Height="26" CornerRadius="7">
-                <Border.Background>
-                  <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                    <GradientStop Color="#7C6CF6" Offset="0" />
-                    <GradientStop Color="#F472B6" Offset="1" />
-                  </LinearGradientBrush>
-                </Border.Background>
-              </Border>
+              <icons:MaterialIcon Kind="BookOpenPageVariant" Width="18" Height="18" Foreground="#38BDF8" />
+              <TextBlock Text="Bible" FontSize="14" FontWeight="Bold" Foreground="#ECEEF2" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <!-- Songs mode -->
+          <Button Classes="topNav songs" Classes.active="{Binding IsSongsMode}"
+                  Command="{Binding ShowSongsModeCommand}"
+                  ToolTip.Tip="Songs mode: smart lyric search and your song library">
+            <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+              <icons:MaterialIcon Kind="MusicNote" Width="18" Height="18" Foreground="#A78BFA" />
+              <TextBlock Text="Songs" FontSize="14" FontWeight="Bold" Foreground="#ECEEF2" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <!-- Media mode: graphics + videos with transport, sent live per channel -->
+          <Button Classes="topNav media" Classes.active="{Binding IsMediaMode}"
+                  Command="{Binding ShowMediaModeCommand}"
+                  ToolTip.Tip="Media: send full-screen / lower-third graphics and videos (with sound) per channel">
+            <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+              <icons:MaterialIcon Kind="PlayBoxOutline" Width="18" Height="18" Foreground="#22D3EE" />
+              <TextBlock Text="Media" FontSize="14" FontWeight="Bold" Foreground="#ECEEF2" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <!-- Notes (own workspace, not a Bible tab) -->
+          <Button Classes="topNav notes" Classes.active="{Binding IsNotesMode}"
+                  Command="{Binding ShowNotesTabCommand}"
+                  ToolTip.Tip="Notes: prayer points and announcements">
+            <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+              <icons:MaterialIcon Kind="NoteTextOutline" Width="18" Height="18" Foreground="#FBBF24" />
+              <TextBlock Text="Notes" FontSize="14" FontWeight="Bold" Foreground="#ECEEF2" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <!-- Themes (opens the Theme Studio dialog) -->
+          <Button Classes="topNav themeNav" Tapped="OnThemeStudioClicked"
+                  ToolTip.Tip="{x:Static svc:OwnerDialogTooltips.ThemesTip}">
+            <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+              <icons:MaterialIcon Kind="PaletteOutline" Width="18" Height="18" Foreground="#F472B6" />
               <TextBlock Text="Themes" FontSize="14" FontWeight="Bold" Foreground="#ECEEF2" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
         </StackPanel>
         </ScrollViewer>
 
-        <!-- RIGHT: live-critical controls stay visible; secondary actions move into the More menu. -->
-        <StackPanel Grid.Column="2" HorizontalAlignment="Right" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-          <Button Classes="ghost" Command="{Binding ToggleScreenOutputCommand}" FontSize="12" Padding="10,6"
-                  ToolTip.Tip="Turn the projector screen output on/off. When off, the physical screen reverts to the desktop / another source — different from Blank, which keeps the feed live but shows black.">
-            <Panel>
-              <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding ScreenOutputEnabled}">
-                <Ellipse Width="9" Height="9" Fill="#22C55E" VerticalAlignment="Center" />
-                <TextBlock Text="Output On" VerticalAlignment="Center" />
-              </StackPanel>
-              <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding !ScreenOutputEnabled}">
-                <Ellipse Width="9" Height="9" Fill="#6E7682" VerticalAlignment="Center" />
-                <TextBlock Text="Output Off" Foreground="#959DAB" VerticalAlignment="Center" />
-              </StackPanel>
-            </Panel>
+        <!-- RIGHT: Output + cog on one baseline (StackPanel = row, like flex align-items: center). -->
+        <StackPanel Grid.Column="2" HorizontalAlignment="Right" Orientation="Horizontal" Spacing="12"
+                    VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
+                      ToolTip.Tip="Master screen output. Off hides projector windows so the physical display reverts to the desktop or another source — different from Blank, which stays live but shows black.">
+            <TextBlock Text="Output" FontSize="12" Foreground="#A7AFBC" VerticalAlignment="Center" />
+            <ToggleButton Classes="compactSwitch" IsChecked="{Binding ScreenOutputEnabled}" />
+          </StackPanel>
+          <Button Classes="ghost" Width="32" Height="32" Padding="0" VerticalAlignment="Center"
+                  Click="OnSettingsClicked" ToolTip.Tip="{x:Static svc:OwnerDialogTooltips.SettingsTip}">
+            <icons:MaterialIcon Kind="Cog" Width="18" Height="18" Foreground="#D8DCE3" />
           </Button>
           <Button Content="Sign in" Command="{Binding SignInCommand}" IsVisible="{Binding !IsSignedIn}"
                   Background="#0E4A6E" Foreground="#7DD3FC" FontWeight="SemiBold"
-                  FontSize="12" Padding="14,6" CornerRadius="6"
+                  FontSize="12" Padding="14,6" CornerRadius="6" VerticalAlignment="Center"
                   ToolTip.Tip="Sign in to sync your library and unlock cloud features">
             <Button.Styles>
               <Style Selector="Button:pointerover">
@@ -262,18 +292,8 @@
               </Style>
             </Button.Styles>
           </Button>
-          <!-- Overflow menu for lower-frequency actions (keeps the bar uncluttered). -->
-          <Button Classes="ghost" Content="More" Padding="10,6" FontSize="12" ToolTip.Tip="More actions">
-            <Button.Flyout>
-              <MenuFlyout Placement="BottomEdgeAlignedRight">
-                <MenuItem Header="Upgrade" Command="{Binding UpgradeCommand}" IsVisible="{Binding ShowUpgrade}" />
-                <MenuItem Header="Pre-service" Click="OnPreServiceClicked" />
-                <MenuItem Header="Settings" Click="OnSettingsClicked" />
-                <Separator />
-                <MenuItem Header="Sign out" Command="{Binding SignOutCommand}" IsVisible="{Binding IsSignedIn}" />
-              </MenuFlyout>
-            </Button.Flyout>
-          </Button>
+          <Button Classes="ghost" Content="Upgrade" Command="{Binding UpgradeCommand}"
+                  IsVisible="{Binding ShowUpgrade}" FontSize="12" Padding="10,6" VerticalAlignment="Center" />
         </StackPanel>
       </Grid>
     </Border>
@@ -344,66 +364,143 @@
           </Border.Styles>
 
           <Panel>
-          <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                        IsVisible="{Binding ShowBibleMediaSidebar}">
-            <StackPanel>
-
-              <!-- ── BOOKMARKS (Bible mode) ──────────────────────────────── -->
-              <StackPanel IsVisible="{Binding IsBibleMode}">
-                <Border Classes="sectionHeader">
+          <!-- Bible: two sibling views — Bookmarks (top) and Compare (bottom), like Songs library / setlist. -->
+          <Grid IsVisible="{Binding IsBibleMode}" RowDefinitions="*,8,*" ClipToBounds="True">
+            <Border Grid.Row="0" Background="#14181F">
+              <DockPanel>
+                <Border DockPanel.Dock="Top" Classes="sectionHeader" BorderBrush="#2A303C" BorderThickness="0,0,0,1">
                   <Grid ColumnDefinitions="*,Auto">
                     <TextBlock Grid.Column="0" Classes="sectionLabel" Text="BOOKMARKS" />
                     <TextBlock Grid.Column="1" Text="&#9733;" FontSize="11" Foreground="#F59E0B" VerticalAlignment="Center" />
                   </Grid>
                 </Border>
-                <TextBlock IsVisible="{Binding !Transcription.HasBookmarks}"
-                           Text="No bookmarks yet — star a verse to pin it here"
-                           Foreground="#5B626E" FontSize="11" Margin="14,8" TextWrapping="Wrap" />
-                <ListBox Classes="navList" ItemsSource="{Binding Transcription.Bookmarks}"
-                         DoubleTapped="OnBookmarksDoubleTapped" IsVisible="{Binding Transcription.HasBookmarks}">
-                  <ListBox.ItemsPanel><ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate></ListBox.ItemsPanel>
-                  <ListBox.ItemTemplate>
-                    <DataTemplate x:DataType="content:SuggestionItem">
-                      <Grid ColumnDefinitions="Auto,*" Background="Transparent"
-                            ToolTip.Tip="Double-click to send live · right-click for more options">
-                        <Grid.ContextMenu>
-                          <ContextMenu>
-                            <MenuItem Header="Send to Live" Click="OnSendBookmarkToLiveMenu" />
-                            <MenuItem Header="Show in Chapter" Click="OnShowFullChapterFromSuggestion" />
-                            <MenuItem Header="Show Entire Book" Click="OnShowFullBookFromBookmark" />
-                            <Separator />
-                            <MenuItem Header="Remove Bookmark" Click="OnRemoveBookmarkMenu" />
-                          </ContextMenu>
-                        </Grid.ContextMenu>
-                        <Panel Grid.Column="0" Margin="0,0,9,0">
-                          <Border Background="#3A2A12" CornerRadius="5" Width="22" Height="22"
-                                  VerticalAlignment="Center" IsVisible="{Binding !IsLive}">
-                            <TextBlock Text="&#9733;" FontSize="11" Foreground="#F59E0B"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
-                          </Border>
-                          <Border Background="#22C55E" CornerRadius="5" Width="22" Height="22"
-                                  VerticalAlignment="Center" IsVisible="{Binding IsLive}">
-                            <Ellipse Width="6" Height="6" Fill="White"
-                                     HorizontalAlignment="Center" VerticalAlignment="Center" />
-                          </Border>
-                        </Panel>
-                        <StackPanel Grid.Column="1" Spacing="0" VerticalAlignment="Center">
-                          <StackPanel Orientation="Horizontal" Spacing="5">
-                            <TextBlock Text="{Binding Title}" Foreground="#E6E9EE" FontSize="13"
-                                       TextTrimming="CharacterEllipsis" MaxLines="1" />
-                            <Border Background="#22C55E" CornerRadius="3" Padding="4,1"
-                                    VerticalAlignment="Center" IsVisible="{Binding IsLive}">
-                              <TextBlock Text="LIVE" Foreground="White" FontSize="7" FontWeight="Bold" />
-                            </Border>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                  <StackPanel>
+                    <TextBlock IsVisible="{Binding !Transcription.HasBookmarks}"
+                               Text="No bookmarks yet — star a verse to pin it here"
+                               Foreground="#5B626E" FontSize="11" Margin="14,8" TextWrapping="Wrap" />
+                    <ListBox Classes="navList" ItemsSource="{Binding Transcription.Bookmarks}"
+                             DoubleTapped="OnBookmarksDoubleTapped" IsVisible="{Binding Transcription.HasBookmarks}">
+                      <ListBox.ItemsPanel><ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate></ListBox.ItemsPanel>
+                      <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="content:SuggestionItem">
+                          <Grid ColumnDefinitions="Auto,*" Background="Transparent"
+                                ToolTip.Tip="Double-click to send live · right-click for more options">
+                            <Grid.ContextMenu>
+                              <ContextMenu>
+                                <MenuItem Header="Send to Live" Click="OnSendBookmarkToLiveMenu" />
+                                <MenuItem Header="Show in Chapter" Click="OnShowFullChapterFromSuggestion" />
+                                <MenuItem Header="Show Entire Book" Click="OnShowFullBookFromBookmark" />
+                                <Separator />
+                                <MenuItem Header="Remove Bookmark" Click="OnRemoveBookmarkMenu" />
+                              </ContextMenu>
+                            </Grid.ContextMenu>
+                            <Panel Grid.Column="0" Margin="0,0,9,0">
+                              <Border Background="#3A2A12" CornerRadius="5" Width="22" Height="22"
+                                      VerticalAlignment="Center" IsVisible="{Binding !IsLive}">
+                                <TextBlock Text="&#9733;" FontSize="11" Foreground="#F59E0B"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                              </Border>
+                              <Border Background="#22C55E" CornerRadius="5" Width="22" Height="22"
+                                      VerticalAlignment="Center" IsVisible="{Binding IsLive}">
+                                <Ellipse Width="6" Height="6" Fill="White"
+                                         HorizontalAlignment="Center" VerticalAlignment="Center" />
+                              </Border>
+                            </Panel>
+                            <StackPanel Grid.Column="1" Spacing="0" VerticalAlignment="Center">
+                              <StackPanel Orientation="Horizontal" Spacing="5">
+                                <TextBlock Text="{Binding Title}" Foreground="#E6E9EE" FontSize="13"
+                                           TextTrimming="CharacterEllipsis" MaxLines="1" />
+                                <Border Background="#22C55E" CornerRadius="3" Padding="4,1"
+                                        VerticalAlignment="Center" IsVisible="{Binding IsLive}">
+                                  <TextBlock Text="LIVE" Foreground="White" FontSize="7" FontWeight="Bold" />
+                                </Border>
+                              </StackPanel>
+                              <TextBlock Text="{Binding Body}" Foreground="#6E7682" FontSize="11"
+                                         TextTrimming="CharacterEllipsis" MaxLines="1" />
+                            </StackPanel>
+                          </Grid>
+                        </DataTemplate>
+                      </ListBox.ItemTemplate>
+                    </ListBox>
+                  </StackPanel>
+                </ScrollViewer>
+              </DockPanel>
+            </Border>
+
+            <Border Grid.Row="2" Background="#14181F" ClipToBounds="True">
+              <DockPanel>
+                <Border DockPanel.Dock="Top" Classes="sectionHeader" BorderBrush="#2A303C" BorderThickness="0,0,0,1"
+                        ClipToBounds="True">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0" Classes="sectionLabel" Text="COMPARE"
+                               Foreground="#A78BFA" TextTrimming="CharacterEllipsis" />
+                    <Button Grid.Column="1" Classes="hdrIcon" Padding="4,2"
+                            ToolTip.Tip="Choose exactly 2 translations">
+                      <icons:MaterialIcon Kind="Cog" Width="14" Height="14" Foreground="#8A92A0" />
+                      <Button.Flyout>
+                        <Flyout Placement="BottomEdgeAlignedRight">
+                          <StackPanel Width="168" Spacing="6">
+                            <TextBlock Text="PICK 2 TRANSLATIONS" FontSize="10" FontWeight="Bold"
+                                       Foreground="#8A92A0" LetterSpacing="0.6" />
+                            <TextBlock Text="Two at a time. Uncheck one to pick another."
+                                       FontSize="10" Foreground="#6E7682" TextWrapping="Wrap" />
+                            <ItemsControl ItemsSource="{Binding CompareOptions}">
+                              <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="op:LiveCompareOption">
+                                  <CheckBox Content="{Binding Code}" IsChecked="{Binding IsSelected}"
+                                            IsEnabled="{Binding IsEnabled}" FontSize="12" Margin="0,2" />
+                                </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                            </ItemsControl>
                           </StackPanel>
-                          <TextBlock Text="{Binding Body}" Foreground="#6E7682" FontSize="11"
-                                     TextTrimming="CharacterEllipsis" MaxLines="1" />
-                        </StackPanel>
-                      </Grid>
-                    </DataTemplate>
-                  </ListBox.ItemTemplate>
-                </ListBox>
-              </StackPanel>
+                        </Flyout>
+                      </Button.Flyout>
+                    </Button>
+                  </Grid>
+                </Border>
+                <ScrollViewer Padding="8"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                  <Panel>
+                    <ItemsControl ItemsSource="{Binding CompareCards}" IsVisible="{Binding HasCompareCards}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <UniformGrid Columns="1" />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="op:LiveCompareCard">
+                          <Border Background="#181C24" BorderBrush="#2A303C" BorderThickness="1" CornerRadius="8"
+                                  Padding="8,7" Margin="0,0,0,6" Cursor="Hand" ClipToBounds="True"
+                                  HorizontalAlignment="Stretch"
+                                  DoubleTapped="OnLiveCompareDoubleTapped"
+                                  ToolTip.Tip="Double-click to send this translation live">
+                            <StackPanel Spacing="4">
+                              <TextBlock Text="{Binding Translation}" Foreground="#A78BFA" FontSize="11"
+                                         FontWeight="Bold" TextTrimming="CharacterEllipsis" />
+                              <TextBlock Text="{Binding Body}" Foreground="#C2C8D2" FontSize="12" LineHeight="18"
+                                         TextWrapping="Wrap" MaxLines="8" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <StackPanel Spacing="4" VerticalAlignment="Center" IsVisible="{Binding !HasCompareCards}">
+                      <TextBlock Text="No compare translations" Foreground="#6E7682" FontSize="12" FontWeight="SemiBold"
+                                 TextWrapping="Wrap" />
+                      <TextBlock Text="Put a verse live, then use the cog to pick 2 translations."
+                                 Foreground="#4B515C" FontSize="11" TextWrapping="Wrap" LineHeight="16" />
+                    </StackPanel>
+                  </Panel>
+                </ScrollViewer>
+              </DockPanel>
+            </Border>
+          </Grid>
+
+          <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                        IsVisible="{Binding IsMediaMode}">
+            <StackPanel>
 
               <!-- ── FOLDERS (Media mode) ────────────────────────────────── -->
               <StackPanel IsVisible="{Binding IsMediaMode}">
@@ -436,7 +533,14 @@
                 </ListBox.ItemsPanel>
                 <ListBox.ItemTemplate>
                   <DataTemplate x:DataType="op:MediaFolderOption">
-                    <Grid ColumnDefinitions="Auto,*" Background="Transparent">
+                    <Grid ColumnDefinitions="Auto,*,Auto" Background="Transparent"
+                          ToolTip.Tip="Right-click a folder to delete it">
+                      <Grid.ContextMenu>
+                        <ContextMenu>
+                          <MenuItem Header="Delete folder" Click="OnDeleteMediaFolderMenu"
+                                    IsVisible="{Binding CanDelete}" />
+                        </ContextMenu>
+                      </Grid.ContextMenu>
                       <Border Grid.Column="0" Background="#15303A" CornerRadius="5" Width="22" Height="22"
                               VerticalAlignment="Center" Margin="0,0,9,0">
                         <TextBlock Text="&#128193;" FontSize="11" Foreground="#22D3EE"
@@ -444,6 +548,14 @@
                       </Border>
                       <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="#E6E9EE" FontSize="13"
                                  TextTrimming="CharacterEllipsis" MaxLines="1" VerticalAlignment="Center" />
+                      <Button Grid.Column="2" Classes="hdrIcon" Content="&#8942;" Padding="4,1"
+                              IsVisible="{Binding CanDelete}" ToolTip.Tip="Folder options">
+                        <Button.Flyout>
+                          <MenuFlyout Placement="BottomEdgeAlignedRight">
+                            <MenuItem Header="Delete folder" Click="OnDeleteMediaFolderMenu" />
+                          </MenuFlyout>
+                        </Button.Flyout>
+                      </Button>
                     </Grid>
                   </DataTemplate>
                 </ListBox.ItemTemplate>
@@ -1494,12 +1606,9 @@
 
                 <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
                   <Button Content="+ Add media" Click="OnAddMediaClicked" Classes="ghost" FontSize="12" Padding="10,6" />
-                  <Button Content="Stop" Command="{Binding StopCommand}" IsEnabled="{Binding HasLiveOnTarget}"
+                  <Button Content="Clear video" Command="{Binding StopCommand}" IsEnabled="{Binding HasLiveOnTarget}"
                           Foreground="#F87171" FontWeight="SemiBold" FontSize="12" Padding="12,6"
-                          ToolTip.Tip="Clear media from the selected screen" />
-                  <Button Content="Clear all" Command="{Binding ClearAllCommand}" IsEnabled="{Binding HasAnyLive}"
-                          Background="#2A1414" Foreground="#F87171" FontWeight="SemiBold" FontSize="12" Padding="12,6"
-                          ToolTip.Tip="Immediately remove media from every screen" />
+                          ToolTip.Tip="Clear live video from the selected screen" />
                 </StackPanel>
               </Grid>
             </Border>
@@ -1508,12 +1617,21 @@
             <Border DockPanel.Dock="Bottom" Background="#14181F" Padding="12,9" BorderBrush="#2A303C" BorderThickness="0,1,0,0"
                     IsVisible="{Binding HasVideoLive}">
               <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto" ColumnSpacing="8">
-                <Button Grid.Column="0" Content="&#9194;" Command="{Binding SkipBackCommand}" Classes="queueBtn"
-                        FontSize="13" Padding="9,5" ToolTip.Tip="Back 10s" />
-                <Button Grid.Column="1" Content="{Binding PlayPauseGlyph}" Command="{Binding PlayPauseCommand}" Classes="queueBtn"
-                        FontSize="13" Padding="11,5" ToolTip.Tip="Play / pause" />
-                <Button Grid.Column="2" Content="&#9193;" Command="{Binding SkipForwardCommand}" Classes="queueBtn"
-                        FontSize="13" Padding="9,5" ToolTip.Tip="Forward 10s" />
+                <Button Grid.Column="0" Command="{Binding SkipBackCommand}" Classes="queueBtn iconBtn"
+                        Padding="9,5" ToolTip.Tip="Back 10s">
+                  <Path Data="M 2,8 L 8,3.5 L 8,12.5 Z M 8,8 L 14,3.5 L 14,12.5 Z" />
+                </Button>
+                <Button Grid.Column="1" Command="{Binding PlayPauseCommand}" Classes="queueBtn iconBtn"
+                        Padding="11,5" ToolTip.Tip="Play / pause">
+                  <Panel Width="14" Height="14">
+                    <Path Data="M 3,2 L 3,14 L 13,8 Z" IsVisible="{Binding IsPaused}" />
+                    <Path Data="M 3,2 H 6.5 V 14 H 3 Z M 9.5,2 H 13 V 14 H 9.5 Z" IsVisible="{Binding !IsPaused}" />
+                  </Panel>
+                </Button>
+                <Button Grid.Column="2" Command="{Binding SkipForwardCommand}" Classes="queueBtn iconBtn"
+                        Padding="9,5" ToolTip.Tip="Forward 10s">
+                  <Path Data="M 2,3.5 L 2,12.5 L 8,8 Z M 8,3.5 L 8,12.5 L 14,8 Z" />
+                </Button>
 
                 <Slider Grid.Column="3" Minimum="0" Maximum="1" Value="{Binding PositionFraction}"
                         VerticalAlignment="Center" Margin="6,0" ToolTip.Tip="Scrub" />
@@ -1522,7 +1640,9 @@
                   <Run Text="{Binding PositionText}" /><Run Text=" / " Foreground="#5C6470" /><Run Text="{Binding DurationText}" Foreground="#8A93A2" />
                 </TextBlock>
 
-                <TextBlock Grid.Column="5" Text="&#128266;" VerticalAlignment="Center" FontSize="13" Margin="10,0,0,0" />
+                <Path Grid.Column="5" Data="M 1,6 H 4 L 8,3 V 13 L 4,10 H 1 Z M 9.5,6.2 C 10.6,7.2 10.6,8.8 9.5,9.8"
+                      Fill="#8A93A2" Stretch="Uniform" Width="14" Height="14" Margin="10,0,0,0"
+                      VerticalAlignment="Center" />
                 <Slider Grid.Column="6" Width="100" Minimum="0" Maximum="100" Value="{Binding Volume}"
                         VerticalAlignment="Center" ToolTip.Tip="Volume" />
               </Grid>
@@ -1548,7 +1668,7 @@
 
                         <Border IsVisible="{Binding IsVideo}" Background="#CC111418" CornerRadius="4" Padding="6,2"
                                 HorizontalAlignment="Left" VerticalAlignment="Top" Margin="7">
-                          <TextBlock Text="&#9834; VIDEO" FontSize="10" Foreground="#C2C8D2" />
+                          <TextBlock Text="{Binding ClipBadge}" FontSize="10" Foreground="#C2C8D2" />
                         </Border>
 
                         <Border IsVisible="{Binding IsLive}" BorderBrush="#F43F5E" BorderThickness="3" CornerRadius="9" />
@@ -1616,13 +1736,17 @@
 
             <Border Grid.Row="2" Background="#14181F" Padding="10,7" BorderBrush="#2A303C" BorderThickness="0,1,0,0">
               <Grid ColumnDefinitions="Auto,*,Auto">
-                <Button Grid.Column="0" Classes="queueBtn" Content="◀" Click="OnPageBack"
-                        FontSize="12" Padding="12,6" ToolTip.Tip="Previous page (Left arrow)" />
+                <Button Grid.Column="0" Classes="queueBtn iconBtn" Click="OnPageBack"
+                        Padding="12,6" ToolTip.Tip="Previous page (Left arrow)">
+                  <Path Data="M 11,2 L 4,8 L 11,14 Z" />
+                </Button>
                 <Button Grid.Column="1" Classes="danger" Content="Blank" Command="{Binding BlankCommand}"
                         HorizontalAlignment="Center" Margin="8,0" FontSize="12" Padding="22,6"
                         ToolTip.Tip="Clear the screen to black (Esc)" />
-                <Button Grid.Column="2" Classes="queueBtn" Content="▶" Click="OnPageForward"
-                        FontSize="12" Padding="12,6" ToolTip.Tip="Next page (Right arrow)" />
+                <Button Grid.Column="2" Classes="queueBtn iconBtn" Click="OnPageForward"
+                        Padding="12,6" ToolTip.Tip="Next page (Right arrow)">
+                  <Path Data="M 3,2 L 10,8 L 3,14 Z" />
+                </Button>
               </Grid>
             </Border>
 
@@ -1635,79 +1759,122 @@
                   <views:ProjectorView DataContext="{Binding ProgramPreview}" />
                 </Border>
               </Viewbox>
-              <StackPanel IsVisible="{Binding !IsLive}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4"
+              <StackPanel IsVisible="{Binding ShowProgramEmptyHint}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4"
                           IsHitTestVisible="False">
                 <TextBlock Text="Screen is blank" Foreground="#6E7682" FontSize="13" HorizontalAlignment="Center" />
-                <TextBlock Text="Double-click a verse to go live" Foreground="#4B515C" FontSize="11" HorizontalAlignment="Center" />
+                <TextBlock Text="{Binding ProgramEmptyHintDetail}" Foreground="#4B515C" FontSize="11" HorizontalAlignment="Center" />
               </StackPanel>
             </Grid>
           </Grid>
           </Border>
           </Border>
 
-          <!-- COMPARE TRANSLATIONS: Bible-only. Hidden in Songs so the right rail is not an empty gap. -->
+          <!-- AI LISTENING: under Program on the right rail. Tinted so it reads as its own panel. -->
           <Border Grid.Row="1" Margin="0,6,0,0"
-                  IsVisible="{Binding IsBibleMode}"
-                  Background="#181C24" CornerRadius="10" BorderBrush="#2A303C" BorderThickness="1" ClipToBounds="True">
-            <DockPanel>
-              <Border DockPanel.Dock="Top" Background="#1B202A" Padding="12,8" BorderBrush="#2A303C" BorderThickness="0,0,0,1">
-                <Grid ColumnDefinitions="*,Auto">
-                  <TextBlock Classes="section" Text="COMPARE TRANSLATIONS" Foreground="#A78BFA" FontSize="11" />
-                  <Button Grid.Column="1" Content="&#9881;" FontSize="14" Padding="6,2"
-                          Background="Transparent" Foreground="#8A92A0" BorderThickness="0"
-                          VerticalAlignment="Center" ToolTip.Tip="Choose exactly 2 translations">
-                    <Button.Flyout>
-                      <Flyout Placement="BottomEdgeAlignedRight">
-                        <StackPanel Width="168" Spacing="6">
-                          <TextBlock Text="PICK 2 TRANSLATIONS" FontSize="10" FontWeight="Bold"
-                                     Foreground="#8A92A0" LetterSpacing="0.6" />
-                          <TextBlock Text="Two at a time. Uncheck one to pick another."
-                                     FontSize="10" Foreground="#6E7682" TextWrapping="Wrap" />
-                          <ItemsControl ItemsSource="{Binding CompareOptions}">
-                            <ItemsControl.ItemTemplate>
-                              <DataTemplate x:DataType="op:LiveCompareOption">
-                                <CheckBox Content="{Binding Code}" IsChecked="{Binding IsSelected}"
-                                          IsEnabled="{Binding IsEnabled}" FontSize="12" Margin="0,2" />
-                              </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                          </ItemsControl>
-                        </StackPanel>
-                      </Flyout>
-                    </Button.Flyout>
-                  </Button>
-                </Grid>
+                  Background="#12202E" CornerRadius="10" BorderBrush="#2B5A7A" BorderThickness="1" ClipToBounds="True">
+            <DockPanel LastChildFill="True">
+              <Border DockPanel.Dock="Top" Background="#163044" BorderBrush="#2B5A7A" BorderThickness="0,0,0,1">
+                <Button Classes="ghost" Command="{Binding ToggleAiListeningSectionCommand}"
+                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="12,8"
+                        ToolTip.Tip="Show or hide AI listening controls">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <icons:MaterialIcon Kind="Microphone" Width="14" Height="14" Foreground="#38BDF8" />
+                    <TextBlock Text="AI LISTENING" Classes="section" Foreground="#38BDF8" FontSize="11"
+                               VerticalAlignment="Center" />
+                    <Ellipse Width="7" Height="7" VerticalAlignment="Center" IsVisible="{Binding Transcription.IsListening}">
+                      <Ellipse.Fill><SolidColorBrush Color="#22C55E" /></Ellipse.Fill>
+                    </Ellipse>
+                  </StackPanel>
+                </Button>
               </Border>
 
-              <ScrollViewer Padding="14,12">
-                <Panel>
-                  <ItemsControl ItemsSource="{Binding CompareCards}" IsVisible="{Binding HasCompareCards}">
-                    <ItemsControl.ItemsPanel>
-                      <ItemsPanelTemplate>
-                        <UniformGrid Columns="2" />
-                      </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="op:LiveCompareCard">
-                        <Border Background="#14181F" BorderBrush="#2A303C" BorderThickness="1" CornerRadius="8"
-                                Padding="16,14" Margin="6" Cursor="Hand"
-                                DoubleTapped="OnLiveCompareDoubleTapped"
-                                ToolTip.Tip="Double-click to send this translation live">
-                          <StackPanel Spacing="4">
-                            <TextBlock Text="{Binding Translation}" Foreground="#A78BFA" FontSize="11"
-                                       FontWeight="Bold" />
-                            <TextBlock Text="{Binding Body}" Foreground="#C2C8D2" FontSize="12" LineHeight="18"
-                                       TextWrapping="Wrap" MaxLines="10" TextTrimming="CharacterEllipsis" />
-                          </StackPanel>
-                        </Border>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                  <StackPanel Spacing="4" VerticalAlignment="Center" IsVisible="{Binding !HasCompareCards}">
-                    <TextBlock Text="No compare translations" Foreground="#6E7682" FontSize="13" FontWeight="SemiBold" />
-                    <TextBlock Text="Put a verse live, then use the cog to pick 2 translations."
-                               Foreground="#4B515C" FontSize="11" TextWrapping="Wrap" LineHeight="16" />
+              <ScrollViewer IsVisible="{Binding AiListeningExpanded}" Padding="12,8">
+                <StackPanel Spacing="10" DataContext="{Binding Transcription}">
+                  <Border IsVisible="{Binding ShowTranscript}" Height="90" ClipToBounds="True"
+                          Background="#0E1014" CornerRadius="8" Padding="10,8"
+                          BorderBrush="#2A303C" BorderThickness="1">
+                    <Grid RowDefinitions="Auto,*">
+                      <TextBlock Grid.Row="0" Text="LIVE TRANSCRIPT" Classes="section" Foreground="#6E7682" FontSize="10" Margin="0,0,0,6" />
+                      <TextBlock Grid.Row="1" Text="{Binding RecentTranscript}" Foreground="#C9D2DE" FontSize="13" LineHeight="18"
+                                 TextWrapping="Wrap" VerticalAlignment="Bottom" />
+                    </Grid>
+                  </Border>
+
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Classes="ghost" Command="{Binding ToggleTranscriptCommand}" Padding="6,3" FontSize="12"
+                            ToolTip.Tip="Show / hide the live transcript">
+                      <icons:MaterialIcon Kind="TextBoxOutline" Width="14" Height="14" Foreground="#8A92A0" />
+                    </Button>
+                    <Border CornerRadius="4" Padding="6,2" VerticalAlignment="Center" Background="#1E2530"
+                            BorderBrush="#2F3845" BorderThickness="1" IsVisible="{Binding ShowEngineName}"
+                            ToolTip.Tip="Active speech-to-text engine">
+                      <TextBlock Text="{Binding EngineName}" Foreground="#8B93A1" FontSize="10" VerticalAlignment="Center" />
+                    </Border>
+                    <Border CornerRadius="4" Padding="7,3" VerticalAlignment="Center" Background="#232932">
+                      <TextBlock Text="{Binding StatusText}" Foreground="#A7AFBC" FontSize="11" MaxWidth="180"
+                                 TextTrimming="CharacterEllipsis" />
+                    </Border>
                   </StackPanel>
-                </Panel>
+
+                  <TextBlock Text="{Binding LastHeard}" Foreground="#7E8794" FontSize="12" FontStyle="Italic"
+                             TextTrimming="CharacterEllipsis" MaxLines="2" TextWrapping="Wrap" />
+
+                  <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsListening}">
+                    <Ellipse Width="8" Height="8" VerticalAlignment="Center" IsVisible="{Binding HasSignal}">
+                      <Ellipse.Fill><SolidColorBrush Color="#22C55E" /></Ellipse.Fill>
+                    </Ellipse>
+                    <Ellipse Width="8" Height="8" VerticalAlignment="Center" IsVisible="{Binding !HasSignal}">
+                      <Ellipse.Fill><SolidColorBrush Color="#3C4350" /></Ellipse.Fill>
+                    </Ellipse>
+                    <ProgressBar Minimum="0" Maximum="100" Value="{Binding AudioLevelPercent}" Height="6" Width="140"
+                                 VerticalAlignment="Center" CornerRadius="3">
+                      <ProgressBar.Styles>
+                        <Style Selector="ProgressBar /template/ Border#PART_Indicator">
+                          <Setter Property="Background" Value="#38BDF8" />
+                          <Setter Property="CornerRadius" Value="3" />
+                        </Style>
+                        <Style Selector="ProgressBar">
+                          <Setter Property="Background" Value="#232932" />
+                        </Style>
+                      </ProgressBar.Styles>
+                    </ProgressBar>
+                  </StackPanel>
+
+                  <StackPanel Spacing="6"
+                              ToolTip.Tip="Mic sensitivity — raise if the meter barely moves; lower if it pins to the top / clips.">
+                    <TextBlock Text="MIC SENSITIVITY" FontSize="10" Foreground="#8B93A1" />
+                    <DockPanel>
+                      <TextBlock DockPanel.Dock="Right" Text="{Binding MicSensitivityLabel}" Foreground="#A7AFBC" FontSize="11"
+                                 MinWidth="34" VerticalAlignment="Center" />
+                      <Slider Minimum="1" Maximum="4" Value="{Binding MicSensitivity}" Margin="0,0,8,0"
+                              VerticalAlignment="Center" />
+                    </DockPanel>
+                  </StackPanel>
+
+                  <ComboBox ItemsSource="{Binding AudioDevices}" SelectedItem="{Binding SelectedDevice}"
+                            Background="#181C24" Foreground="#ECEEF2" BorderBrush="#3C4350"
+                            CornerRadius="6" Padding="8,4" FontSize="11"
+                            HorizontalAlignment="Stretch"
+                            ToolTip.Tip="Microphone input device" />
+
+                  <Button Command="{Binding ToggleListeningCommand}"
+                          Padding="14,8" CornerRadius="6" FontSize="12" FontWeight="SemiBold"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+                    <Panel>
+                      <TextBlock Text="Stop" HorizontalAlignment="Center" IsVisible="{Binding IsListening}" />
+                      <TextBlock Text="Start" HorizontalAlignment="Center" IsVisible="{Binding !IsListening}" />
+                    </Panel>
+                    <Button.Styles>
+                      <Style Selector="Button">
+                        <Setter Property="Background" Value="#0E4A6E" />
+                        <Setter Property="Foreground" Value="White" />
+                      </Style>
+                      <Style Selector="Button:pointerover">
+                        <Setter Property="Background" Value="#155E8A" />
+                      </Style>
+                    </Button.Styles>
+                  </Button>
+                </StackPanel>
               </ScrollViewer>
             </DockPanel>
           </Border>
@@ -1716,166 +1883,74 @@
 
     </Grid>
 
-    <!-- BACKGROUNDS PALETTE: swappable media layer (still images + motion loops). Only Placeholder
-         themes take a live background; solid/image themes ignore clicks so no selection ring appears. -->
-    <Border Grid.Row="2" Background="#12161D" Padding="14,8" BorderBrush="#2A303C" BorderThickness="0,1,0,0"
-            DataContext="{Binding Backgrounds}">
+    <!-- BACKGROUNDS PALETTE: swappable media layer (still images + motion loops). Collapsed by
+         default in Media mode so the bin has the height. Only Placeholder themes take a live
+         background; solid/image themes ignore clicks so no selection ring appears. -->
+    <Border Grid.Row="2" Background="#12161D" Padding="14,6" BorderBrush="#2A303C" BorderThickness="0,1,0,0">
       <DockPanel>
-        <StackPanel DockPanel.Dock="Left" Width="120" VerticalAlignment="Center" Spacing="6">
-          <TextBlock Text="BACKGROUNDS" Classes="section" Foreground="#7C6CF6" FontSize="11" FontWeight="SemiBold" />
-          <Button Content="+ Add media" Click="OnAddBackgroundClicked" Classes="ghost" FontSize="12"
-                  Background="#1B202A" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
-          <Button Content="None (theme)" Command="{Binding ClearCommand}" IsEnabled="{Binding HasSelection}"
-                  Classes="ghost" FontSize="12" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
-        </StackPanel>
-
-        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="12,0,0,0">
-          <ItemsControl ItemsSource="{Binding Items}">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate>
-                <StackPanel Orientation="Horizontal" Spacing="8" />
-              </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="op:BackgroundTileViewModel">
-                <Border Classes="bgTile" Classes.selected="{Binding IsSelected}"
-                        DoubleTapped="OnBackgroundTileTapped" Tapped="OnBackgroundTileTapped"
-                        ToolTip.Tip="{Binding Name}">
-                  <Panel>
-                    <!-- Image thumbnail -->
-                    <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" IsVisible="{Binding HasThumbnail}" />
-                    <!-- Motion / no-thumb placeholder -->
-                    <TextBlock Text="▶ MOTION" Foreground="#8B93A1" FontSize="11" FontWeight="SemiBold"
-                               HorizontalAlignment="Center" VerticalAlignment="Center"
-                               IsVisible="{Binding !HasThumbnail}" />
-                    <!-- Motion badge -->
-                    <Border Background="#CC000000" CornerRadius="3" Padding="4,1" Margin="4"
-                            HorizontalAlignment="Left" VerticalAlignment="Top" IsVisible="{Binding IsVideo}">
-                      <TextBlock Text="▶" Foreground="#22C55E" FontSize="10" FontWeight="Bold" />
-                    </Border>
-                    <!-- Filename label -->
-                    <Border Background="#B3000000" VerticalAlignment="Bottom" Padding="5,2">
-                      <TextBlock Text="{Binding Name}" Foreground="#E6E9EF" FontSize="10"
-                                 TextTrimming="CharacterEllipsis" MaxLines="1" />
-                    </Border>
-                    <!-- Remove -->
-                    <Button Content="✕" Click="OnRemoveBackgroundClicked" Classes="ghost"
-                            HorizontalAlignment="Right" VerticalAlignment="Top" Padding="4,1" FontSize="10"
-                            Foreground="#F87171" Background="#CC000000" />
-                  </Panel>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </ScrollViewer>
-      </DockPanel>
-    </Border>
-
-    <!-- AI LISTENING BAR (slim; mic, status, last-heard, level, device, start/stop) with an
-         expandable live-transcript panel so the operator can see exactly what the AI is hearing -->
-    <Border Grid.Row="3" Background="#14181F" Padding="14,7" BorderBrush="#2A303C" BorderThickness="0,1,0,0"
-            DataContext="{Binding Transcription}" ClipToBounds="True">
-      <DockPanel LastChildFill="True">
-
-      <!-- Expandable live transcript (newest words anchored at the bottom for a real-time feel) -->
-      <Border DockPanel.Dock="Top" IsVisible="{Binding ShowTranscript}" Height="118" ClipToBounds="True"
-              Background="#0E1014" CornerRadius="8" Margin="0,2,0,9" Padding="14,10"
-              BorderBrush="#2A303C" BorderThickness="1">
-        <Grid RowDefinitions="Auto,*">
-          <TextBlock Grid.Row="0" Text="LIVE TRANSCRIPT" Classes="section" Foreground="#6E7682" FontSize="10" Margin="0,0,0,6" />
-          <TextBlock Grid.Row="1" Text="{Binding RecentTranscript}" Foreground="#C9D2DE" FontSize="14" LineHeight="21"
-                     TextWrapping="Wrap" VerticalAlignment="Bottom" />
-        </Grid>
-      </Border>
-
-      <!-- Right-side controls scroll when the window is narrow instead of overlapping neighbors. -->
-      <ScrollViewer DockPanel.Dock="Right" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
-                    Margin="12,0,0,0">
-        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" IsVisible="{Binding IsListening}">
-            <Ellipse Width="8" Height="8" VerticalAlignment="Center" IsVisible="{Binding HasSignal}">
-              <Ellipse.Fill><SolidColorBrush Color="#22C55E" /></Ellipse.Fill>
-            </Ellipse>
-            <Ellipse Width="8" Height="8" VerticalAlignment="Center" IsVisible="{Binding !HasSignal}">
-              <Ellipse.Fill><SolidColorBrush Color="#3C4350" /></Ellipse.Fill>
-            </Ellipse>
-            <ProgressBar Minimum="0" Maximum="100" Value="{Binding AudioLevelPercent}" Height="6" Width="110"
-                         VerticalAlignment="Center" CornerRadius="3">
-              <ProgressBar.Styles>
-                <Style Selector="ProgressBar /template/ Border#PART_Indicator">
-                  <Setter Property="Background" Value="#A78BFA" />
-                  <Setter Property="CornerRadius" Value="3" />
-                </Style>
-                <Style Selector="ProgressBar">
-                  <Setter Property="Background" Value="#232932" />
-                </Style>
-              </ProgressBar.Styles>
-            </ProgressBar>
+        <Button DockPanel.Dock="Top" Classes="ghost" Command="{Binding ToggleBackgroundsSectionCommand}"
+                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="0,2"
+                ToolTip.Tip="Show or hide live backgrounds">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="▶" FontSize="10" Foreground="#8A92A0" VerticalAlignment="Center"
+                       IsVisible="{Binding !BackgroundsExpanded}" />
+            <TextBlock Text="▼" FontSize="10" Foreground="#8A92A0" VerticalAlignment="Center"
+                       IsVisible="{Binding BackgroundsExpanded}" />
+            <TextBlock Text="BACKGROUNDS" Classes="section" Foreground="#7C6CF6" FontSize="11"
+                       FontWeight="SemiBold" VerticalAlignment="Center" />
           </StackPanel>
-
-          <!-- Mic sensitivity: software input gain the operator can tune live while watching the meter. -->
-          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="6,0,0,0"
-                      ToolTip.Tip="Mic sensitivity — raise if the meter barely moves; lower if it pins to the top / clips.">
-            <TextBlock Text="&#127897;" FontSize="13" VerticalAlignment="Center" Foreground="#8B93A1" />
-            <Slider Minimum="1" Maximum="4" Value="{Binding MicSensitivity}" Width="96"
-                    VerticalAlignment="Center" />
-            <TextBlock Text="{Binding MicSensitivityLabel}" Foreground="#A7AFBC" FontSize="11"
-                       MinWidth="34" VerticalAlignment="Center" />
-          </StackPanel>
-
-          <ComboBox ItemsSource="{Binding AudioDevices}" SelectedItem="{Binding SelectedDevice}"
-                    Background="#181C24" Foreground="#ECEEF2" BorderBrush="#3C4350"
-                    CornerRadius="6" Padding="8,4" FontSize="11" MinWidth="120" MaxWidth="220"
-                    VerticalAlignment="Center" ToolTip.Tip="Microphone input device" />
-
-          <Button Command="{Binding ToggleListeningCommand}"
-                  Padding="14,6" CornerRadius="6" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center">
-            <Panel>
-              <TextBlock Text="Stop" IsVisible="{Binding IsListening}" />
-              <TextBlock Text="Start" IsVisible="{Binding !IsListening}" />
-            </Panel>
-            <Button.Styles>
-              <Style Selector="Button">
-                <Setter Property="Background" Value="#A78BFA" />
-                <Setter Property="Foreground" Value="White" />
-              </Style>
-              <Style Selector="Button:pointerover">
-                <Setter Property="Background" Value="#8B5CF6" />
-              </Style>
-            </Button.Styles>
-          </Button>
-        </StackPanel>
-      </ScrollViewer>
-
-      <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
-        <Button Classes="ghost" Command="{Binding ToggleTranscriptCommand}" Padding="6,3" FontSize="12"
-                ToolTip.Tip="Show / hide the live transcript">
-          <Panel>
-            <TextBlock Text="&#9650;" FontSize="10" IsVisible="{Binding !ShowTranscript}" />
-            <TextBlock Text="&#9660;" FontSize="10" IsVisible="{Binding ShowTranscript}" />
-          </Panel>
         </Button>
-        <TextBlock Text="&#127908;" FontSize="14" VerticalAlignment="Center" />
-        <TextBlock Text="AI LISTENING" Classes="section" Foreground="#A78BFA" FontSize="11" VerticalAlignment="Center" />
-        <Border CornerRadius="4" Padding="6,2" VerticalAlignment="Center" Background="#1E2530"
-                BorderBrush="#2F3845" BorderThickness="1" IsVisible="{Binding ShowEngineName}"
-                ToolTip.Tip="Active speech-to-text engine">
-          <TextBlock Text="{Binding EngineName}" Foreground="#8B93A1" FontSize="10" VerticalAlignment="Center" />
-        </Border>
-        <Border CornerRadius="4" Padding="7,3" VerticalAlignment="Center" Background="#232932">
-          <TextBlock Text="{Binding StatusText}" Foreground="#A7AFBC" FontSize="11" MaxWidth="180"
-                     TextTrimming="CharacterEllipsis" />
-        </Border>
-      </StackPanel>
 
-      <TextBlock Text="{Binding LastHeard}" Foreground="#7E8794" FontSize="12" FontStyle="Italic"
-                 VerticalAlignment="Center" Margin="12,0,0,0" TextTrimming="CharacterEllipsis" MaxLines="1"
-                 MinWidth="0" />
+        <Panel IsVisible="{Binding BackgroundsExpanded}" Margin="0,8,0,0">
+          <DockPanel DataContext="{Binding Backgrounds}">
+            <StackPanel DockPanel.Dock="Left" Width="120" VerticalAlignment="Center" Spacing="6">
+              <Button Content="+ Add media" Click="OnAddBackgroundClicked" Classes="ghost" FontSize="12"
+                      Background="#1B202A" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+              <Button Content="None (theme)" Command="{Binding ClearCommand}" IsEnabled="{Binding HasSelection}"
+                      Classes="ghost" FontSize="12" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+            </StackPanel>
+
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="12,0,0,0">
+              <ItemsControl ItemsSource="{Binding Items}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" Spacing="8" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="op:BackgroundTileViewModel">
+                    <Border Classes="bgTile" Classes.selected="{Binding IsSelected}"
+                            DoubleTapped="OnBackgroundTileTapped" Tapped="OnBackgroundTileTapped"
+                            ToolTip.Tip="{Binding Name}">
+                      <Panel>
+                        <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" IsVisible="{Binding HasThumbnail}" />
+                        <TextBlock Text="▶ MOTION" Foreground="#8B93A1" FontSize="11" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   IsVisible="{Binding !HasThumbnail}" />
+                        <Border Background="#CC000000" CornerRadius="3" Padding="4,1" Margin="4"
+                                HorizontalAlignment="Left" VerticalAlignment="Top" IsVisible="{Binding IsVideo}">
+                          <TextBlock Text="▶" Foreground="#22C55E" FontSize="10" FontWeight="Bold" />
+                        </Border>
+                        <Border Background="#B3000000" VerticalAlignment="Bottom" Padding="5,2">
+                          <TextBlock Text="{Binding Name}" Foreground="#E6E9EF" FontSize="10"
+                                     TextTrimming="CharacterEllipsis" MaxLines="1" />
+                        </Border>
+                        <Button Content="✕" Click="OnRemoveBackgroundClicked" Classes="ghost"
+                                HorizontalAlignment="Right" VerticalAlignment="Top" Padding="4,1" FontSize="10"
+                                Foreground="#F87171" Background="#CC000000" />
+                      </Panel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </DockPanel>
+        </Panel>
       </DockPanel>
     </Border>
 
     <!-- STATUS BAR -->
-    <Border Grid.Row="4" Background="#181C24" Padding="16,7" BorderBrush="#2A303C" BorderThickness="0,1,0,0">
+    <Border Grid.Row="3" Background="#181C24" Padding="16,7" BorderBrush="#2A303C" BorderThickness="0,1,0,0">
       <Grid ColumnDefinitions="*,Auto">
         <TextBlock Text="{Binding StatusText}" Foreground="#959DAB" FontSize="12" VerticalAlignment="Center" />
 
@@ -1917,6 +1992,11 @@
             </Border>
           </Panel>
 
+          <Button Content="Sign out" Command="{Binding SignOutCommand}" IsVisible="{Binding IsSignedIn}"
+                  Background="Transparent" Foreground="#F87171" FontSize="11" FontWeight="SemiBold"
+                  Padding="8,3" BorderThickness="0" Cursor="Hand"
+                  ToolTip.Tip="Sign out of this seat" />
+
           <Button Command="{Binding CheckForUpdatesCommand}"
                   Background="Transparent" BorderThickness="0" Padding="6,2" Cursor="Hand"
                   ToolTip.Tip="Check for updates">
@@ -1928,21 +2008,30 @@
 
     <!-- PERSISTENT MEDIA BAR - always visible (any mode) while media is live, so the operator can
          stop/pause it from anywhere (e.g. while preloading scripture in Bible mode). -->
-    <Border Grid.Row="5" Background="#1B202A" Padding="14,8" BorderBrush="#3A2230" BorderThickness="0,1,0,0"
+    <Border Grid.Row="4" Background="#1B202A" Padding="14,8" BorderBrush="#3A2230" BorderThickness="0,1,0,0"
             IsVisible="{Binding MediaPlayback.HasAnyLive}">
-      <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,0,14,0">
           <Ellipse Width="9" Height="9" Fill="#F43F5E" VerticalAlignment="Center" />
           <TextBlock Text="MEDIA LIVE" Foreground="#F43F5E" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" />
         </StackPanel>
         <TextBlock Grid.Column="1" Text="{Binding MediaPlayback.NowPlaying}" Foreground="#ECEEF2" FontSize="12"
                    VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-        <Button Grid.Column="2" Content="{Binding MediaPlayback.PlayPauseGlyph}" Command="{Binding MediaPlayback.PlayPauseCommand}"
-                IsVisible="{Binding MediaPlayback.HasVideoLive}" FontSize="13" Padding="12,5" Margin="0,0,8,0"
-                ToolTip.Tip="Play / pause the live video" />
-        <Button Grid.Column="3" Content="Stop media" Command="{Binding MediaPlayback.ClearAllCommand}"
+        <TextBlock Grid.Column="2" VerticalAlignment="Center" FontSize="12" Foreground="#C2C8D2" Margin="12,0"
+                   IsVisible="{Binding MediaPlayback.HasVideoLive}">
+          <Run Text="{Binding MediaPlayback.PositionText}" /><Run Text=" / " Foreground="#5C6470" /><Run Text="{Binding MediaPlayback.DurationText}" Foreground="#8A93A2" />
+        </TextBlock>
+        <Button Grid.Column="3" Command="{Binding MediaPlayback.PlayPauseCommand}" Classes="queueBtn iconBtn"
+                IsVisible="{Binding MediaPlayback.HasVideoLive}" Padding="12,5" Margin="0,0,8,0"
+                ToolTip.Tip="Play / pause the live video">
+          <Panel Width="14" Height="14">
+            <Path Data="M 3,2 L 3,14 L 13,8 Z" IsVisible="{Binding MediaPlayback.IsPaused}" />
+            <Path Data="M 3,2 H 6.5 V 14 H 3 Z M 9.5,2 H 13 V 14 H 9.5 Z" IsVisible="{Binding !MediaPlayback.IsPaused}" />
+          </Panel>
+        </Button>
+        <Button Grid.Column="4" Content="Clear video" Command="{Binding MediaPlayback.ClearAllCommand}"
                 Background="#2A1414" Foreground="#F87171" FontWeight="SemiBold" FontSize="12" Padding="14,6"
-                ToolTip.Tip="Stop media on all screens" />
+                ToolTip.Tip="Clear live video on every screen" />
       </Grid>
     </Border>
 

@@ -19,6 +19,10 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
     public OperatorWindow()
     {
         InitializeComponent();
+        CanResize = OperatorWindowChrome.CanResize;
+        ExtendClientAreaToDecorationsHint = OperatorWindowChrome.ExtendClientArea;
+        WindowState = OperatorWindowChrome.StartsMaximized ? WindowState.Maximized : WindowState.Normal;
+        SystemDecorations = SystemDecorations.Full;
 
         // Handle paging arrows in the TUNNEL phase so they fire before any focused ListBox swallows
         // them for its own selection movement. This is why arrows previously did nothing once a
@@ -732,8 +736,7 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
         try
         {
             if (DataContext is not OperatorViewModel vm) return;
-            var dialog = new SettingsWindow { DataContext = vm };
-            await dialog.ShowDialog(this);
+            await ShowOwnedDialogAsync(new SettingsWindow { DataContext = vm }, sender as Control);
         }
         catch (Exception ex)
         {
@@ -746,8 +749,7 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
         try
         {
             if (DataContext is not OperatorViewModel vm) return;
-            var dialog = new PreServiceWindow { DataContext = new PreServiceViewModel(vm) };
-            await dialog.ShowDialog(this);
+            await ShowOwnedDialogAsync(new PreServiceWindow { DataContext = new PreServiceViewModel(vm) }, sender as Control);
         }
         catch (Exception ex)
         {
@@ -760,23 +762,36 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
         try
         {
             if (DataContext is not OperatorViewModel vm) return;
-
-            // Prevent the Themes nav tooltip from flickering behind the modal dialog (stale pointer-over state).
-            if (sender is Control ctrl)
-            {
-                ToolTip.SetIsOpen(ctrl, false);
-                ToolTip.SetTip(ctrl, null);
-            }
-
-            var dialog = new ThemeStudioWindow { DataContext = vm.CreateThemeStudio() };
-            await dialog.ShowDialog(this);
-
-            if (sender is Control restore)
-                ToolTip.SetTip(restore, "Design themes — one look for scripture, songs, notes, and announcements");
+            await ShowOwnedDialogAsync(new ThemeStudioWindow { DataContext = vm.CreateThemeStudio() }, sender as Control);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "Failed to open theme studio dialog");
+        }
+    }
+
+    /// <summary>
+    /// Modal over the operator window. Avalonia keeps the trigger in pointer-over, so the
+    /// owner tooltip flickers against the dialog unless we clear it for the duration.
+    /// </summary>
+    private async Task ShowOwnedDialogAsync(Window dialog, Control? trigger)
+    {
+        object? saved = null;
+        if (trigger is not null)
+        {
+            saved = ToolTip.GetTip(trigger);
+            ToolTip.SetIsOpen(trigger, false);
+            ToolTip.SetTip(trigger, OwnerDialogTooltips.TipWhileOpen(true, saved));
+        }
+
+        try
+        {
+            await dialog.ShowDialog(this);
+        }
+        finally
+        {
+            if (trigger is not null)
+                ToolTip.SetTip(trigger, OwnerDialogTooltips.TipWhileOpen(false, saved));
         }
     }
 
@@ -843,6 +858,15 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
         if (DataContext is OperatorViewModel vm && sender is Control { DataContext: MediaTileViewModel tile })
             vm.MediaPlayback.RemoveCommand.Execute(tile).Subscribe();
         e.Handled = true;
+    }
+
+    public void OnDeleteMediaFolderMenu(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not OperatorViewModel vm) return;
+        var folder = sender is MenuItem { DataContext: MediaFolderOption option }
+            ? option
+            : (sender as Control)?.DataContext as MediaFolderOption;
+        _ = vm.MediaPlayback.DeleteFolderAsync(folder);
     }
 
     public async void OnAddMediaClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)

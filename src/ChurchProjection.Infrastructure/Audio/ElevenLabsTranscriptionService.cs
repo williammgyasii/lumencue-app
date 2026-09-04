@@ -71,8 +71,8 @@ public sealed class ElevenLabsTranscriptionService : ITranscriptionService
     }
 
     public ElevenLabsTranscriptionService(ISttTokenProvider tokenProvider, double minConfidence = 0.5,
-        double inputGain = 1.0, bool vadGate = true, double vadThreshold = 0.01)
-        : this(tokenProvider, apiKey: null, minConfidence, inputGain, vadGate, vadThreshold)
+        double inputGain = 1.0, bool vadGate = true, double vadThreshold = 0.01, string? apiKey = null)
+        : this(tokenProvider, apiKey, minConfidence, inputGain, vadGate, vadThreshold)
     {
     }
 
@@ -123,19 +123,20 @@ public sealed class ElevenLabsTranscriptionService : ITranscriptionService
 
         string? singleUseToken = null;
         if (_tokenProvider is not null)
-        {
             singleUseToken = await _tokenProvider.GetTokenAsync().ConfigureAwait(false);
-            if (string.IsNullOrWhiteSpace(singleUseToken))
-            {
-                Log.Error("No ElevenLabs Scribe token available");
-                _statusMessage.OnNext("Speech token unavailable");
-                return;
-            }
-        }
-        else if (string.IsNullOrWhiteSpace(_apiKey))
+
+        var auth = SttAuthPolicy.Resolve(singleUseToken, _apiKey);
+        if (auth == SttAuthMode.Unavailable)
         {
+            Log.Error("No ElevenLabs Scribe token or local key available");
             _statusMessage.OnNext("Speech token unavailable");
             return;
+        }
+
+        if (auth == SttAuthMode.LocalKey)
+        {
+            Log.Warning("STT: cloud token mint failed; using local ElevenLabs key");
+            singleUseToken = null;
         }
 
         var ws = new ClientWebSocket();

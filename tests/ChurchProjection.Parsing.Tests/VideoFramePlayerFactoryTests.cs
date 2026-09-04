@@ -22,6 +22,14 @@ public class VideoFramePlayerFactoryTests
     }
 
     [Fact]
+    public void VideoPlayRequest_PathOnly_DoesNotLoop()
+    {
+        var request = new VideoPlayRequest("/tmp/clip.mp4");
+
+        Assert.False(request.Loop);
+    }
+
+    [Fact]
     public void Start_MissingFile_IsNotRunning()
     {
         using var player = VideoFramePlayerFactory.Start(

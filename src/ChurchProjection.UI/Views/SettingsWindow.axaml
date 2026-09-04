@@ -3,27 +3,30 @@
         xmlns:vm="using:ChurchProjection.UI.ViewModels"
         xmlns:op="using:ChurchProjection.UI.ViewModels.Operator"
         xmlns:cs="using:ChurchProjection.Core.Services"
-        xmlns:proj="using:ChurchProjection.Core.Models.Projection"
+        xmlns:icons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
         x:Class="ChurchProjection.UI.Views.SettingsWindow"
         x:DataType="vm:OperatorViewModel"
         Title="Settings"
         Icon="/Assets/app-icon.png"
-        Width="780" Height="620"
-        MinWidth="660" MinHeight="460"
+        Width="{x:Static cs:SettingsFormChrome.WindowWidth}"
+        Height="{x:Static cs:SettingsFormChrome.WindowHeight}"
+        MinWidth="{x:Static cs:SettingsFormChrome.WindowWidth}"
+        MinHeight="{x:Static cs:SettingsFormChrome.WindowHeight}"
+        MaxWidth="{x:Static cs:SettingsFormChrome.WindowWidth}"
+        MaxHeight="{x:Static cs:SettingsFormChrome.WindowHeight}"
         WindowStartupLocation="CenterOwner"
-        CanResize="True"
+        CanResize="{x:Static cs:SettingsFormChrome.CanResize}"
         Background="#0E1014"
         ShowInTaskbar="False">
 
   <Window.Styles>
-    <!-- Sidebar nav -->
     <Style Selector="ListBox.nav">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="Padding" Value="6,4" />
+      <Setter Property="Padding" Value="8,4" />
     </Style>
     <Style Selector="ListBox.nav ListBoxItem">
-      <Setter Property="Padding" Value="12,9" />
+      <Setter Property="Padding" Value="10,8" />
       <Setter Property="Margin" Value="2,2" />
       <Setter Property="CornerRadius" Value="8" />
       <Setter Property="Foreground" Value="#959DAB" />
@@ -43,20 +46,28 @@
       <Setter Property="Background" Value="#2E2A52" />
     </Style>
 
-    <!-- Hide the TabControl's own header strip; navigation is driven by the sidebar list -->
     <Style Selector="TabControl /template/ ItemsPresenter">
       <Setter Property="IsVisible" Value="False" />
     </Style>
     <Style Selector="TabControl">
       <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="VerticalContentAlignment" Value="Stretch" />
     </Style>
     <Style Selector="TabItem">
       <Setter Property="Padding" Value="0" />
       <Setter Property="Margin" Value="0" />
       <Setter Property="MinHeight" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="VerticalContentAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="ScrollViewer.page">
+      <Setter Property="VerticalAlignment" Value="Stretch" />
+      <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+      <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+      <Setter Property="MaxHeight" Value="{x:Static cs:SettingsFormChrome.ContentPaneHeight}" />
     </Style>
 
-    <!-- Inputs -->
     <Style Selector="ComboBox">
       <Setter Property="Background" Value="#181C24" />
       <Setter Property="Foreground" Value="#ECEEF2" />
@@ -74,11 +85,11 @@
       <Setter Property="FontSize" Value="13" />
     </Style>
 
-    <!-- Row label -->
     <Style Selector="TextBlock.rowTitle">
       <Setter Property="Foreground" Value="#ECEEF2" />
       <Setter Property="FontSize" Value="13" />
       <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
     <Style Selector="TextBlock.rowHint">
       <Setter Property="Foreground" Value="#6E7682" />
@@ -91,149 +102,218 @@
       <Setter Property="FontWeight" Value="Medium" />
     </Style>
 
-    <!-- Setting row: bottom divider + comfortable height -->
-    <Style Selector="Border.row">
-      <Setter Property="BorderBrush" Value="#1E232C" />
-      <Setter Property="BorderThickness" Value="0,0,0,1" />
-      <Setter Property="Padding" Value="0,16" />
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="#14181F" />
+      <Setter Property="BorderBrush" Value="#2A303C" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Padding" Value="14,12" />
+      <Setter Property="Margin" Value="0,0,0,8" />
     </Style>
 
-    <Style Selector="ToggleSwitch">
-      <Setter Property="HorizontalAlignment" Value="Right" />
-      <Setter Property="OnContent" Value="" />
-      <Setter Property="OffContent" Value="" />
-      <Setter Property="MinWidth" Value="0" />
+    <Style Selector="ToggleButton.compactSwitch">
+      <Setter Property="Width" Value="40" />
+      <Setter Property="Height" Value="22" />
+      <Setter Property="MinWidth" Value="40" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border x:Name="track" Width="40" Height="22" CornerRadius="11" Background="#3C4350">
+            <Panel>
+              <Ellipse x:Name="knobOff" Width="16" Height="16" Fill="#ECEEF2"
+                       HorizontalAlignment="Left" Margin="3,0" />
+              <Ellipse x:Name="knobOn" Width="16" Height="16" Fill="#0E1014"
+                       HorizontalAlignment="Right" Margin="3,0" IsVisible="False" />
+            </Panel>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="ToggleButton.compactSwitch:checked /template/ Border#track">
+      <Setter Property="Background" Value="#22C55E" />
+    </Style>
+    <Style Selector="ToggleButton.compactSwitch:checked /template/ Ellipse#knobOff">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="ToggleButton.compactSwitch:checked /template/ Ellipse#knobOn">
+      <Setter Property="IsVisible" Value="True" />
     </Style>
   </Window.Styles>
 
   <DockPanel>
 
-    <!-- Footer -->
-    <Border DockPanel.Dock="Bottom" Background="#0E1014" Padding="24,14" BorderBrush="#2A303C" BorderThickness="0,1,0,0">
+    <Border DockPanel.Dock="Bottom" Background="#0E1014" Padding="20,14" BorderBrush="#2A303C" BorderThickness="0,1,0,0">
       <Button Content="Done" HorizontalAlignment="Right"
               Background="#7C6CF6" Foreground="White" FontWeight="SemiBold"
               Padding="26,9" CornerRadius="6" FontSize="13"
               Click="OnDoneClicked" />
     </Border>
 
-    <Grid ColumnDefinitions="216,*">
+    <Grid ColumnDefinitions="Auto,*">
 
-      <!-- Sidebar -->
-      <Border Grid.Column="0" Background="#14181F" BorderBrush="#2A303C" BorderThickness="0,0,1,0">
+      <Border Grid.Column="0" Width="{x:Static cs:SettingsFormChrome.SidebarWidth}"
+              Background="#14181F" BorderBrush="#2A303C" BorderThickness="0,0,1,0">
         <DockPanel>
-          <StackPanel DockPanel.Dock="Top" Spacing="2" Margin="18,20,16,14">
+          <StackPanel DockPanel.Dock="Top" Spacing="2" Margin="16,20,12,14">
             <TextBlock Classes="h1" Text="Settings" FontSize="18" Foreground="#ECEEF2" />
-            <TextBlock Text="App &amp; output preferences" Foreground="#6E7682" FontSize="12" />
+            <TextBlock Text="App &amp; output" Foreground="#6E7682" FontSize="12" />
           </StackPanel>
 
           <ListBox x:Name="Nav" Classes="nav" SelectedIndex="0">
-            <ListBoxItem>Display</ListBoxItem>
-            <ListBoxItem>Behavior</ListBoxItem>
-            <ListBoxItem>Screens</ListBoxItem>
-            <ListBoxItem>ProPresenter</ListBoxItem>
-            <ListBoxItem>About</ListBoxItem>
+            <ListBoxItem>
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <icons:MaterialIcon Kind="Monitor" Width="18" Height="18" />
+                <TextBlock Text="Display" VerticalAlignment="Center" />
+              </StackPanel>
+            </ListBoxItem>
+            <ListBoxItem>
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <icons:MaterialIcon Kind="Tune" Width="18" Height="18" />
+                <TextBlock Text="Behavior" VerticalAlignment="Center" />
+              </StackPanel>
+            </ListBoxItem>
+            <ListBoxItem>
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <icons:MaterialIcon Kind="ProjectorScreen" Width="18" Height="18" />
+                <TextBlock Text="Screens" VerticalAlignment="Center" />
+              </StackPanel>
+            </ListBoxItem>
+            <ListBoxItem>
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <icons:MaterialIcon Kind="Cast" Width="18" Height="18" />
+                <TextBlock Text="ProPresenter" VerticalAlignment="Center" />
+              </StackPanel>
+            </ListBoxItem>
+            <ListBoxItem>
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <icons:MaterialIcon Kind="InformationOutline" Width="18" Height="18" />
+                <TextBlock Text="About" VerticalAlignment="Center" />
+              </StackPanel>
+            </ListBoxItem>
           </ListBox>
         </DockPanel>
       </Border>
 
-      <!-- Content pages, driven by the sidebar selection -->
       <TabControl Grid.Column="1" Background="Transparent"
+                  VerticalAlignment="Stretch"
                   SelectedIndex="{Binding #Nav.SelectedIndex}">
 
-        <!-- DISPLAY -->
         <TabItem>
-          <ScrollViewer Padding="28,24" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Spacing="0">
-              <TextBlock Classes="h1" Text="Display" FontSize="22" Foreground="#ECEEF2" Margin="0,0,0,8" />
-              <TextBlock Text="How scripture and songs are rendered on the projector screens." Classes="rowHint" Margin="0,0,0,8" />
+          <ScrollViewer Classes="page" Padding="20,24">
+            <StackPanel Width="{x:Static cs:SettingsFormChrome.ContentWidth}"
+                        MaxWidth="{x:Static cs:SettingsFormChrome.ContentWidth}"
+                        HorizontalAlignment="Left">
+              <TextBlock Classes="h1" Text="Display" FontSize="22" Foreground="#ECEEF2" Margin="0,0,0,6" />
+              <TextBlock Text="How scripture and songs are rendered on the projector screens." Classes="rowHint" Margin="0,0,0,14" />
 
-              <Border Classes="row">
-                <Grid ColumnDefinitions="*,240" VerticalAlignment="Center">
-                  <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+              <Border Classes="card">
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,12,0">
                     <TextBlock Classes="rowTitle" Text="Font size" />
                     <TextBlock Classes="rowHint" Text="Base size for projected body text." />
                   </StackPanel>
-                  <ComboBox Grid.Column="1" ItemsSource="{Binding FontSizeOptions}" SelectedItem="{Binding ProjectorFontSize}" />
+                  <ComboBox Grid.Column="1" Width="{x:Static cs:SettingsFormChrome.ComboColumnWidth}"
+                            ItemsSource="{Binding FontSizeOptions}" SelectedItem="{Binding ProjectorFontSize}" />
                 </Grid>
               </Border>
 
-              <Border Classes="row">
-                <Grid ColumnDefinitions="*,240" VerticalAlignment="Center">
-                  <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+              <Border Classes="card">
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,12,0">
                     <TextBlock Classes="rowTitle" Text="Background" />
                     <TextBlock Classes="rowHint" Text="Use Transparent when keying over an ATEM / video source." />
                   </StackPanel>
-                  <ComboBox Grid.Column="1" ItemsSource="{Binding BackgroundOptions}" SelectedItem="{Binding ProjectorBackground}" />
+                  <ComboBox Grid.Column="1" Width="{x:Static cs:SettingsFormChrome.ComboColumnWidth}"
+                            ItemsSource="{Binding BackgroundOptions}" SelectedItem="{Binding ProjectorBackground}" />
                 </Grid>
               </Border>
 
-              <Border Classes="row">
-                <Grid ColumnDefinitions="*,240" VerticalAlignment="Center">
-                  <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+              <Border Classes="card">
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,12,0">
                     <TextBlock Classes="rowTitle" Text="Layout style" />
                     <TextBlock Classes="rowHint" Text="Full screen, lower-third, and more." />
                   </StackPanel>
-                  <ComboBox Grid.Column="1" ItemsSource="{Binding LayoutOptions}" SelectedItem="{Binding ProjectorLayout}" />
+                  <ComboBox Grid.Column="1" Width="{x:Static cs:SettingsFormChrome.ComboColumnWidth}"
+                            ItemsSource="{Binding LayoutOptions}" SelectedItem="{Binding ProjectorLayout}" />
                 </Grid>
               </Border>
             </StackPanel>
           </ScrollViewer>
         </TabItem>
 
-        <!-- BEHAVIOR -->
         <TabItem>
-          <ScrollViewer Padding="28,24" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Spacing="0">
-              <TextBlock Classes="h1" Text="Behavior" FontSize="22" Foreground="#ECEEF2" Margin="0,0,0,8" />
-              <TextBlock Text="Operator workflow defaults." Classes="rowHint" Margin="0,0,0,8" />
+          <ScrollViewer Classes="page" Padding="20,24">
+            <StackPanel Width="{x:Static cs:SettingsFormChrome.ContentWidth}"
+                        MaxWidth="{x:Static cs:SettingsFormChrome.ContentWidth}"
+                        HorizontalAlignment="Left">
+              <TextBlock Classes="h1" Text="Behavior" FontSize="22" Foreground="#ECEEF2" Margin="0,0,0,6" />
+              <TextBlock Text="Operator workflow defaults." Classes="rowHint" Margin="0,0,0,14" />
 
-              <Border Classes="row">
-                <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-                  <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+              <Border Classes="card">
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,12,0">
                     <TextBlock Classes="rowTitle" Text="Single click sends to live" />
                     <TextBlock Classes="rowHint" Text="Skip the preview step — items go directly to the projector." />
                   </StackPanel>
-                  <ToggleSwitch Grid.Column="1" IsChecked="{Binding SingleClickGoesLive}" />
+                  <ToggleButton Grid.Column="1" Classes="compactSwitch" IsChecked="{Binding SingleClickGoesLive}" />
                 </Grid>
               </Border>
 
-              <Border Classes="row">
-                <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-                  <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+              <Border Classes="card">
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,12,0">
                     <TextBlock Classes="rowTitle" Text="Auto-start AI Listening" />
                     <TextBlock Classes="rowHint" Text="Begin transcription automatically when the app launches." />
                   </StackPanel>
-                  <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoStartListening}" />
+                  <ToggleButton Grid.Column="1" Classes="compactSwitch" IsChecked="{Binding AutoStartListening}" />
+                </Grid>
+              </Border>
+
+              <Border Classes="card">
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,12,0">
+                    <TextBlock Classes="rowTitle" Text="Update live scripture when I change translation" />
+                    <TextBlock Classes="rowHint" Text="When off, the picker and search change language but the verse already on screen stays put until you send it again." />
+                  </StackPanel>
+                  <ToggleButton Grid.Column="1" Classes="compactSwitch" IsChecked="{Binding UpdateLiveOnTranslationChange}" />
                 </Grid>
               </Border>
             </StackPanel>
           </ScrollViewer>
         </TabItem>
 
-        <!-- SCREENS -->
         <TabItem>
-          <ScrollViewer Padding="28,24" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Spacing="0">
-              <TextBlock Classes="h1" Text="Screens" FontSize="22" Foreground="#ECEEF2" Margin="0,0,0,8" />
-              <TextBlock Classes="rowHint" Margin="0,0,0,14"
-                         Text="Every screen shows the same program feed. Turn each one on/off, give it a name, and pick its view (theme) — e.g. a green-screen lower-third for an ATEM versus a full-screen LED wall. Leave View on 'Follow content' to use the per-content theme. Enable NDI (OBS) to stream the program feed over the network — add an NDI Source in OBS and pick your source name." />
+          <ScrollViewer Classes="page" Padding="20,24">
+            <StackPanel Width="{x:Static cs:SettingsFormChrome.ContentWidth}"
+                        MaxWidth="{x:Static cs:SettingsFormChrome.ContentWidth}"
+                        HorizontalAlignment="Left">
+              <TextBlock Classes="h1" Text="Screens" FontSize="22" Foreground="#ECEEF2" Margin="0,0,0,6" />
+              <TextBlock Classes="rowHint" Margin="0,0,0,10"
+                         Text="Every screen shows the same program feed. Turn each one on/off, name it, and pick its view. Enable NDI to stream to OBS." />
 
-              <Grid ColumnDefinitions="Auto,*,160" ColumnSpacing="14" Margin="0,0,0,4">
+              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" Margin="4,0,4,6">
                 <TextBlock Grid.Column="1" Text="NAME" Foreground="#6E7682" FontSize="10.5" FontWeight="SemiBold" />
-                <TextBlock Grid.Column="2" Text="VIEW (theme)" Foreground="#6E7682" FontSize="10.5" FontWeight="SemiBold" />
+                <TextBlock Grid.Column="2" Text="VIEW (THEME)" Foreground="#6E7682" FontSize="10.5" FontWeight="SemiBold"
+                           Width="{x:Static cs:SettingsFormChrome.ThemeColumnWidth}" />
               </Grid>
 
               <ItemsControl ItemsSource="{Binding Outputs}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:OutputRow">
-                    <Border Classes="row" Padding="0,12">
-                      <Grid ColumnDefinitions="Auto,*,160" ColumnSpacing="14" VerticalAlignment="Center">
-                        <ToggleSwitch Grid.Column="0" IsChecked="{Binding IsActive}" HorizontalAlignment="Left" VerticalAlignment="Center" />
-                        <TextBox Grid.Column="1" Text="{Binding Name}" FontSize="13" VerticalAlignment="Center"
+                    <Border Classes="card">
+                      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" VerticalAlignment="Center">
+                        <ToggleButton Grid.Column="0" Classes="compactSwitch" IsChecked="{Binding IsActive}" />
+                        <TextBox Grid.Column="1" Text="{Binding Name}" FontSize="13"
                                  IsEnabled="{Binding CanRename}"
                                  ToolTip.Tip="The screen's name (e.g. LED Wall, Lobby)" />
-                        <ComboBox Grid.Column="2" ItemsSource="{Binding ThemeOptions}" SelectedItem="{Binding SelectedThemeOption}"
-                                  HorizontalAlignment="Stretch" FontSize="12" VerticalAlignment="Center" />
+                        <ComboBox Grid.Column="2" Width="{x:Static cs:SettingsFormChrome.ThemeColumnWidth}"
+                                  ItemsSource="{Binding ThemeOptions}" SelectedItem="{Binding SelectedThemeOption}"
+                                  HorizontalAlignment="Stretch" FontSize="12" />
                       </Grid>
                     </Border>
                   </DataTemplate>
@@ -243,69 +323,78 @@
           </ScrollViewer>
         </TabItem>
 
-        <!-- PROPRESENTER -->
         <TabItem>
-          <ScrollViewer Padding="28,24" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+          <ScrollViewer Classes="page" Padding="20,24"
                         DataContext="{Binding ProPresenter}" x:DataType="op:ProPresenterViewModel">
-            <StackPanel Spacing="0">
-              <TextBlock Classes="h1" Text="ProPresenter" FontSize="22" Foreground="#ECEEF2" Margin="0,0,0,8" />
-              <TextBlock Classes="rowHint" Margin="0,0,0,16"
-                         Text="Connection &amp; message mapping. Turn the ProPresenter output on/off on the Screens page." />
+            <StackPanel Width="{x:Static cs:SettingsFormChrome.ContentWidth}"
+                        MaxWidth="{x:Static cs:SettingsFormChrome.ContentWidth}"
+                        HorizontalAlignment="Left">
+              <TextBlock Classes="h1" Text="ProPresenter" FontSize="22" Foreground="#ECEEF2" Margin="0,0,0,6" />
+              <TextBlock Classes="rowHint" Margin="0,0,0,14"
+                         Text="Connection and message mapping. Turn the ProPresenter output on/off on the Screens page." />
 
-              <Grid ColumnDefinitions="2*,*" ColumnSpacing="16">
-                <StackPanel Grid.Column="0" Spacing="6">
-                  <TextBlock Classes="label" Text="Host / IP" />
-                  <TextBox Text="{Binding Host}" Watermark="localhost" />
-                </StackPanel>
-                <StackPanel Grid.Column="1" Spacing="6">
-                  <TextBlock Classes="label" Text="Port" />
-                  <TextBox Text="{Binding Port}" Watermark="1025" />
-                </StackPanel>
-              </Grid>
+              <Border Classes="card">
+                <Grid ColumnDefinitions="2*,*" ColumnSpacing="12">
+                  <StackPanel Grid.Column="0" Spacing="6">
+                    <TextBlock Classes="label" Text="Host / IP" />
+                    <TextBox Text="{Binding Host}" Watermark="localhost" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Spacing="6">
+                    <TextBlock Classes="label" Text="Port" />
+                    <TextBox Text="{Binding Port}" Watermark="1025" />
+                  </StackPanel>
+                </Grid>
+              </Border>
 
-              <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,16,0,0">
+              <StackPanel Spacing="8" Margin="0,4,0,12">
                 <Button Content="Test &amp; Load Messages"
                         Command="{Binding TestConnectionCommand}"
                         IsEnabled="{Binding !IsBusy}"
+                        HorizontalAlignment="Left"
                         Background="#262446" Foreground="#C7C0FF" FontWeight="SemiBold"
                         Padding="14,8" CornerRadius="6" FontSize="13" />
-                <TextBlock Text="{Binding StatusText}" Foreground="#959DAB" FontSize="12"
-                           VerticalAlignment="Center" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding StatusText}" Foreground="#959DAB" FontSize="12" TextWrapping="Wrap" />
               </StackPanel>
 
-              <StackPanel Spacing="6" Margin="0,16,0,0">
-                <TextBlock Classes="label" Text="Message" />
-                <ComboBox ItemsSource="{Binding Messages}" SelectedItem="{Binding SelectedMessage}"
-                          PlaceholderText="Connect, then pick a ProPresenter Message">
-                  <ComboBox.ItemTemplate>
-                    <DataTemplate x:DataType="cs:ProMessage">
-                      <TextBlock Text="{Binding Name}" />
-                    </DataTemplate>
-                  </ComboBox.ItemTemplate>
-                </ComboBox>
-              </StackPanel>
-
-              <Grid ColumnDefinitions="*,*" ColumnSpacing="16" Margin="0,16,0,0">
-                <StackPanel Grid.Column="0" Spacing="6">
-                  <TextBlock Classes="label" Text="Verse / body token" />
-                  <ComboBox ItemsSource="{Binding AvailableTokens}" SelectedItem="{Binding SelectedTextToken}"
-                            PlaceholderText="Token for text" />
+              <Border Classes="card">
+                <StackPanel Spacing="6">
+                  <TextBlock Classes="label" Text="Message" />
+                  <ComboBox ItemsSource="{Binding Messages}" SelectedItem="{Binding SelectedMessage}"
+                            PlaceholderText="Connect, then pick a ProPresenter Message">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="cs:ProMessage">
+                        <TextBlock Text="{Binding Name}" />
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
                 </StackPanel>
-                <StackPanel Grid.Column="1" Spacing="6">
-                  <TextBlock Classes="label" Text="Reference token (optional)" />
-                  <ComboBox ItemsSource="{Binding AvailableTokens}" SelectedItem="{Binding SelectedReferenceToken}"
-                            PlaceholderText="Token for reference" />
+              </Border>
+
+              <Border Classes="card">
+                <StackPanel Spacing="12">
+                  <StackPanel Spacing="6">
+                    <TextBlock Classes="label" Text="Verse / body token" />
+                    <ComboBox ItemsSource="{Binding AvailableTokens}" SelectedItem="{Binding SelectedTextToken}"
+                              PlaceholderText="Token for text" />
+                  </StackPanel>
+                  <StackPanel Spacing="6">
+                    <TextBlock Classes="label" Text="Reference token (optional)" />
+                    <ComboBox ItemsSource="{Binding AvailableTokens}" SelectedItem="{Binding SelectedReferenceToken}"
+                              PlaceholderText="Token for reference" />
+                  </StackPanel>
                 </StackPanel>
-              </Grid>
+              </Border>
 
-              <StackPanel Spacing="6" Margin="0,16,0,0">
-                <TextBlock Classes="label" Text="Max characters per slide on LED (0 = off)" />
-                <TextBox Text="{Binding MaxCharsPerSlide}" Watermark="0" Width="120" HorizontalAlignment="Left" />
-                <TextBlock Classes="rowHint"
-                           Text="Splits long passages into smaller pages you arrow through, so text stays readable instead of overflowing the ProPresenter message. ~250 is a good start." />
-              </StackPanel>
+              <Border Classes="card">
+                <StackPanel Spacing="6">
+                  <TextBlock Classes="label" Text="Max characters per slide on LED (0 = off)" />
+                  <TextBox Text="{Binding MaxCharsPerSlide}" Watermark="0" Width="120" HorizontalAlignment="Left" />
+                  <TextBlock Classes="rowHint"
+                             Text="Splits long passages into smaller pages you arrow through. ~250 is a good start." />
+                </StackPanel>
+              </Border>
 
-              <Border Background="#161A22" CornerRadius="8" Padding="14" Margin="0,18,0,0" BorderBrush="#2A303C" BorderThickness="1">
+              <Border Classes="card">
                 <TextBlock Classes="rowHint"
                            Text="In ProPresenter: enable the network, create a Message with text token(s), style it for the LED, then Test &amp; Load here." />
               </Border>
@@ -313,69 +402,64 @@
           </ScrollViewer>
         </TabItem>
 
-        <!-- ABOUT -->
         <TabItem>
-          <ScrollViewer Padding="28,24" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Spacing="0">
-              <TextBlock Classes="h1" Text="About" FontSize="22" Foreground="#ECEEF2" Margin="0,0,0,8" />
-              <TextBlock Text="App information and software updates." Classes="rowHint" Margin="0,0,0,16" />
+          <ScrollViewer Classes="page" Padding="20,24">
+            <StackPanel Width="{x:Static cs:SettingsFormChrome.ContentWidth}"
+                        MaxWidth="{x:Static cs:SettingsFormChrome.ContentWidth}"
+                        HorizontalAlignment="Left">
+              <TextBlock Classes="h1" Text="About" FontSize="22" Foreground="#ECEEF2" Margin="0,0,0,6" />
+              <TextBlock Text="App information and software updates." Classes="rowHint" Margin="0,0,0,14" />
 
-              <!-- Identity -->
-              <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,4,0,8">
-                <Image Source="/Assets/logo.png" Width="56" Height="56" VerticalAlignment="Center" />
+              <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,0,0,12">
+                <Image Source="/Assets/logo.png" Width="48" Height="48" VerticalAlignment="Center" />
                 <StackPanel Spacing="2" VerticalAlignment="Center">
                   <TextBlock Text="LumenCue" Foreground="#ECEEF2" FontSize="20" FontWeight="SemiBold" />
                   <TextBlock Text="{Binding AppVersion}" Foreground="#959DAB" FontSize="13" />
                 </StackPanel>
               </StackPanel>
 
-              <Border Classes="row">
-                <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+              <Border Classes="card">
+                <Grid ColumnDefinitions="*,Auto">
                   <TextBlock Grid.Column="0" Classes="rowTitle" Text="Version" />
                   <TextBlock Grid.Column="1" Text="{Binding AppVersion}" Foreground="#959DAB" FontSize="13" />
                 </Grid>
               </Border>
-              <Border Classes="row">
-                <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-                  <TextBlock Grid.Column="0" Classes="rowTitle" Text="Operating system" />
-                  <TextBlock Grid.Column="1" Text="{Binding OsDescription}" Foreground="#959DAB" FontSize="13" />
-                </Grid>
+              <Border Classes="card">
+                <StackPanel Spacing="4">
+                  <TextBlock Classes="rowTitle" Text="Operating system" />
+                  <TextBlock Text="{Binding OsDescription}" Foreground="#959DAB" FontSize="13" TextWrapping="Wrap" />
+                </StackPanel>
               </Border>
-              <Border Classes="row">
-                <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-                  <TextBlock Grid.Column="0" Classes="rowTitle" Text="Runtime" />
-                  <TextBlock Grid.Column="1" Text="{Binding RuntimeDescription}" Foreground="#959DAB" FontSize="13" />
-                </Grid>
+              <Border Classes="card">
+                <StackPanel Spacing="4">
+                  <TextBlock Classes="rowTitle" Text="Runtime" />
+                  <TextBlock Text="{Binding RuntimeDescription}" Foreground="#959DAB" FontSize="13" TextWrapping="Wrap" />
+                </StackPanel>
               </Border>
 
-              <!-- Updates -->
-              <TextBlock Text="Software updates" Foreground="#ECEEF2" FontSize="15" FontWeight="SemiBold" Margin="0,22,0,4" />
+              <TextBlock Text="Software updates" Foreground="#ECEEF2" FontSize="15" FontWeight="SemiBold" Margin="0,10,0,4" />
               <TextBlock Classes="rowHint" Margin="0,0,0,12"
                          Text="LumenCue checks for updates automatically. You can also check now and install without leaving the app." />
 
-              <Border Background="#161A22" CornerRadius="10" Padding="18" BorderBrush="#2A303C" BorderThickness="1">
+              <Border Classes="card">
                 <StackPanel Spacing="14">
-
-                  <StackPanel Orientation="Horizontal" Spacing="12">
+                  <StackPanel Spacing="8">
                     <Button Content="Check for updates"
                             Command="{Binding CheckForUpdatesCommand}"
                             IsEnabled="{Binding !IsUpdateBusy}"
+                            HorizontalAlignment="Left"
                             Background="#262446" Foreground="#C7C0FF" FontWeight="SemiBold"
                             Padding="14,8" CornerRadius="6" FontSize="13" />
                     <TextBlock Text="Checking for updates…" Foreground="#959DAB" FontSize="13"
-                               VerticalAlignment="Center" IsVisible="{Binding IsCheckingForUpdate}" />
+                               IsVisible="{Binding IsCheckingForUpdate}" TextWrapping="Wrap" />
                     <TextBlock Text="{Binding UpdateMessage}" Foreground="#959DAB" FontSize="13"
-                               VerticalAlignment="Center" IsVisible="{Binding HasUpdateMessage}" />
+                               IsVisible="{Binding HasUpdateMessage}" TextWrapping="Wrap" />
                   </StackPanel>
 
-                  <!-- Update available / download manager -->
                   <StackPanel Spacing="12" IsVisible="{Binding UpdateAvailable}">
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                      <Ellipse Width="9" Height="9" Fill="#7C6CF6" VerticalAlignment="Center" />
-                      <TextBlock Foreground="#ECEEF2" FontSize="13" VerticalAlignment="Center">
-                        <Run Text="LumenCue" /><Run Text=" " /><Run Text="{Binding UpdateVersion}" /><Run Text=" is available" />
-                      </TextBlock>
-                    </StackPanel>
+                    <TextBlock Foreground="#ECEEF2" FontSize="13" TextWrapping="Wrap">
+                      <Run Text="LumenCue" /><Run Text=" " /><Run Text="{Binding UpdateVersion}" /><Run Text=" is available" />
+                    </TextBlock>
 
                     <Button Content="Download &amp; install"
                             Command="{Binding InstallUpdateCommand}"
@@ -384,7 +468,6 @@
                             Background="#7C6CF6" Foreground="White" FontWeight="SemiBold"
                             Padding="16,9" CornerRadius="6" FontSize="13" />
 
-                    <!-- Download progress -->
                     <StackPanel Spacing="6" IsVisible="{Binding IsDownloadingUpdate}">
                       <ProgressBar Minimum="0" Maximum="100" Value="{Binding DownloadProgress}" Height="8"
                                    Foreground="#7C6CF6" Background="#2A303C" CornerRadius="4" />
@@ -393,9 +476,9 @@
                     </StackPanel>
 
                     <TextBlock Text="Installing… LumenCue will restart to finish."
-                               Foreground="#C7C0FF" FontSize="13" IsVisible="{Binding IsInstallingUpdate}" />
+                               Foreground="#C7C0FF" FontSize="13" TextWrapping="Wrap"
+                               IsVisible="{Binding IsInstallingUpdate}" />
                   </StackPanel>
-
                 </StackPanel>
               </Border>
 

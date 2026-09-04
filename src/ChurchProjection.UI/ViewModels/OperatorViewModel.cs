@@ -55,6 +55,8 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     private int _translationRefreshGeneration;
     private int _compareGeneration;
     private readonly List<string> _compareChosen = [];
+    private readonly WorkspaceModeSnapshot _workspace = new();
+    private WorkspaceSelectionCause _selectionCause = WorkspaceSelectionCause.ListRebuild;
 
     // The chapter we've already auto-loaded into the Scripture tab, so projecting another verse from
     // the same chapter doesn't reload it. Lets the operator instantly hop to adjacent verses (the
@@ -86,6 +88,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     private bool _hasMultipleSlides;
     private DisplayOption? _selectedDisplay;
     private bool _singleClickGoesLive;
+    private bool _updateLiveOnTranslationChange = TranslationLiveUpdate.DefaultEnabled;
     private int _selectedContentTab;
     private int _aiSuggestionCount;
     private bool _hasNewSuggestions;
@@ -325,8 +328,21 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     public bool IsLive
     {
         get => _isLive;
-        set => this.RaiseAndSetIfChanged(ref _isLive, value);
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _isLive, value);
+            this.RaisePropertyChanged(nameof(ShowProgramEmptyHint));
+        }
     }
+
+    /// <summary>True when Program has neither a live slide nor live media — show the empty hint.</summary>
+    public bool ShowProgramEmptyHint => ProgramEmptyHint.IsVisible(IsLive, MediaPlayback.HasAnyLive);
+
+    public string ProgramEmptyHintDetail => ProgramEmptyHint.Detail(
+        IsMediaMode ? ProgramEmptyHint.Workspace.Media
+        : IsSongsMode ? ProgramEmptyHint.Workspace.Songs
+        : IsNotesMode ? ProgramEmptyHint.Workspace.Notes
+        : ProgramEmptyHint.Workspace.Bible);
 
     public string PreviewTitle
     {
@@ -598,6 +614,17 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         }
     }
 
+    /// <summary>When true, changing the Bible translation re-projects live scripture into that version.</summary>
+    public bool UpdateLiveOnTranslationChange
+    {
+        get => _updateLiveOnTranslationChange;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _updateLiveOnTranslationChange, value);
+            _ = _settings.SetBoolAsync(TranslationLiveUpdate.SettingsKey, value);
+        }
+    }
+
     public string ProjectorFontSize
     {
         get => _projectorFontSize;
@@ -766,46 +793,108 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         this.RaisePropertyChanged(nameof(ShowNotesTabContent));
         this.RaisePropertyChanged(nameof(ShowScriptureList));
         this.RaisePropertyChanged(nameof(ShowNowSinging));
+        this.RaisePropertyChanged(nameof(ProgramEmptyHintDetail));
+        this.RaisePropertyChanged(nameof(ShowProgramEmptyHint));
     }
 
-    public void EnterBibleMode()
+    public void EnterBibleMode() => SwitchToBible(restorePlace: true);
+
+    private void SwitchToBible(bool restorePlace)
     {
+        var switching = !IsBibleMode;
+        if (switching)
+            RememberCurrentWorkspace();
+
         IsNotesMode = false;
         IsMediaMode = false;
         IsSongsMode = false;
+        SyncUtilityBarExpansion(isMediaMode: false);
         // Scripture-driven service: keep the AI suggestions panel to scriptures only (no songs).
         _aiMatcher.IncludeContentMatches = false;
         if (SelectedContentTab == SongsTabIndex) SelectedContentTab = TopicalTabIndex;
-        _ = ContentSearch.ResetForModeAsync(songsMode: false);
+        if (switching && restorePlace)
+        {
+            _selectionCause = WorkspaceSelectionCause.ModeRestore;
+            _ = ContentSearch.RestorePlaceAsync(_workspace.RestoreBible(), songsMode: false);
+        }
     }
 
-    public void EnterSongsMode()
+    public void EnterSongsMode() => SwitchToSongs(restorePlace: true);
+
+    private void SwitchToSongs(bool restorePlace)
     {
+        var switching = !IsSongsMode;
+        if (switching)
+            RememberCurrentWorkspace();
+
         IsNotesMode = false;
         IsMediaMode = false;
         IsSongsMode = true;
+        SyncUtilityBarExpansion(isMediaMode: false);
         _aiMatcher.IncludeContentMatches = true;
         SelectedContentTab = SongsTabIndex;
-        _ = ContentSearch.ResetForModeAsync(songsMode: true);
+        if (switching && restorePlace)
+        {
+            _selectionCause = WorkspaceSelectionCause.ModeRestore;
+            var place = _workspace.RestoreSongs();
+            _ = place is null
+                ? ContentSearch.ResetForModeAsync(songsMode: true)
+                : ContentSearch.RestorePlaceAsync(place.Value, songsMode: true);
+        }
     }
 
     /// <summary>Switches the center area to the Media Playback view (graphics/videos + transport).</summary>
     public void EnterMediaMode()
     {
+        if (!IsMediaMode)
+            RememberCurrentWorkspace();
+
         IsNotesMode = false;
         IsSongsMode = false;
         IsMediaMode = true;
+        SyncUtilityBarExpansion(isMediaMode: true);
+    }
+
+    private void RememberCurrentWorkspace()
+    {
+        if (IsBibleMode)
+        {
+            var place = ContentSearch.CapturePlace();
+            if (place is not null)
+                _workspace.RememberBible(place.Value);
+        }
+        else if (IsSongsMode)
+        {
+            var place = ContentSearch.CapturePlace();
+            if (place is not null)
+                _workspace.RememberSongs(place.Value);
+        }
+        else if (IsMediaMode)
+        {
+            _workspace.RememberMediaFolder(MediaPlayback.SelectedFolder.Id);
+        }
     }
 
     public void EnterNotesMode()
     {
+        if (!IsNotesMode)
+            RememberCurrentWorkspace();
+
         IsSongsMode = false;
         IsMediaMode = false;
         IsNotesMode = true;
+        SyncUtilityBarExpansion(isMediaMode: false);
         _ = Notes.LoadAsync();
         StatusText = Notes.HasNotes
             ? "Double-click a note to open its slides."
             : "Add a note, then double-click it to open its slides.";
+    }
+
+    private void SyncUtilityBarExpansion(bool isMediaMode)
+    {
+        var expanded = MediaWorkspaceChrome.UtilityBarsExpanded(isMediaMode);
+        BackgroundsExpanded = expanded;
+        AiListeningExpanded = expanded;
     }
 
     public bool HasNewTopical
@@ -976,6 +1065,22 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
 
     public ReactiveCommand<Unit, Unit> ToggleLibrarySectionCommand { get; }
     public ReactiveCommand<Unit, Unit> TogglePlaylistsSectionCommand { get; }
+    public ReactiveCommand<Unit, Unit> ToggleBackgroundsSectionCommand { get; }
+    public ReactiveCommand<Unit, Unit> ToggleAiListeningSectionCommand { get; }
+
+    private bool _backgroundsExpanded = true;
+    public bool BackgroundsExpanded
+    {
+        get => _backgroundsExpanded;
+        set => this.RaiseAndSetIfChanged(ref _backgroundsExpanded, value);
+    }
+
+    private bool _aiListeningExpanded = true;
+    public bool AiListeningExpanded
+    {
+        get => _aiListeningExpanded;
+        set => this.RaiseAndSetIfChanged(ref _aiListeningExpanded, value);
+    }
 
     /// <summary>Saved set lists shown in the left sidebar for fast referencing.</summary>
     public ObservableCollection<SavedPlaylist> Playlists { get; } = [];
@@ -1081,6 +1186,8 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         _themeAssetStore = themeAssetStore;
         Backgrounds = new BackgroundsViewModel(liveBackground);
         MediaPlayback = new Operator.MediaPlaybackViewModel(announcements, Outputs);
+        MediaPlayback.WhenAnyValue(m => m.HasAnyLive)
+            .Subscribe(_ => this.RaisePropertyChanged(nameof(ShowProgramEmptyHint)));
         CompareCards.CollectionChanged += (_, _) => this.RaisePropertyChanged(nameof(HasCompareCards));
 
         _updates = updates;
@@ -1142,6 +1249,8 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         DeletePlaylistCommand = ReactiveCommand.Create<SavedPlaylist>(DeletePlaylist);
         ToggleLibrarySectionCommand = ReactiveCommand.Create(() => { LibraryExpanded = !LibraryExpanded; });
         TogglePlaylistsSectionCommand = ReactiveCommand.Create(() => { PlaylistsExpanded = !PlaylistsExpanded; });
+        ToggleBackgroundsSectionCommand = ReactiveCommand.Create(() => { BackgroundsExpanded = !BackgroundsExpanded; });
+        ToggleAiListeningSectionCommand = ReactiveCommand.Create(() => { AiListeningExpanded = !AiListeningExpanded; });
         ShowLibraryTabCommand = ReactiveCommand.Create(() => { SelectedContentTab = 0; });
         ShowSuggestionsTabCommand = ReactiveCommand.Create(() => { SelectedContentTab = SuggestionsTabIndex; });
         ClearSuggestionsCommand = ReactiveCommand.Create(() => { Transcription.Suggestions.Clear(); HasNewSuggestions = false; });
@@ -1227,12 +1336,15 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
                 if (item is not null)
                 {
                     SetPreview(item.Title, item.Body, item.Footer);
-                    if (SingleClickGoesLive) SendItemToLive(item);
+                    if (WorkspaceSelectionPolicy.MaySendLive(_selectionCause, SingleClickGoesLive))
+                        SendItemToLive(item);
                 }
                 else if (Transcription.SelectedSuggestion is null)
                 {
                     ClearPreview();
                 }
+
+                _selectionCause = WorkspaceSelectionCause.ListRebuild;
             });
 
         Transcription.WhenAnyValue<TranscriptionViewModel, SuggestionItem?>(x => x.SelectedSuggestion)
@@ -1797,7 +1909,9 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         var origin = _liveScriptureRef?.VerseStart ?? 0;
         await ContentSearch.HandleTranslationChangeAsync(origin, _liveScriptureRef);
         RelinkLiveHighlight();
-        await RefreshLiveTranslationAsync(translation, generation);
+        var scriptureLive = _liveSlideType == SlideType.Scripture && _liveScriptureRef is not null;
+        if (TranslationLiveUpdate.ShouldRefreshLive(UpdateLiveOnTranslationChange, scriptureLive))
+            await RefreshLiveTranslationAsync(translation, generation);
     }
 
     /// <summary>
@@ -1925,7 +2039,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
 
     private void LoadChapterIntoLibrary(string book, int chapter, int originVerse)
     {
-        EnterBibleMode();
+        SwitchToBible(restorePlace: false);
         SelectedContentTab = 0;
         StatusText = $"Loading {book} {chapter}...";
         _ = ContentSearch.LoadFullChapterAsync(book, chapter, originVerse);
@@ -1933,7 +2047,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
 
     private void LoadBookIntoLibrary(string book, int originChapter, int originVerse)
     {
-        EnterBibleMode();
+        SwitchToBible(restorePlace: false);
         SelectedContentTab = 0;
         StatusText = $"Loading {book}...";
         _ = ContentSearch.LoadFullBookAsync(book, originChapter, originVerse);
@@ -2448,7 +2562,7 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     public void LoadPlaylist(SavedPlaylist? playlist)
     {
         if (playlist is null || playlist.Items.Count == 0) return;
-        EnterSongsMode();
+        SwitchToSongs(restorePlace: false);
         var title = playlist.Items[0].Title;
         var song = LibrarySongs.FirstOrDefault(s =>
             s.Title.Equals(title, StringComparison.OrdinalIgnoreCase));
@@ -2607,6 +2721,9 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
     {
         _singleClickGoesLive = await _settings.GetBoolAsync("single_click_goes_live", false);
         this.RaisePropertyChanged(nameof(SingleClickGoesLive));
+        _updateLiveOnTranslationChange = await _settings.GetBoolAsync(
+            TranslationLiveUpdate.SettingsKey, TranslationLiveUpdate.DefaultEnabled);
+        this.RaisePropertyChanged(nameof(UpdateLiveOnTranslationChange));
 
         _projectorFontSize = await _settings.GetAsync("projector_font_size") ?? "Large";
         this.RaisePropertyChanged(nameof(ProjectorFontSize));

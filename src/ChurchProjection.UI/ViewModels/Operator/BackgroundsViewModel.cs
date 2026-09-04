@@ -7,6 +7,7 @@ using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 using ChurchProjection.Core.Models.Projection;
 using ChurchProjection.UI.Services;
 using ChurchProjection.UI.Services.Video;
@@ -110,7 +111,8 @@ public sealed class BackgroundTileViewModel : ReactiveObject, IDisposable
     private bool _isSelected;
     private Bitmap? _thumbnail;
     private readonly Bitmap? _imageThumbnail;
-    private readonly IVideoFramePlayer? _preview;
+    private IVideoFramePlayer? _preview;
+    private bool _gotStill;
 
     public BackgroundTileViewModel(LiveBackground model)
     {
@@ -174,11 +176,36 @@ public sealed class BackgroundTileViewModel : ReactiveObject, IDisposable
         set => this.RaiseAndSetIfChanged(ref _isSelected, value);
     }
 
-    private void OnPreviewFrame(Bitmap frame) => Thumbnail = frame;
+    private void OnPreviewFrame(Bitmap frame)
+    {
+        if (_gotStill) return;
+        _gotStill = true;
+
+        try
+        {
+            using var ms = new MemoryStream();
+            frame.Save(ms);
+            ms.Position = 0;
+            Thumbnail = new Bitmap(ms);
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "Could not freeze background thumbnail for {Path}", Model.Path);
+            Thumbnail = frame;
+            return;
+        }
+
+        var player = _preview;
+        _preview = null;
+        Dispatcher.UIThread.Post(() => player?.Dispose(), DispatcherPriority.Background);
+    }
 
     public void Dispose()
     {
         _preview?.Dispose();
+        _preview = null;
         SafeBitmapDisposal.Retire(_imageThumbnail);
+        if (!ReferenceEquals(_thumbnail, _imageThumbnail))
+            SafeBitmapDisposal.Retire(_thumbnail);
     }
 }

@@ -152,7 +152,7 @@ public class App : Application
         var elevenLabsKey = config["ElevenLabs:ApiKey"];
         if (!string.IsNullOrWhiteSpace(cloudApiBaseUrl))
         {
-            Log.Information("STT: ElevenLabs Scribe v2 (cloud token), confidence gate {Min:P0}", minConfidence);
+            Log.Information("STT: ElevenLabs Scribe v2 (cloud token, local key fallback), confidence gate {Min:P0}", minConfidence);
             var sttHttp = new HttpClient(new SeatAuthHandler(seatTokens, new HttpClientHandler()))
             {
                 BaseAddress = new Uri(cloudApiBaseUrl.TrimEnd('/') + "/"),
@@ -161,7 +161,7 @@ public class App : Application
             var sttTokenProvider = new HttpSttTokenProvider(sttHttp);
             services.AddSingleton<ISttTokenProvider>(sttTokenProvider);
             services.AddSingleton<ITranscriptionService>(_ =>
-                new ElevenLabsTranscriptionService(sttTokenProvider, minConfidence, inputGain, vadGate, vadThreshold));
+                new ElevenLabsTranscriptionService(sttTokenProvider, minConfidence, inputGain, vadGate, vadThreshold, elevenLabsKey));
         }
         else if (!string.IsNullOrWhiteSpace(elevenLabsKey))
         {
