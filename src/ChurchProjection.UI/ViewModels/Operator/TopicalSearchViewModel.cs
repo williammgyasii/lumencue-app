@@ -29,6 +29,7 @@ public class TopicalSearchViewModel : ViewModelBase
     private ContentItem? _selectedDetectedItem;
     private bool _hasResults;
     private bool _hasDetected;
+    private double _cardWidth = OperatorWorkspaceChrome.ScriptureCardMinWidth;
 
     public string Translation { get; set; } = "BSB";
 
@@ -76,6 +77,20 @@ public class TopicalSearchViewModel : ViewModelBase
     }
 
     public ObservableCollection<ContentItem> Results { get; } = [];
+
+    /// <summary>One third of the Find Scripture list, same formula as the Scripture tab.</summary>
+    public double CardWidth
+    {
+        get => _cardWidth;
+        private set => this.RaiseAndSetIfChanged(ref _cardWidth, value);
+    }
+
+    public void SetCardPaneWidth(double paneWidth)
+    {
+        CardWidth = OperatorWorkspaceChrome.ScriptureCardWidth(paneWidth);
+        foreach (var item in Results)
+            item.CardWidth = CardWidth;
+    }
 
     /// <summary>Verses auto-detected from the preacher paraphrasing scripture. Separate from the
     /// operator's manual <see cref="Results"/> so live detection never clobbers a manual search.</summary>
@@ -166,6 +181,7 @@ public class TopicalSearchViewModel : ViewModelBase
                     Tag = p.Translation,
                     Footer = $"{p.Reference} ({p.Translation})",
                     Source = p,
+                    CardWidth = CardWidth,
                 });
             }
 

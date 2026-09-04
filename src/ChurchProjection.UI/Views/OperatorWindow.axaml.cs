@@ -76,10 +76,16 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
     }
 
     private void OnOperatorWindowSizeChanged(object? sender, SizeChangedEventArgs e)
-        => ApplyScriptureCardWidths();
+    {
+        ApplyScriptureCardWidths();
+        ApplyFindScriptureCardWidths();
+    }
 
     private void OnContentListSizeChanged(object? sender, SizeChangedEventArgs e)
         => ApplyScriptureCardWidths();
+
+    private void OnTopicalListSizeChanged(object? sender, SizeChangedEventArgs e)
+        => ApplyFindScriptureCardWidths();
 
     private void ApplyScriptureCardWidths()
     {
@@ -87,6 +93,14 @@ public partial class OperatorWindow : ReactiveWindow<OperatorViewModel>
         var width = ContentListBox.Bounds.Width;
         if (width <= 0) return;
         vm.ContentSearch.SetCardPaneWidth(width);
+    }
+
+    private void ApplyFindScriptureCardWidths()
+    {
+        if (DataContext is not OperatorViewModel vm || TopicalListBox is null) return;
+        var width = TopicalListBox.Bounds.Width;
+        if (width <= 0) return;
+        vm.TopicalSearch.SetCardPaneWidth(width);
     }
 
     private static void ApplyProgramPreviewHeight(Grid host, double railWidth, double railHeight)

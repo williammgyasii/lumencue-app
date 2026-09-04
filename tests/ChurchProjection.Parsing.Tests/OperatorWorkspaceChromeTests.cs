@@ -113,6 +113,16 @@ public class OperatorWorkspaceChromeTests
     }
 
     [Fact]
+    public void Find_scripture_cards_hug_and_wrap_like_the_scripture_grid()
+    {
+        Assert.True(OperatorWorkspaceChrome.FindScriptureCardsHugContent);
+        Assert.True(OperatorWorkspaceChrome.FindScriptureUsesWrapPanel);
+        Assert.True(OperatorWorkspaceChrome.ScriptureCardsHugContent);
+        Assert.True(OperatorWorkspaceChrome.ScriptureUsesWrapPanel);
+        Assert.Equal(3, OperatorWorkspaceChrome.ScriptureGridColumns);
+    }
+
+    [Fact]
     public void Now_singing_cards_hug_content_instead_of_filling_the_pane()
     {
         Assert.True(OperatorWorkspaceChrome.NowSingingCardsHugContent);
