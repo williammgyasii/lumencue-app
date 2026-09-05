@@ -2874,8 +2874,8 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
             .Where(s => !string.IsNullOrEmpty(s))
             .Subscribe(s => StatusText = s);
 
-        // Pre-warm the local Bible cache so live scripture lookups hit SQLite instead of the network.
-        var cacheTask = CacheTranslationAsync(ContentSearch.SelectedTranslation);
+        // Pre-warm every picker Bible in the background. Selected first so live lookups hit SQLite.
+        var cacheTask = CachePickerTranslationsAsync();
 
         await ContentSearch.LoadAllContentAsync();
         await LoadLibrarySongsAsync();
@@ -2926,6 +2926,16 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         catch (Exception ex)
         {
             Log.Warning(ex, "Failed to evaluate What's New panel");
+        }
+    }
+
+    private async Task CachePickerTranslationsAsync()
+    {
+        foreach (var code in BibleCacheQueue.Order(
+                     ContentSearch.SelectedTranslation,
+                     ContentSearch.AvailableTranslations))
+        {
+            await CacheTranslationAsync(code);
         }
     }
 
