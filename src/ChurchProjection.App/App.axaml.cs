@@ -206,18 +206,21 @@ public class App : Application
             _desktop = desktop;
             desktop.ShutdownMode = Avalonia.Controls.ShutdownMode.OnLastWindowClose;
 
-            _ = Task.Run(async () =>
+            if (SemanticEmbeddingPolicy.LoadAtLaunch)
             {
-                try
+                _ = Task.Run(async () =>
                 {
-                    var embedding = _services.GetRequiredService<SemanticEmbeddingService>();
-                    await embedding.InitializeAsync();
-                }
-                catch (Exception ex)
-                {
-                    Log.Warning(ex, "Semantic embedding init failed (non-fatal)");
-                }
-            });
+                    try
+                    {
+                        var embedding = _services.GetRequiredService<SemanticEmbeddingService>();
+                        await embedding.InitializeAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warning(ex, "Semantic embedding init failed (non-fatal)");
+                    }
+                });
+            }
 
             splash?.SetStatus("Loading your library…");
             splash?.SetProgress(80);

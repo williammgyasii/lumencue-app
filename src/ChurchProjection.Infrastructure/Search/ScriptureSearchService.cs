@@ -67,6 +67,10 @@ public sealed class ScriptureSearchService : IScriptureSearchService
                 return;
             }
 
+            // Lazy MiniLM: ONNX stays off until Find Scripture actually indexes.
+            if (!_embeddings.IsReady)
+                await _embeddings.InitializeAsync().ConfigureAwait(false);
+
             // Try the on-disk embedding cache first.
             var loaded = TryLoadFromDisk(translation, verses);
             if (loaded is not null)
