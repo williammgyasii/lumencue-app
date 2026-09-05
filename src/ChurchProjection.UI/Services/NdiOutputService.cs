@@ -7,6 +7,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Threading;
 using ChurchProjection.Core.Models.Theme;
+using ChurchProjection.Core.Services;
 using ChurchProjection.UI.ViewModels;
 using ChurchProjection.UI.Views;
 using NewTek;
@@ -30,6 +31,7 @@ public sealed class NdiOutputService : INdiOutputService
     private static readonly object InitLock = new();
     private static int _ndiRefCount;
     private static bool _ndiInitialized;
+    private static bool _windowsResolverRegistered;
 
     private Sender? _sender;
     private VideoFrame? _videoFrame;
@@ -238,6 +240,8 @@ public sealed class NdiOutputService : INdiOutputService
                 return true;
             }
 
+            MapWindowsNdiLibrary();
+
             if (!NDIlib.initialize())
             {
                 throw new InvalidOperationException("NDIlib.initialize() returned false.");
@@ -259,5 +263,35 @@ public sealed class NdiOutputService : INdiOutputService
             NDIlib.destroy();
             _ndiInitialized = false;
         }
+    }
+
+    private static void MapWindowsNdiLibrary()
+    {
+        if (_windowsResolverRegistered || !OperatingSystem.IsWindows())
+            return;
+
+        _windowsResolverRegistered = true;
+
+        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        var path = NdiRuntimeLocator.FindWindowsLibrary(
+            Environment.GetEnvironmentVariable("NDI_RUNTIME_DIR_V6"),
+            Environment.GetEnvironmentVariable("NDI_RUNTIME_DIR_V5"),
+            Path.Combine(programFiles, "NDI", "NDI 6 Runtime", "v6"),
+            Path.Combine(programFiles, "NDI", "NDI 6 Tools", "Runtime"),
+            Path.Combine(programFiles, "NDI", "NDI 5 Runtime", "v5"),
+            Path.Combine(programFiles, "NDI", "NDI 5 Tools", "Runtime"),
+            AppContext.BaseDirectory);
+
+        if (path is null)
+            return;
+
+        NativeLibrary.SetDllImportResolver(typeof(NDIlib).Assembly, (name, _, _) =>
+        {
+            if (name.Equals("NDILib", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("Processing.NDI.Lib.x64", StringComparison.OrdinalIgnoreCase))
+                return NativeLibrary.Load(path);
+            return IntPtr.Zero;
+        });
+        Log.Information("NDI Windows runtime mapped from {Path}", path);
     }
 }
