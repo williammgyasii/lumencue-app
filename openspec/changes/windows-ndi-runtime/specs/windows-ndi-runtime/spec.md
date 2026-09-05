@@ -40,3 +40,12 @@ When a Windows library path is known, its directory MUST be first on the process
 
 - **WHEN** the locator has resolved a Windows library file
 - **THEN** that file’s directory is the first entry on PATH
+
+### Requirement: Probe does not steal the wrapper resolver
+
+Preparing the Windows runtime MUST NOT call `SetDllImportResolver`. The NDI wrapper owns that slot.
+
+#### Scenario: Second resolver is not set
+
+- **WHEN** Windows has found `Processing.NDI.Lib.x64.dll` and NDI is probed
+- **THEN** `NDIlib` does not throw `A resolver is already set for the assembly`

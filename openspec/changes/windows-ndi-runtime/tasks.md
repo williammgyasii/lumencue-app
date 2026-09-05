@@ -10,3 +10,7 @@
 
 - [x] 3.1 Add a failing test that the library directory is first on PATH. Verify it fails
 - [x] 3.2 Prepend PATH and preload the DLL; do not call `SetDllImportResolver`. Verify task 3.1 is green
+
+## 4. Windows VM check
+
+- [x] 4.1 Add `NdiWindowsProbeTests` plus a `windows-ndi` GitHub Actions job on `windows-latest`
