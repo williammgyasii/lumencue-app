@@ -78,9 +78,13 @@ public sealed class NdiOutputService : INdiOutputService
             // Avalonia only renders controls attached to a shown window; a bare Measure/Arrange yields black frames.
             _captureWindow = new Window
             {
-                Width = Width,
-                Height = Height,
-                ShowInTaskbar = false,
+                Width = NdiCaptureWindowChrome.Width,
+                Height = NdiCaptureWindowChrome.Height,
+                Opacity = NdiCaptureWindowChrome.Opacity,
+                ShowActivated = NdiCaptureWindowChrome.ShowActivated,
+                ShowInTaskbar = NdiCaptureWindowChrome.ShowInTaskbar,
+                IsHitTestVisible = NdiCaptureWindowChrome.IsHitTestVisible,
+                WindowState = NdiCaptureWindowChrome.IsMinimized ? WindowState.Minimized : WindowState.Normal,
                 SystemDecorations = SystemDecorations.None,
                 CanResize = false,
                 Background = Brushes.Black,
