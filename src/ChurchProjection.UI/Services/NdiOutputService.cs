@@ -24,8 +24,8 @@ public sealed class NdiOutputService : INdiOutputService
 {
     private const int Width = (int)Theme.CanvasWidth;
     private const int Height = (int)Theme.CanvasHeight;
-    private const int FpsNumerator = 30;
-    private const int FpsDenominator = 1;
+    private const int FpsNumerator = NdiCaptureWindowChrome.FpsNumerator;
+    private const int FpsDenominator = NdiCaptureWindowChrome.FpsDenominator;
     private const string DefaultSourceName = "LumenCue Program";
 
     private static readonly object InitLock = new();

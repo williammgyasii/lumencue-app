@@ -15,4 +15,6 @@ public static class NdiCaptureWindowChrome
     public const bool IsMinimized = false;
     public const double Width = Theme.CanvasWidth;
     public const double Height = Theme.CanvasHeight;
+    public const int FpsNumerator = 15;
+    public const int FpsDenominator = 1;
 }

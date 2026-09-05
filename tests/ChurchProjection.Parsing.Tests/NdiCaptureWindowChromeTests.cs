@@ -32,4 +32,12 @@ public class NdiCaptureWindowChromeTests
         Assert.Equal(Theme.CanvasHeight, NdiCaptureWindowChrome.Height);
         Assert.False(NdiCaptureWindowChrome.IsMinimized);
     }
+
+    [Fact]
+    public void Capture_runs_at_fifteen_frames_per_second()
+    {
+        Assert.Equal(15, NdiCaptureWindowChrome.FpsNumerator);
+        Assert.Equal(1, NdiCaptureWindowChrome.FpsDenominator);
+        Assert.True(NdiCaptureWindowChrome.FpsNumerator < 30);
+    }
 }
