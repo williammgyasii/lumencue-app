@@ -31,7 +31,7 @@ public sealed class NdiOutputService : INdiOutputService
     private static readonly object InitLock = new();
     private static int _ndiRefCount;
     private static bool _ndiInitialized;
-    private static bool _windowsResolverRegistered;
+    private static bool _windowsRuntimePrepared;
 
     private Sender? _sender;
     private VideoFrame? _videoFrame;
@@ -267,10 +267,10 @@ public sealed class NdiOutputService : INdiOutputService
 
     private static void MapWindowsNdiLibrary()
     {
-        if (_windowsResolverRegistered || !OperatingSystem.IsWindows())
+        if (_windowsRuntimePrepared || !OperatingSystem.IsWindows())
             return;
 
-        _windowsResolverRegistered = true;
+        _windowsRuntimePrepared = true;
 
         var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
         var path = NdiRuntimeLocator.FindWindowsLibrary(
@@ -285,13 +285,13 @@ public sealed class NdiOutputService : INdiOutputService
         if (path is null)
             return;
 
-        NativeLibrary.SetDllImportResolver(typeof(NDIlib).Assembly, (name, _, _) =>
-        {
-            if (name.Equals("NDILib", StringComparison.OrdinalIgnoreCase)
-                || name.Equals("Processing.NDI.Lib.x64", StringComparison.OrdinalIgnoreCase))
-                return NativeLibrary.Load(path);
-            return IntPtr.Zero;
-        });
-        Log.Information("NDI Windows runtime mapped from {Path}", path);
+        Environment.SetEnvironmentVariable(
+            "PATH",
+            NdiRuntimeLocator.WithLibraryDirectoryFirst(Environment.GetEnvironmentVariable("PATH"), path));
+
+        if (NativeLibrary.TryLoad(path, out _))
+            Log.Information("NDI Windows runtime mapped from {Path}", path);
+        else
+            Log.Warning("NDI Windows runtime found at {Path} but failed to load", path);
     }
 }

@@ -12,11 +12,11 @@ See proposal.md. `NDILibDotNetCoreBase` P/Invokes `NDILib`. NDI Tools/Runtime on
 
 1. **`NdiRuntimeLocator` in Core** — given env dirs and extra roots, return the first existing `Processing.NDI.Lib.x64.dll`. V6 before V5 before extra roots. Alternative: only env vars (misses a Tools install that did not write the variable).
 
-2. **`NativeLibrary.SetDllImportResolver` on the NDI wrapper assembly** — map `NDILib` to that full path. Alternative: copy/rename into the app folder at runtime (Velopack current is replaceable; writing there is fragile).
+2. **Put the runtime folder first on PATH and preload the DLL** — the wrapper’s own static ctor already `SetDllImportResolver` and `TryLoad("Processing.NDI.Lib.x64.dll")` by file name. A second resolver throws `A resolver is already set for the assembly`. Alternative: our own resolver (shipped in 0.7.31, broken on Windows).
 
 3. **Mac does not use the locator** — existing dylib next to the app stays.
 
 ## Risks / Trade-offs
 
 - [NDI Tools not installed] → Same as today: unavailable, install Tools. We do not download a redist.
-- [Resolver registered too late] → Register once, before the first `NDIlib.initialize()`.
+- [Wrapper already owns the resolver] → Never call `SetDllImportResolver` on that assembly. Prepend PATH and preload before `NDIlib.initialize()`.

@@ -23,6 +23,21 @@ public static class NdiRuntimeLocator
         return null;
     }
 
+    /// <summary>Puts the library's directory first on PATH so the NDI wrapper can load it by file name.</summary>
+    public static string WithLibraryDirectoryFirst(string? pathVariable, string libraryPath)
+    {
+        var dir = Path.GetDirectoryName(libraryPath);
+        if (string.IsNullOrEmpty(dir))
+            return pathVariable ?? "";
+
+        var current = pathVariable ?? "";
+        var parts = current.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length > 0 && string.Equals(parts[0], dir, StringComparison.OrdinalIgnoreCase))
+            return current;
+
+        return string.IsNullOrEmpty(current) ? dir : dir + Path.PathSeparator + current;
+    }
+
     private static IEnumerable<string> Candidates(
         string? runtimeDirV6,
         string? runtimeDirV5,

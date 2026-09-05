@@ -28,6 +28,17 @@ public class NdiRuntimeLocatorTests : IDisposable
     }
 
     [Fact]
+    public void Library_directory_leads_PATH()
+    {
+        var v6 = Plant("v6");
+        var library = Library(v6);
+
+        var path = NdiRuntimeLocator.WithLibraryDirectoryFirst("C:\\Windows\\System32", library);
+
+        Assert.StartsWith(v6 + Path.PathSeparator, path, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void No_runtime_on_disk_is_empty()
     {
         var empty = Path.Combine(_root, "empty");

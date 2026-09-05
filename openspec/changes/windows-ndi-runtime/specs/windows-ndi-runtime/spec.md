@@ -31,3 +31,12 @@ The locator MUST NOT return a path when the library file does not exist.
 
 - **WHEN** no candidate directory contains `Processing.NDI.Lib.x64.dll`
 - **THEN** the resolved library path is empty
+
+### Requirement: Runtime folder is first on PATH
+
+When a Windows library path is known, its directory MUST be first on the process PATH so the NDI wrapper can `TryLoad` `Processing.NDI.Lib.x64.dll` by file name.
+
+#### Scenario: Library directory leads PATH
+
+- **WHEN** the locator has resolved a Windows library file
+- **THEN** that file’s directory is the first entry on PATH
