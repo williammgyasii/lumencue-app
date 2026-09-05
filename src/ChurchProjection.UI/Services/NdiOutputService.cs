@@ -72,7 +72,7 @@ public sealed class NdiOutputService : INdiOutputService
 
         try
         {
-            _sender = new Sender(SourceName, clockVideo: true, clockAudio: false);
+            _sender = new Sender(SourceName, clockVideo: NdiCaptureWindowChrome.ClockVideo, clockAudio: false);
             _videoFrame = new VideoFrame(Width, Height, 16f / 9f, FpsNumerator, FpsDenominator);
 
             // Avalonia only renders controls attached to a shown window; a bare Measure/Arrange yields black frames.

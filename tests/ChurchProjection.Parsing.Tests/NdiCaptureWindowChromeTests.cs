@@ -40,4 +40,10 @@ public class NdiCaptureWindowChromeTests
         Assert.Equal(1, NdiCaptureWindowChrome.FpsDenominator);
         Assert.True(NdiCaptureWindowChrome.FpsNumerator < 30);
     }
+
+    [Fact]
+    public void Send_does_not_clock_video()
+    {
+        Assert.False(NdiCaptureWindowChrome.ClockVideo);
+    }
 }
