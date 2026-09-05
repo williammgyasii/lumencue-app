@@ -3,6 +3,7 @@
 // Runtime types generated with workerd@1.20260831.1 2026-09-02 nodejs_compat
 interface __BaseEnv_Env {
 	NEON_CONNECTION_STRING: string;
+	APIBIBLE_API_KEY: string;
 	LUMEN_CUE_API: DurableObjectNamespace<import("./workers/api/index").LumenCueApi>;
 }
 declare namespace Cloudflare {
@@ -17,7 +18,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "NEON_CONNECTION_STRING">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "NEON_CONNECTION_STRING" | "APIBIBLE_API_KEY">> {}
 }
 
 // Begin runtime types
