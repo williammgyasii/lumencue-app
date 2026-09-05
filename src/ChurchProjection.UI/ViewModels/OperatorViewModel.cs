@@ -2945,6 +2945,10 @@ public class OperatorViewModel : ViewModelBase, IActivatableViewModel
         {
             await _bibleCache.EnsureTranslationCachedAsync(translation);
 
+            // Prefetch downloads every picker Bible; only the selected one gets MiniLM indexing.
+            if (!BiblePrefetchIndex.ShouldIndex(translation, ContentSearch.SelectedTranslation))
+                return;
+
             // Build (or load) the topical search index for this translation in the background so the
             // "Find Scripture" tab can do semantic lookups. Keyword search works regardless.
             _ = Task.Run(() => _scriptureSearch.EnsureIndexedAsync(translation, _indexProgress));
