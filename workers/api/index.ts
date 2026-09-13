@@ -13,6 +13,7 @@ export class LumenCueApi extends Container<Env> {
     DOTNET_HOSTBUILDER__RELOADCONFIGONCHANGE: "false",
     NEON_CONNECTION_STRING: env.NEON_CONNECTION_STRING,
     APIBIBLE_API_KEY: env.APIBIBLE_API_KEY,
+    ELEVENLABS_API_KEY: env.ELEVENLABS_API_KEY,
   };
 
   override onStart(): void {

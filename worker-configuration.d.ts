@@ -4,6 +4,7 @@
 interface __BaseEnv_Env {
 	NEON_CONNECTION_STRING: string;
 	APIBIBLE_API_KEY: string;
+	ELEVENLABS_API_KEY: string;
 	LUMEN_CUE_API: DurableObjectNamespace<import("./workers/api/index").LumenCueApi>;
 }
 declare namespace Cloudflare {
@@ -18,7 +19,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "NEON_CONNECTION_STRING" | "APIBIBLE_API_KEY">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "NEON_CONNECTION_STRING" | "APIBIBLE_API_KEY" | "ELEVENLABS_API_KEY">> {}
 }
 
 // Begin runtime types
