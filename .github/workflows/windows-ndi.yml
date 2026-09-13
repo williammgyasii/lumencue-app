@@ -1,0 +1,28 @@
+name: windows-ndi
+
+# GitHub-hosted Windows VM. Catches the 0.7.31 "resolver already set" crash
+# without needing a local Parallels box.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "src/ChurchProjection.Core/Services/NdiRuntimeLocator.cs"
+      - "src/ChurchProjection.UI/Services/NdiOutputService.cs"
+      - "tests/ChurchProjection.Parsing.Tests/Ndi*.cs"
+      - ".github/workflows/windows-ndi.yml"
+
+jobs:
+  probe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: NDI locator and probe tests
+        run: >
+          dotnet test tests/ChurchProjection.Parsing.Tests/ChurchProjection.Parsing.Tests.csproj
+          --filter "FullyQualifiedName~Ndi"
+          --nologo -m:1

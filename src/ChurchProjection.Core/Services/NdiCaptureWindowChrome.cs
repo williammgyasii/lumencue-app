@@ -18,4 +18,5 @@ public static class NdiCaptureWindowChrome
     public const int FpsNumerator = 15;
     public const int FpsDenominator = 1;
     public const bool ClockVideo = false;
+    public const bool SkipUnchanged = true;
 }

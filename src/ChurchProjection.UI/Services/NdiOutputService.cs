@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
@@ -44,6 +45,8 @@ public sealed class NdiOutputService : INdiOutputService
     private DispatcherTimer? _timer;
     private string _sourceName = DefaultSourceName;
     private bool _running;
+    private ProjectorViewModel? _programFeed;
+    private NdiPaintGate _paintGate = new();
 
     public NdiOutputService()
     {
@@ -128,6 +131,10 @@ public sealed class NdiOutputService : INdiOutputService
             Log.Information("NDI capture pixel format {Format} (treat as RGBA: {Rgba})",
                 _captureBitmap.Format, _captureIsRgba);
 
+            _programFeed = programFeed;
+            _paintGate = new NdiPaintGate();
+            _programFeed.PropertyChanged += OnProgramFeedChanged;
+
             _timer = new DispatcherTimer(TimeSpan.FromMilliseconds(1000.0 / FpsNumerator), DispatcherPriority.Render, CaptureTick);
             _timer.Start();
             _running = true;
@@ -149,6 +156,10 @@ public sealed class NdiOutputService : INdiOutputService
         _running = false;
         _timer?.Stop();
         _timer = null;
+        if (_programFeed is not null)
+            _programFeed.PropertyChanged -= OnProgramFeedChanged;
+        _programFeed = null;
+        _paintGate = new NdiPaintGate();
         _captureWindow?.Close();
         _captureWindow = null;
         _captureRoot = null;
@@ -164,10 +175,21 @@ public sealed class NdiOutputService : INdiOutputService
 
     public void Dispose() => Stop();
 
+    private void OnProgramFeedChanged(object? sender, PropertyChangedEventArgs e) =>
+        _paintGate.NoteChanged();
+
     private void CaptureTick(object? sender, EventArgs e)
     {
         if (!_running || _captureRoot is null || _captureBitmap is null || _captureBuffer is null || _videoFrame is null || _sender is null)
             return;
+
+        if (!_paintGate.ShouldPaint(NdiCaptureWindowChrome.SkipUnchanged, motionLive: false))
+        {
+            if (_paintGate.SkipCount == 1 || _paintGate.SkipCount % 75 == 0)
+                Log.Information("NDI skip unchanged ({Painted} painted, {Skipped} skipped)",
+                    _paintGate.PaintCount, _paintGate.SkipCount);
+            return;
+        }
 
         try
         {
@@ -194,6 +216,10 @@ public sealed class NdiOutputService : INdiOutputService
             }
 
             _sender.Send(_videoFrame);
+            _paintGate.MarkPainted();
+            if (_paintGate.PaintCount <= NdiPaintGate.WarmupPaints || _paintGate.PaintCount % 15 == 0)
+                Log.Information("NDI painted frame {Painted} (skipped {Skipped})",
+                    _paintGate.PaintCount, _paintGate.SkipCount);
         }
         catch (Exception ex)
         {
