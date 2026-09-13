@@ -34,14 +34,38 @@ function isRetryableContainerError(error: unknown): boolean {
   );
 }
 
+function containerEnv(workerEnv: Env) {
+  return {
+    PORT: "8080",
+    ASPNETCORE_URLS: "http://0.0.0.0:8080",
+    ASPNETCORE_ENVIRONMENT: "Production",
+    DOTNET_HOSTBUILDER__RELOADCONFIGONCHANGE: "false",
+    NEON_CONNECTION_STRING: workerEnv.NEON_CONNECTION_STRING,
+    APIBIBLE_API_KEY: workerEnv.APIBIBLE_API_KEY,
+    ELEVENLABS_API_KEY: workerEnv.ELEVENLABS_API_KEY,
+  };
+}
+
 export default {
   async fetch(request: Request, workerEnv: Env): Promise<Response> {
+    const url = new URL(request.url);
+    if (url.pathname === "/worker-env") {
+      return Response.json({
+        elevenLabsBound: Boolean(workerEnv.ELEVENLABS_API_KEY),
+        apiBibleBound: Boolean(workerEnv.APIBIBLE_API_KEY),
+        neonBound: Boolean(workerEnv.NEON_CONNECTION_STRING),
+      });
+    }
+
     const stub = workerEnv.LUMEN_CUE_API.getByName("singleton");
+    const startOptions = { envVars: containerEnv(workerEnv) };
     try {
+      await stub.startAndWaitForPorts({ startOptions });
       return await stub.fetch(request);
     } catch (error) {
       if (!isRetryableContainerError(error)) throw error;
       try {
+        await stub.startAndWaitForPorts({ startOptions });
         return await stub.fetch(request);
       } catch (retryError) {
         const message = retryError instanceof Error ? retryError.message : String(retryError);
