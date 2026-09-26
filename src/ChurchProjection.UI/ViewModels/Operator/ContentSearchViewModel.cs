@@ -58,8 +58,7 @@ public class ContentSearchViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _selectedTranslation, value);
     }
 
-    public ObservableCollection<string> AvailableTranslations { get; } =
-        ["BSB", "KJV", "NIV", "NKJV", "NLT", "ASV", "LSV", "WEB", "FBV", "DRA", "GNV", "RV", "T4T"];
+    public ObservableCollection<string> AvailableTranslations { get; } = new(BiblePickerTranslations.OfferedCodes);
 
     public ObservableCollection<ContentItem> Results { get; } = [];
 

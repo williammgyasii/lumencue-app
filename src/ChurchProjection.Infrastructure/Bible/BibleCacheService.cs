@@ -24,47 +24,17 @@ public class BibleCacheService
     private readonly ConcurrentDictionary<string, bool> _activeDownloads = new();
     private readonly SemaphoreSlim _dbWriteLock;
 
-    private ConcurrentDictionary<string, string> _freeApiTranslations = new(StringComparer.OrdinalIgnoreCase);
+    private ConcurrentDictionary<string, string> _freeApiTranslations = FallbackCatalog();
 
-    /// <summary>
-    /// The curated set of translations offered in the UI, in display order. KJV/BSB are public
-    /// domain (served free); the rest are copyrighted and resolved through the API.Bible Pro plan.
-    /// </summary>
-    private static readonly (string Code, string Name)[] CuratedTranslations =
-    [
-        ("KJV", "King James Version"),
-        ("NIV", "New International Version"),
-        ("NKJV", "New King James Version"),
-        ("NLT", "New Living Translation"),
-        ("MSG", "The Message"),
-        ("AMP", "Amplified Bible"),
-        ("CSB", "Christian Standard Bible"),
-    ];
-
-    /// <summary>
-    /// Custom translations we host ourselves as static JSON (not available from the public or premium
-    /// Bible APIs). The app downloads each file once and caches it into local SQLite, exactly like the
-    /// other translations, after which it works fully offline. Add a new hosted Bible by importing it
-    /// (tools/BibleImporter) and adding a row here.
-    /// </summary>
-    private static readonly (string Code, string Name, string Url)[] CustomTranslations =
-    [
-        ("TPT", "The Passion Translation",
-            "https://raw.githubusercontent.com/williammgyasii/lumencue-releases/main/bibles/translations/TPT.json"),
-        ("TLB", "The Living Bible",
-            "https://raw.githubusercontent.com/williammgyasii/lumencue-releases/main/bibles/translations/TLB.json"),
-        ("AMPC", "Amplified Bible, Classic Edition",
-            "https://raw.githubusercontent.com/williammgyasii/lumencue-releases/main/bibles/translations/AMPC.json"),
-        ("ESV", "English Standard Version",
-            "https://raw.githubusercontent.com/williammgyasii/lumencue-releases/main/bibles/translations/ESV.json"),
-        ("GNT", "Good News Translation",
-            "https://raw.githubusercontent.com/williammgyasii/lumencue-releases/main/bibles/translations/GNT.json"),
-        ("ASV", "American Standard Version",
-            "https://raw.githubusercontent.com/williammgyasii/lumencue-releases/main/bibles/translations/ASV.json"),
-    ];
+    private static ConcurrentDictionary<string, string> FallbackCatalog()
+    {
+        var map = new ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        BiblePickerTranslations.ApplyAliases(map);
+        return map;
+    }
 
     private static (string Code, string Name, string Url)? FindCustom(string translation) =>
-        CustomTranslations
+        BiblePickerTranslations.Hosted
             .Cast<(string Code, string Name, string Url)?>()
             .FirstOrDefault(c => string.Equals(c!.Value.Code, translation, StringComparison.OrdinalIgnoreCase));
 
@@ -105,30 +75,23 @@ public class BibleCacheService
                 newMap[shortName] = id;
             }
 
+            BiblePickerTranslations.ApplyAliases(newMap);
             _freeApiTranslations = newMap;
-            Log.Information("Loaded {Count} English translations from bible.helloao.org; offering {Curated} curated picks",
-                newMap.Count, CuratedTranslations.Length);
+            Log.Information("Loaded {Count} English translations from bible.helloao.org; offering {Offered} picker codes",
+                newMap.Count, BiblePickerTranslations.OfferedCodes.Count);
             return OfferedTranslations();
         }
         catch (Exception ex)
         {
             Log.Warning(ex, "Failed to load available translations, using defaults");
-            _freeApiTranslations = new ConcurrentDictionary<string, string>(
-                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-                {
-                    ["BSB"] = "BSB",
-                    ["KJV"] = "eng_kjv",
-                });
+            _freeApiTranslations = FallbackCatalog();
             return OfferedTranslations();
         }
     }
 
-    /// <summary>The translations surfaced in the UI: the curated API-backed picks plus our own hosted
-    /// custom translations.</summary>
+    /// <summary>The translations surfaced in the UI: helloao booth codes plus hosted JSON.</summary>
     private static List<(string Id, string Name)> OfferedTranslations() =>
-        CuratedTranslations.Select(c => (c.Code, c.Name))
-            .Concat(CustomTranslations.Select(c => (c.Code, c.Name)))
-            .ToList();
+        BiblePickerTranslations.Offered.ToList();
 
     public bool CanBulkCache(string translation) =>
         _freeApiTranslations.ContainsKey(translation) || FindCustom(translation) is not null;

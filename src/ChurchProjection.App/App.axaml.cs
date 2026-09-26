@@ -83,22 +83,9 @@ public class App : Application
         services.AddSingleton<BibleCacheService>();
         services.AddSingleton<FreeBibleApiClient>(sp =>
             new FreeBibleApiClient(sp.GetRequiredService<BibleCacheService>()));
-        // Premium translations come through the cloud API's /bible/ proxy (api.bible key stays
-        // server-side); the seat token authenticates each request.
-        ApiBibleClient? apiBibleClient = null;
-        if (!string.IsNullOrWhiteSpace(cloudApiBaseUrl))
-        {
-            var bibleHttp = new HttpClient(new SeatAuthHandler(seatTokens, new HttpClientHandler()))
-            {
-                BaseAddress = new Uri(cloudApiBaseUrl.TrimEnd('/') + "/bible/"),
-                Timeout = TimeSpan.FromSeconds(25),
-            };
-            apiBibleClient = new ApiBibleClient(bibleHttp);
-        }
-        if (apiBibleClient is not null)
-            services.AddSingleton(apiBibleClient);
+        // Booth Bibles come from helloao + hosted JSON (cached once). API.Bible is unwired.
         services.AddSingleton<IBibleApiService>(sp =>
-            new CombinedBibleService(sp.GetRequiredService<FreeBibleApiClient>(), apiBibleClient));
+            new CombinedBibleService(sp.GetRequiredService<FreeBibleApiClient>()));
         // Tenancy / cloud sign-in + song sync. The hosted HTTP API is the single source of truth:
         // it keeps every DB/provider credential server-side and enforces seats, hardware binding and
         // entitlements. When no API is configured we refuse sign-in rather than accept anything

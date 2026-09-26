@@ -16,6 +16,17 @@ public class ContentSearchTranslationTests
     }
 
     [Fact]
+    public void Seed_includes_KJV_and_BSB_and_excludes_paid_codes()
+    {
+        var search = new ContentSearchViewModel(new FakeLibrary());
+
+        Assert.Contains("KJV", search.AvailableTranslations);
+        Assert.Contains("BSB", search.AvailableTranslations);
+        Assert.DoesNotContain("NIV", search.AvailableTranslations);
+        Assert.DoesNotContain("MSG", search.AvailableTranslations);
+    }
+
+    [Fact]
     public async Task ChangingTranslation_KeepsTheChapterVerseCards()
     {
         var library = new FakeLibrary();

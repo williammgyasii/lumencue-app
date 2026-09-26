@@ -13,16 +13,8 @@ public class FreeBibleApiClient : IBibleApiService
     private readonly HttpClient _http = BibleHttpClients.Helloao;
     private readonly BibleCacheService? _cacheService;
 
-    private static readonly Dictionary<string, string> FallbackTranslationIds = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["BSB"] = "BSB",
-        ["KJV"] = "eng_kjv",
-        ["ASV"] = "eng_asv",
-        ["WEB"] = "ENGWEBP",
-        ["NET"] = "eng_net",
-        ["YLT"] = "eng_ylt",
-        ["LSV"] = "eng_lsv",
-    };
+    private static IReadOnlyDictionary<string, string> FallbackTranslationIds =>
+        BiblePickerTranslations.Aliases;
 
     public FreeBibleApiClient(BibleCacheService? cacheService = null)
     {
