@@ -77,21 +77,33 @@ public class BibleCacheService
 
             BiblePickerTranslations.ApplyAliases(newMap);
             _freeApiTranslations = newMap;
+            var picker = await OfferedTranslationsAsync().ConfigureAwait(false);
             Log.Information("Loaded {Count} English translations from bible.helloao.org; offering {Offered} picker codes",
-                newMap.Count, BiblePickerTranslations.OfferedCodes.Count);
-            return OfferedTranslations();
+                newMap.Count, picker.Count);
+            return picker;
         }
         catch (Exception ex)
         {
             Log.Warning(ex, "Failed to load available translations, using defaults");
             _freeApiTranslations = FallbackCatalog();
-            return OfferedTranslations();
+            return await OfferedTranslationsAsync().ConfigureAwait(false);
         }
     }
 
-    /// <summary>The translations surfaced in the UI: helloao booth codes plus hosted JSON.</summary>
-    private static List<(string Id, string Name)> OfferedTranslations() =>
-        BiblePickerTranslations.Offered.ToList();
+    /// <summary>Helloao + hosted JSON, plus any translation already finished in local SQLite.</summary>
+    private async Task<List<(string Id, string Name)>> OfferedTranslationsAsync()
+    {
+        var complete = await ListCompleteCachedAsync().ConfigureAwait(false);
+        return BiblePickerTranslations.WithCached(complete).ToList();
+    }
+
+    private async Task<IReadOnlyList<string>> ListCompleteCachedAsync()
+    {
+        await using var conn = _db.GetConnection();
+        var rows = await conn.QueryAsync<string>(
+            "SELECT translation FROM bible_cache_status WHERE is_complete = 1");
+        return rows.AsList();
+    }
 
     public bool CanBulkCache(string translation) =>
         _freeApiTranslations.ContainsKey(translation) || FindCustom(translation) is not null;

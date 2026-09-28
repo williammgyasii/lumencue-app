@@ -42,4 +42,28 @@ public class BiblePickerTranslationsTests
         Assert.True(BiblePickerTranslations.CanBulkCache(catalog, "KJV"));
         Assert.True(BiblePickerTranslations.CanBulkCache(catalog, "NET"));
     }
+
+    [Fact]
+    public void WithCached_adds_complete_NIV_NLT_AMP()
+    {
+        var picker = BiblePickerTranslations.WithCached(["NIV", "NLT", "AMP"]);
+        var codes = picker.Select(p => p.Code).ToList();
+
+        Assert.Contains("NIV", codes);
+        Assert.Contains("NLT", codes);
+        Assert.Contains("AMP", codes);
+        Assert.Contains("KJV", codes);
+        Assert.Contains("BSB", codes);
+        Assert.Equal("New International Version", picker.Single(p => p.Code == "NIV").Name);
+    }
+
+    [Fact]
+    public void WithCached_adds_nothing_when_paid_cache_is_empty()
+    {
+        var codes = BiblePickerTranslations.WithCached([]).Select(p => p.Code).ToList();
+
+        Assert.DoesNotContain("NIV", codes);
+        Assert.DoesNotContain("NLT", codes);
+        Assert.DoesNotContain("AMP", codes);
+    }
 }

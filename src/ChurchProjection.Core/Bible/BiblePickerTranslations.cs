@@ -36,6 +36,33 @@ public static class BiblePickerTranslations
     public static IReadOnlyList<string> OfferedCodes =>
         Offered.Select(o => o.Code).ToList();
 
+    /// <summary>Names for translations a booth may still have on disk after we stopped offering them.</summary>
+    public static readonly IReadOnlyDictionary<string, string> CachedNames =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["NIV"] = "New International Version",
+            ["NKJV"] = "New King James Version",
+            ["NLT"] = "New Living Translation",
+            ["MSG"] = "The Message",
+            ["AMP"] = "Amplified Bible",
+            ["CSB"] = "Christian Standard Bible",
+        };
+
+    public static IReadOnlyList<(string Code, string Name)> WithCached(IEnumerable<string> completeCodes)
+    {
+        var offered = Offered.ToList();
+        var seen = new HashSet<string>(offered.Select(o => o.Code), StringComparer.OrdinalIgnoreCase);
+        foreach (var code in completeCodes)
+        {
+            if (string.IsNullOrWhiteSpace(code) || !seen.Add(code))
+                continue;
+            var name = CachedNames.TryGetValue(code, out var known) ? known : code;
+            offered.Add((code, name));
+        }
+
+        return offered;
+    }
+
     /// <summary>
     /// Helloao catalog short names are KJAV / NETB. Booth codes stay KJV / NET.
     /// </summary>
